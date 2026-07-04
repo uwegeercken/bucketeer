@@ -27,3 +27,9 @@ replay_pid*
 /target/classes/application.yml
 /target/classes/messages.properties
 /target/classes/messages_de.properties
+/.idea/.gitignore
+/.idea/compiler.xml
+/.idea/encodings.xml
+/.idea/jarRepositories.xml
+/.idea/misc.xml
+/.idea/vcs.xml
