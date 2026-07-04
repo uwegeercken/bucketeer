@@ -109,9 +109,9 @@
                            th:value="${prefix}"
                            oninput="updateResolvedPrefix()"/>
                     <div class="placeholder-hint">
-                        <span th:text="#{label.availablePlaceholders}">Placeholders:</span>
-                        <span th:each="p,i : ${availablePlaceholders}">
-                            <code th:text="'{' + ${p} + '}'"></code><span th:if="${!i.last}">, </span>
+                        <span th:text="#{label.availableFunctions}">Functions:</span>
+                        <span th:each="p,i : ${availableFunctions}">
+                            <code th:text="'{' + ${p} + '(...)}'"></code><span th:if="${!i.last}">, </span>
                         </span>
                     </div>
                     <div class="resolved-prefix" id="resolvedPrefix"
@@ -252,12 +252,12 @@
             return;
         }
         container.innerHTML = list.map(fav => {
-            const safeName   = escHtml(fav.name);
-            const safeTitle  = escHtml((fav.server || '') + ' / ' + (fav.bucket || '') + ' / ' + (fav.prefix || ''));
-            const jsonName   = JSON.stringify(fav.name);
+            const safeName  = escHtml(fav.name);
+            const safeTitle = escHtml((fav.server || '') + ' / ' + (fav.bucket || '') + ' / ' + (fav.prefix || ''));
+            const safeKey   = escHtml(fav.name);  // used as data attribute - safe
             return `<span class="fav-pill" title="${safeTitle}">
-                        <span onclick="applyFavorite(${jsonName})">${safeName}</span>
-                        <span class="del" onclick="deleteFavorite(${jsonName})">&times;</span>
+                        <span class="fav-apply" data-fav="${safeKey}">${safeName}</span>
+                        <span class="del fav-delete" data-fav="${safeKey}">&times;</span>
                     </span>`;
         }).join('');
     }
@@ -278,6 +278,14 @@
     document.addEventListener('DOMContentLoaded', () => {
         renderFavorites();
         updateResolvedPrefix();
+
+        // event delegation for favorites - avoids inline onclick with arguments
+        document.getElementById('favoritePills').addEventListener('click', e => {
+            const applyEl  = e.target.closest('.fav-apply');
+            const deleteEl = e.target.closest('.fav-delete');
+            if (applyEl)  applyFavorite(applyEl.dataset.fav);
+            if (deleteEl) deleteFavorite(deleteEl.dataset.fav);
+        });
     });
 </script>
 </body>
