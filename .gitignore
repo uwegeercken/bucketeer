@@ -22,3 +22,8 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+/target/classes/META-INF/spring-configuration-metadata.json
+/target/classes/templates/index.html
+/target/classes/application.yml
+/target/classes/messages.properties
+/target/classes/messages_de.properties

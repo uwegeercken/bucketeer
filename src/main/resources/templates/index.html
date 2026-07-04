@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="#{app.title}">Bucketeer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+    <style>
+        body { background-color: #f0f2f5; }
+        .panel {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+        }
+        .panel-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6c757d;
+            margin-bottom: 0.6rem;
+        }
+        .fav-pill {
+            font-size: 0.78rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 1rem;
+            border: 1px solid #adb5bd;
+            background: #f8f9fa;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            white-space: nowrap;
+        }
+        .fav-pill:hover { background: #e9ecef; }
+        .fav-pill .del { color: #adb5bd; font-size: 0.9rem; line-height:1; }
+        .fav-pill .del:hover { color: #dc3545; }
+        .resolved-prefix {
+            font-size: 0.78rem;
+            color: #0d6efd;
+            font-family: monospace;
+            margin-top: 0.25rem;
+            min-height: 1.1rem;
+        }
+        .placeholder-hint { font-size: 0.75rem; color: #6c757d; margin-top: 0.2rem; }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark bg-dark mb-3">
+    <div class="container-fluid">
+        <span class="navbar-brand fw-bold" th:text="#{app.title}">Bucketeer</span>
+        <form method="post" action="/session/server" class="d-flex align-items-center gap-2">
+            <label class="text-secondary small" th:text="#{label.server}">Server</label>
+            <select name="serverName" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                <option th:each="s : ${serverNames}"
+                        th:value="${s}"
+                        th:text="${s}"
+                        th:selected="${s == selectedServer}">
+                </option>
+            </select>
+        </form>
+    </div>
+</nav>
+
+<div class="container-fluid px-4">
+
+    <!-- Error -->
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show py-2" role="alert">
+        <strong>Fehler:</strong> <span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Favorites -->
+    <div class="panel">
+        <div class="panel-title" th:text="#{nav.favorites}">Favorites</div>
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <div id="favoritePills" class="d-flex flex-wrap gap-1 flex-grow-1"></div>
+            <div class="d-flex align-items-center gap-1 ms-auto flex-shrink-0">
+                <input type="text" id="favoriteName" class="form-control form-control-sm"
+                       style="width:150px"
+                       th:placeholder="#{placeholder.favoriteName}"/>
+                <button class="btn btn-sm btn-outline-primary"
+                        onclick="addFavorite()"
+                        th:text="#{btn.addFavorite}">+</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="panel">
+        <div class="panel-title" th:text="#{nav.search}">Search</div>
+        <form method="get" action="/" id="searchForm">
+            <input type="hidden" name="search" value="true"/>
+            <div class="row g-2 align-items-start">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" th:text="#{label.bucket}">Bucket</label>
+                    <input type="text" name="bucket" id="bucketInput"
+                           class="form-control form-control-sm font-monospace"
+                           th:value="${bucket}"/>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold" th:text="#{label.prefix}">Prefix</label>
+                    <input type="text" name="prefix" id="prefixInput"
+                           class="form-control form-control-sm font-monospace"
+                           th:value="${prefix}"
+                           oninput="updateResolvedPrefix()"/>
+                    <div class="placeholder-hint">
+                        <span th:text="#{label.availablePlaceholders}">Placeholders:</span>
+                        <span th:each="p,i : ${availablePlaceholders}">
+                            <code th:text="'{' + ${p} + '}'"></code><span th:if="${!i.last}">, </span>
+                        </span>
+                    </div>
+                    <div class="resolved-prefix" id="resolvedPrefix"
+                         th:text="${resolvedPrefix}"></div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" th:text="#{label.key}">Key</label>
+                    <input type="text" name="key" id="keyInput"
+                           class="form-control form-control-sm font-monospace"
+                           th:value="${key}"
+                           oninput="updateResolvedPrefix()"/>
+                </div>
+            </div>
+            <div class="mt-3 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary"
+                        th:text="#{label.search}">Suche</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="clearForm()"
+                        th:text="#{btn.clear}">Leeren</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results -->
+    <div class="panel" th:if="${listing != null}">
+        <div class="panel-title" th:text="#{nav.results}">Results</div>
+
+        <div th:if="${listing.objects.isEmpty()}" class="text-muted small"
+             th:text="#{msg.noObjects}">No objects found.</div>
+
+        <table th:if="${!listing.objects.isEmpty()}"
+               class="table table-sm table-hover table-bordered mb-2">
+            <thead class="table-secondary">
+            <tr>
+                <th th:text="#{label.objectKey}">Key</th>
+                <th class="text-end" style="width:110px" th:text="#{label.size}">Size</th>
+                <th style="width:210px" th:text="#{label.lastModified}">Last Modified</th>
+                <th style="width:90px"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="obj : ${listing.objects}">
+                <td th:text="${obj.key}" class="text-break small font-monospace"></td>
+                <td th:text="${obj.sizeBytes}" class="text-end small"></td>
+                <td th:text="${obj.lastModified}" class="small"></td>
+                <td>
+                    <a th:href="@{/download(bucket=${bucket},key=${obj.key})}"
+                       class="btn btn-sm btn-outline-secondary"
+                       th:text="#{label.download}">Download</a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <div th:if="${listing.truncated}" class="d-flex align-items-center gap-2">
+            <span class="text-muted small" th:text="#{msg.truncated}">More available.</span>
+            <a th:href="@{/(bucket=${bucket},prefix=${prefix},key=${key},token=${listing.nextContinuationToken},search=true)}"
+               class="btn btn-sm btn-outline-primary"
+               th:text="#{btn.next}">Next page</a>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    const currentServer = /*[[${selectedServer}]]*/ '';
+    const STORAGE_KEY   = 'bucketeer_favorites';
+
+    // --- Prefix template preview ---
+
+    function updateResolvedPrefix() {
+        const prefix = document.getElementById('prefixInput').value;
+        const key    = document.getElementById('keyInput').value;
+        if (!prefix) { document.getElementById('resolvedPrefix').textContent = ''; return; }
+        fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(key))
+            .then(r => r.text())
+            .then(resolved => { document.getElementById('resolvedPrefix').textContent = resolved; })
+            .catch(() => {});
+    }
+
+    // --- Favorites ---
+
+    function loadFavorites() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+        catch { return []; }
+    }
+
+    function saveFavorites(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+
+    function addFavorite() {
+        const name = document.getElementById('favoriteName').value.trim();
+        if (!name) return;
+        const fav = {
+            name,
+            server: currentServer || '',
+            bucket: document.getElementById('bucketInput').value,
+            prefix: document.getElementById('prefixInput').value,
+            key:    document.getElementById('keyInput').value
+        };
+        const list = loadFavorites();
+        const idx  = list.findIndex(f => f.name === name);
+        if (idx >= 0) list[idx] = fav; else list.push(fav);
+        saveFavorites(list);
+        document.getElementById('favoriteName').value = '';
+        renderFavorites();
+    }
+
+    function applyFavorite(name) {
+        const fav = loadFavorites().find(f => f.name === name);
+        if (!fav) return;
+        if (fav.server && fav.server !== currentServer) {
+            const form = document.createElement('form');
+            form.method = 'POST'; form.action = '/session/server';
+            const inp  = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'serverName'; inp.value = fav.server;
+            form.appendChild(inp); document.body.appendChild(form); form.submit();
+            return;
+        }
+        document.getElementById('bucketInput').value = fav.bucket || '';
+        document.getElementById('prefixInput').value = fav.prefix || '';
+        document.getElementById('keyInput').value    = fav.key    || '';
+        updateResolvedPrefix();
+    }
+
+    function deleteFavorite(name) {
+        saveFavorites(loadFavorites().filter(f => f.name !== name));
+        renderFavorites();
+    }
+
+    function renderFavorites() {
+        const list      = loadFavorites();
+        const container = document.getElementById('favoritePills');
+        if (list.length === 0) {
+            container.innerHTML = '<span class="text-muted small fst-italic" id="noFavMsg"></span>';
+            const el = document.getElementById('noFavMsg');
+            if (el) el.textContent = /*[[#{msg.noFavorites}]]*/ 'No favorites yet.';
+            return;
+        }
+        container.innerHTML = list.map(fav => {
+            const safeName   = escHtml(fav.name);
+            const safeTitle  = escHtml((fav.server || '') + ' / ' + (fav.bucket || '') + ' / ' + (fav.prefix || ''));
+            const jsonName   = JSON.stringify(fav.name);
+            return `<span class="fav-pill" title="${safeTitle}">
+                        <span onclick="applyFavorite(${jsonName})">${safeName}</span>
+                        <span class="del" onclick="deleteFavorite(${jsonName})">&times;</span>
+                    </span>`;
+        }).join('');
+    }
+
+    function escHtml(s) {
+        return String(s)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function clearForm() {
+        ['bucketInput','prefixInput','keyInput'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('resolvedPrefix').textContent = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderFavorites();
+        updateResolvedPrefix();
+    });
+</script>
+</body>
+</html>
