@@ -45,7 +45,7 @@ segment1/{functionName(ref, arg1, arg2)}/segment3/
 ```
 
 - A **literal** segment is used as-is: `myprefix`, `2024`, `ABCDEFGH`
-- A **placeholder** is wrapped in `{ }`: `{shortenedKey(key)}`
+- A **placeholder** is wrapped in `{ }`: `{everyNth(key, 0, 2)}`
 - Use `\{` to include a literal `{` in the path
 
 ### References
@@ -65,7 +65,7 @@ Inside a function call, the first argument is a **reference**:
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `shortenedKey(ref)` | 1 ref | Characters at index 0, 2, 4, … |
+| `everyNth(ref, start, step)` | 1 ref + 2 args | Characters at index start, start+step, start+2*step, … |
 | `left(ref, n)` | 1 ref + 1 arg | First `n` characters; truncates if shorter |
 | `right(ref, n)` | 1 ref + 1 arg | Last `n` characters; truncates if shorter |
 | `substring(ref, start, len)` | 1 ref + 2 args | From `start` (0-based), length `len`; truncates if needed |
@@ -84,6 +84,28 @@ A `*` at the end of the **Key** field performs a prefix search:
 - Key `ABCDE*` → lists all objects whose key starts with `ABCDE` under the resolved prefix
 - Only trailing wildcards are supported (S3 native prefix listing)
 
+### Function chaining
+
+Functions can be nested — the result of the inner function becomes the input of the outer:
+
+```
+{outer(inner(ref, args), outerArgs)}
+```
+
+The inner function is fully resolved first, then its result is passed as the reference to the outer function.
+Chaining is arbitrarily deep.
+
+Examples:
+```
+{upper(everyNth(key, 0, 2))}        → everyNth result in uppercase
+{lower(left(key, 5))}               → first 5 chars in lowercase
+{left(everyNth(key, 0, 2), 4)}      → everyNth result, first 4 chars
+{upper(everyNth(p3, 0, 2))}         → everyNth on a literal segment, uppercased
+```
+
+Note: `date` ignores its reference argument, so `{upper(date(yyyy/MM/dd))}` is valid
+but the `upper` has no meaningful effect on a date string containing only digits and separators.
+
 ---
 
 ## Examples
@@ -100,7 +122,7 @@ Lists all objects under that exact path.
 
 ### 2. Shortened key pattern
 ```
-Template:  myprefix/{shortenedKey(key)}/{key}/
+Template:  myprefix/{everyNth(key, 0, 2)}/{key}/
 Key:       MTIzLzQ1Ni83ODkvMDEy
 Result:    myprefix/MILQN8OkME/MTIzLzQ1Ni83ODkvMDEy/
 ```
@@ -111,7 +133,7 @@ Used for even distribution across S3 prefixes to avoid hotspots.
 
 ### 3. Shortened key from a literal segment
 ```
-Template:  myprefix/{shortenedKey(p3)}/ABCDEFGH/
+Template:  myprefix/{everyNth(p3, 0, 2)}/ABCDEFGH/
 Key:       (empty)
 Result:    myprefix/ACEG/ABCDEFGH/
 ```
@@ -121,7 +143,7 @@ Result:    myprefix/ACEG/ABCDEFGH/
 
 ### 4. Multiple functions on the same literal
 ```
-Template:  data/{left(p3, 4)}/{shortenedKey(p3)}/ABCDEFGH/
+Template:  data/{left(p3, 4)}/{everyNth(p3, 0, 2)}/ABCDEFGH/
 Key:       (empty)
 Result:    data/ABCD/ACEG/ABCDEFGH/
 ```
@@ -146,7 +168,7 @@ Result:    reports/2026/06/summary/
 
 ### 6. Combined date and key
 ```
-Template:  data/{date(yyyy/MM/dd)}/{shortenedKey(key)}/{key}/
+Template:  data/{date(yyyy/MM/dd)}/{everyNth(key, 0, 2)}/{key}/
 Key:       MTIzLzQ1Ni83ODkvMDEy
 Result:    data/2026/07/04/MILQN8OkME/MTIzLzQ1Ni83ODkvMDEy/
 ```
@@ -155,7 +177,7 @@ Result:    data/2026/07/04/MILQN8OkME/MTIzLzQ1Ni83ODkvMDEy/
 
 ### 7. Wildcard search
 ```
-Template:  myprefix/{shortenedKey(key)}/
+Template:  myprefix/{everyNth(key, 0, 2)}/
 Key:       ABCD*
 ```
 Lists all objects under `myprefix/<shortenedKey>/` whose key starts with `ABCD`.
