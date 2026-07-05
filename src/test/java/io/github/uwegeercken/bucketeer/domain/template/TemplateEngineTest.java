@@ -19,7 +19,7 @@ class TemplateEngineTest {
     void setUp() {
         TemplateParser parser = new TemplateParser();
         List<TemplateFunction> functions = List.of(
-                new ShortenedKeyFunction(),
+                new EveryNthCharFunction(),
                 new LeftFunction(),
                 new RightFunction(),
                 new SubstringFunction(),
@@ -57,9 +57,9 @@ class TemplateEngineTest {
     // --- Category 2: key reference ---
 
     @Test
-    @DisplayName("T04: shortenedKey(key) + key")
-    void t04_shortenedKeyAndKey() {
-        assertThat(engine.resolve("data/{shortenedKey(key)}/{key}/", "MTIzLzQ1Ni83ODkvMDEy"))
+    @DisplayName("T04: everyNth(key) + key")
+    void t04_everyNthAndKey() {
+        assertThat(engine.resolve("data/{everyNth(key, 0, 2)}/{key}/", "MTIzLzQ1Ni83ODkvMDEy"))
                 .isEqualTo("data/MILQN8OkME/MTIzLzQ1Ni83ODkvMDEy/");
     }
 
@@ -94,24 +94,24 @@ class TemplateEngineTest {
     // --- Category 3: pN reference on literal ---
 
     @Test
-    @DisplayName("T09: shortenedKey(p3) where p3 is literal")
-    void t09_shortenedKeyP3() {
-        assertThat(engine.resolve("data/{shortenedKey(p3)}/ABCDEFGH/", null))
+    @DisplayName("T09: everyNth(p3) where p3 is literal")
+    void t09_everyNthP3() {
+        assertThat(engine.resolve("data/{everyNth(p3, 0, 2)}/ABCDEFGH/", null))
                 .isEqualTo("data/ACEG/ABCDEFGH/");
     }
 
     @Test
-    @DisplayName("T10: left(p3,4) and shortenedKey(p3) both on same literal")
+    @DisplayName("T10: left(p3,4) and everyNth(p3) both on same literal")
     void t10_leftAndShortenedKeyP3() {
-        assertThat(engine.resolve("data/{left(p3, 4)}/{shortenedKey(p3)}/ABCDEFGH/", null))
+        assertThat(engine.resolve("data/{left(p3, 4)}/{everyNth(p3, 0, 2)}/ABCDEFGH/", null))
                 .isEqualTo("data/ABCD/ACEG/ABCDEFGH/");
     }
 
     @Test
-    @DisplayName("T11: date + shortenedKey(p2) where p2 is literal")
+    @DisplayName("T11: date + everyNth(p2) where p2 is literal")
     void t11_dateAndShortenedKeyP2() {
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-        assertThat(engine.resolve("{date(yyyy/MM/dd)}/{shortenedKey(p3)}/ABCDEFGH/", null))
+        assertThat(engine.resolve("{date(yyyy/MM/dd)}/{everyNth(p3, 0, 2)}/ABCDEFGH/", null))
                 .isEqualTo(today + "/ACEG/ABCDEFGH/");
     }
 
@@ -155,8 +155,8 @@ class TemplateEngineTest {
     @DisplayName("T16: key with wildcard - template resolves normally, wildcard stripped for prefix")
     void t16_wildcardInKey() {
         // the engine resolves the template; wildcard handling is the controller's responsibility
-        // key with wildcard: shortenedKey strips the '*' as it's just another char - document this behaviour
-        String result = engine.resolve("data/{shortenedKey(key)}/{key}/", "ABCDE*");
+        // key with wildcard: everyNth strips the '*' as it's just another char - document this behaviour
+        String result = engine.resolve("data/{everyNth(key, 0, 2)}/{key}/", "ABCDE*");
         assertThat(result).isEqualTo("data/AD*/ABCDE*/");
     }
 
@@ -188,7 +188,7 @@ class TemplateEngineTest {
     @Test
     @DisplayName("T20: pN references itself (function call at same position) → TemplateParseException")
     void t20_selfReference() {
-        assertThatThrownBy(() -> engine.resolve("data/{shortenedKey(p2)}/{key}/", "abc"))
+        assertThatThrownBy(() -> engine.resolve("data/{everyNth(p2, 0, 2)}/{key}/", "abc"))
                 .isInstanceOf(TemplateParseException.class)
                 .hasMessageContaining("not-yet-resolved");
     }
@@ -196,7 +196,7 @@ class TemplateEngineTest {
     @Test
     @DisplayName("T21: pN out of range → TemplateParseException")
     void t21_outOfRange() {
-        assertThatThrownBy(() -> engine.resolve("data/{shortenedKey(p99)}/ABCDEFGH/", null))
+        assertThatThrownBy(() -> engine.resolve("data/{everyNth(p99)}/ABCDEFGH/", null))
                 .isInstanceOf(TemplateParseException.class)
                 .hasMessageContaining("out of range");
     }
@@ -256,7 +256,7 @@ class TemplateEngineTest {
     @Test
     @DisplayName("validate returns empty list for valid template")
     void validateValid() {
-        assertThat(engine.validate("data/{shortenedKey(key)}/{key}/")).isEmpty();
+        assertThat(engine.validate("data/{everyNth(key, 0, 2)}/{key}/")).isEmpty();
     }
 
     @Test

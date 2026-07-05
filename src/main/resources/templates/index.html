@@ -143,20 +143,21 @@
              th:text="#{msg.noObjects}">No objects found.</div>
 
         <table th:if="${!listing.objects.isEmpty()}"
-               class="table table-sm table-hover table-bordered mb-2">
+               class="table table-sm table-hover table-bordered mb-2"
+               style="font-size: 0.875rem;">
             <thead class="table-secondary">
             <tr>
-                <th th:text="#{label.objectKey}">Key</th>
-                <th class="text-end" style="width:110px" th:text="#{label.size}">Size</th>
+                <th th:text="#{label.objectName}">Name</th>
+                <th class="text-end" style="width:110px" th:text="#{label.size}">Size (KB)</th>
                 <th style="width:210px" th:text="#{label.lastModified}">Last Modified</th>
                 <th style="width:90px"></th>
             </tr>
             </thead>
             <tbody>
             <tr th:each="obj : ${listing.objects}">
-                <td th:text="${obj.key}" class="text-break small font-monospace"></td>
-                <td th:text="${obj.sizeBytes}" class="text-end small"></td>
-                <td th:text="${obj.lastModified}" class="small"></td>
+                <td th:text="${obj.key}" class="text-break font-monospace"></td>
+                <td th:text="${#numbers.formatDecimal(obj.sizeBytes / 1024.0, 1, 2)}" class="text-end"></td>
+                <td th:text="${obj.lastModified}"></td>
                 <td>
                     <a th:href="@{/download(bucket=${bucket},key=${obj.key})}"
                        class="btn btn-sm btn-outline-secondary"

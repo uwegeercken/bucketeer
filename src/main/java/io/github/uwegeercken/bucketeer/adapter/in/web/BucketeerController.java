@@ -62,17 +62,22 @@ public class BucketeerController {
             String resolvedPrefix = bucketeerUseCase.resolveTemplate(prefix, key);
             model.addAttribute("resolvedPrefix", resolvedPrefix);
 
+            // ensure prefix ends with slash before appending key
+            String normalizedPrefix = StringUtils.hasText(resolvedPrefix) && !resolvedPrefix.endsWith("/")
+                    ? resolvedPrefix + "/"
+                    : resolvedPrefix;
+
             // determine the effective S3 prefix and optional key filter
-            String s3Prefix = resolvedPrefix;
+            String s3Prefix = normalizedPrefix;
             String keyFilter = null;
 
             if (StringUtils.hasText(key)) {
                 if (key.endsWith("*")) {
                     // wildcard: use key prefix as additional S3 prefix
-                    s3Prefix = resolvedPrefix + key.substring(0, key.length() - 1);
+                    s3Prefix = normalizedPrefix + key.substring(0, key.length() - 1);
                 } else {
                     // exact key: append full key to prefix for precise listing
-                    s3Prefix = resolvedPrefix + key;
+                    s3Prefix = normalizedPrefix + key;
                     keyFilter = key;
                 }
             }
@@ -81,7 +86,7 @@ public class BucketeerController {
 
             // for exact key: filter client-side to only matching object
             if (keyFilter != null) {
-                String finalKeyFilter = resolvedPrefix + keyFilter;
+                String finalKeyFilter = normalizedPrefix + keyFilter;
                 listing = listing.withObjects(
                         listing.objects().stream()
                                 .filter(obj -> obj.key().equals(finalKeyFilter))
