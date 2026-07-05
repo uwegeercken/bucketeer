@@ -7,7 +7,7 @@ import java.util.List;
  *
  * A segment is either:
  *   - LITERAL  : a plain string, e.g. "myprefix" or "ABCDEFGH"
- *   - FUNCTION : a placeholder with a function call, e.g. {shortenedKey(p3)}
+ *   - FUNCTION : a placeholder with a function call, e.g. {upper(everyNth(key, 0, 2))}
  */
 public sealed interface Segment {
 
@@ -19,6 +19,6 @@ public sealed interface Segment {
     record FunctionCall(
             int position,
             String functionName,
-            List<String> arguments   // each argument is "key", "p1".."pN", or a literal param
+            List<Argument> arguments
     ) implements Segment {}
 }

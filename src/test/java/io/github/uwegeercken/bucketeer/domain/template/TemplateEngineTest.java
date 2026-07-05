@@ -265,4 +265,58 @@ class TemplateEngineTest {
         assertThat(engine.validate("data/{foo(key)}/{bar(key)}/"))
                 .containsExactlyInAnyOrder("foo", "bar");
     }
+
+    // --- Category 7: function chaining ---
+
+    @Test
+    @DisplayName("T24: upper(everyNth(key, 0, 2)) - chain two functions")
+    void t24_upperEveryNth() {
+        assertThat(engine.resolve("data/{upper(everyNth(key, 0, 2))}/", "abcdefgh"))
+                .isEqualTo("data/ACEG/");
+    }
+
+    @Test
+    @DisplayName("T25: lower(left(key, 5)) - chain left then lower")
+    void t25_lowerLeft() {
+        assertThat(engine.resolve("data/{lower(left(key, 5))}/", "ABCDEFGH"))
+                .isEqualTo("data/abcde/");
+    }
+
+    @Test
+    @DisplayName("T26: left(everyNth(key, 0, 2), 4) - chain everyNth then left")
+    void t26_leftEveryNth() {
+        assertThat(engine.resolve("data/{left(everyNth(key, 0, 2), 4)}/", "ABCDEFGHIJ"))
+                .isEqualTo("data/ACEG/");
+    }
+
+    @Test
+    @DisplayName("T27: upper(date(yyyy/MM/dd)) - chain date then upper")
+    void t27_upperDate() {
+        // date returns e.g. "2026/07/04" - upper has no effect on digits/slashes
+        String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        assertThat(engine.resolve("data/{upper(date(yyyy/MM/dd))}/", null))
+                .isEqualTo("data/" + today + "/");
+    }
+
+    @Test
+    @DisplayName("T28: upper(everyNth(p3, 0, 2)) where p3 is literal")
+    void t28_upperEveryNthP3() {
+        assertThat(engine.resolve("data/{upper(everyNth(p3, 0, 2))}/abcdefgh/", null))
+                .isEqualTo("data/ACEG/abcdefgh/");
+    }
+
+    @Test
+    @DisplayName("T29: unknown nested function → TemplateParseException")
+    void t29_unknownNestedFunction() {
+        assertThatThrownBy(() -> engine.resolve("data/{upper(unknownFn(key))}/", "abc"))
+                .isInstanceOf(TemplateParseException.class)
+                .hasMessageContaining("unknownFn");
+    }
+
+    @Test
+    @DisplayName("validate detects unknown function in nested call")
+    void validateNestedUnknown() {
+        assertThat(engine.validate("data/{upper(unknownFn(key))}/"))
+                .containsExactly("unknownFn");
+    }
 }
