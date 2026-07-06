@@ -73,22 +73,22 @@ class TemplateEngineTest {
     @Test
     @DisplayName("T06: left(key, 4)")
     void t06_leftKey() {
-        assertThat(engine.resolve("data/{left(key, 4)}/{key}/", "ABCDEFGH"))
-                .isEqualTo("data/ABCD/ABCDEFGH/");
+        assertThat(engine.resolve("data/{left(key, 4)}/", "ABCDEFGH"))
+                .isEqualTo("data/ABCD/");
     }
 
     @Test
     @DisplayName("T07: right(key, 3)")
     void t07_rightKey() {
-        assertThat(engine.resolve("data/{right(key, 3)}/{key}/", "ABCDEFGH"))
-                .isEqualTo("data/FGH/ABCDEFGH/");
+        assertThat(engine.resolve("data/{right(key, 3)}/", "ABCDEFGH"))
+                .isEqualTo("data/FGH/");
     }
 
     @Test
     @DisplayName("T08: substring(key, 2, 4)")
     void t08_substringKey() {
-        assertThat(engine.resolve("data/{substring(key, 2, 4)}/{key}/", "ABCDEFGH"))
-                .isEqualTo("data/CDEF/ABCDEFGH/");
+        assertThat(engine.resolve("data/{substring(key, 2, 4)}/", "ABCDEFGH"))
+                .isEqualTo("data/CDEF/");
     }
 
     // --- Category 3: pN reference on literal ---
@@ -103,7 +103,7 @@ class TemplateEngineTest {
     @Test
     @DisplayName("T10: left(p3,4) and everyNth(p3) both on same literal")
     void t10_leftAndShortenedKeyP3() {
-        assertThat(engine.resolve("data/{left(p3, 4)}/{everyNth(p3, 0, 2)}/ABCDEFGH/", null))
+        assertThat(engine.resolve("data/{left(p4, 4)}/{everyNth(p4, 0, 2)}/ABCDEFGH/", null))
                 .isEqualTo("data/ABCD/ACEG/ABCDEFGH/");
     }
 
@@ -156,7 +156,7 @@ class TemplateEngineTest {
     void t16_wildcardInKey() {
         // the engine resolves the template; wildcard handling is the controller's responsibility
         // key with wildcard: everyNth strips the '*' as it's just another char - document this behaviour
-        String result = engine.resolve("data/{everyNth(key, 0, 2)}/{key}/", "ABCDE*");
+        String result = engine.resolve("data/{everyNth(key, 0, 2)}/", "ABCDE*");
         assertThat(result).isEqualTo("data/AD*/ABCDE*/");
     }
 

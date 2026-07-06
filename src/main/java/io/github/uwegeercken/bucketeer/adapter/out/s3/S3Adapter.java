@@ -4,11 +4,20 @@ import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import org.springframework.stereotype.Component;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.InputStream;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 
@@ -67,5 +76,42 @@ public class S3Adapter implements S3StoragePort {
             throw new IllegalArgumentException("Unknown S3 server: " + serverName);
         }
         return client;
+    }
+
+    private S3Client buildClient() throws NoSuchAlgorithmException, KeyManagementException
+    {
+        TrustManager[] trustAll = new TrustManager[]{
+                new X509TrustManager()
+                {
+                    @Override
+                    public void checkClientTrusted(X509Certificate[] chain, String authType)
+                    {
+                    }
+
+                    @Override
+                    public void checkServerTrusted(X509Certificate[] chain, String authType)
+                    {
+                    }
+
+                    @Override
+                    public X509Certificate[] getAcceptedIssuers()
+                    {
+                        return new X509Certificate[0];
+                    }
+                }
+        };
+
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(null, trustAll, new SecureRandom());
+
+        return S3Client.builder()
+                .region(region)
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .httpClientBuilder(
+                        NettyNioAsyncHttpClient.builder()
+                                .sslContext(sslContext)
+                                .hostnameVerifier((hostname, session) -> true) // nur Test
+                )
+                .build();
     }
 }

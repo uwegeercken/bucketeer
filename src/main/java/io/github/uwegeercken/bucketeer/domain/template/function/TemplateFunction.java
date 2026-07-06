@@ -15,11 +15,20 @@ import java.util.List;
  */
 public interface TemplateFunction {
 
-    /** Function name as used in the template, e.g. "shortenedKey", "left", "date". */
+    /** Function name as used in the template, e.g. "left", "date". */
     String name();
 
     /** Expected number of arguments (excluding the resolved reference value). */
     int expectedArgCount();
+
+    /** Short human-readable description shown on the help page. */
+    default String description() { return ""; }
+
+    /**
+     * Usage examples shown on the help page.
+     * Each entry is a complete placeholder expression, e.g. "{left(key, 4)}".
+     */
+    default List<String> examples() { return List.of(); }
 
     /**
      * Applies the function.
