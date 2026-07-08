@@ -4,57 +4,41 @@ import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import org.springframework.stereotype.Component;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
-import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.io.InputStream;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.util.List;
-import java.util.Map;
 
 @Component
 public class S3Adapter implements S3StoragePort {
 
-    private final Map<String, S3Client> s3Clients;
+    private final S3ClientRegistry registry;
 
-    public S3Adapter(Map<String, S3Client> s3Clients) {
-        this.s3Clients = s3Clients;
+    public S3Adapter(S3ClientRegistry registry) {
+        this.registry = registry;
     }
 
     @Override
     public List<String> serverNames() {
-        return List.copyOf(s3Clients.keySet());
+        return registry.serverNames();
     }
 
     @Override
     public ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken) {
-        ListObjectsV2Request.Builder requestBuilder = ListObjectsV2Request.builder()
+        S3Client client = registry.clientFor(serverName);
+
+        ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder()
                 .bucket(bucket)
                 .prefix(prefix != null ? prefix : "");
-
         if (continuationToken != null && !continuationToken.isBlank()) {
-            requestBuilder.continuationToken(continuationToken);
+            builder.continuationToken(continuationToken);
         }
 
-        ListObjectsV2Response response = clientFor(serverName).listObjectsV2(requestBuilder.build());
-
+        ListObjectsV2Response response = client.listObjectsV2(builder.build());
         List<S3Object> objects = response.contents().stream()
-                .map(obj -> new S3Object(
-                        obj.key(),
-                        bucket,
-                        obj.size(),
-                        obj.lastModified(),
-                        obj.eTag()
-                ))
+                .map(obj -> new S3Object(obj.key(), bucket, obj.size(), obj.lastModified(), obj.eTag()))
                 .toList();
 
         return new ObjectListing(objects, response.nextContinuationToken(), response.isTruncated());
@@ -62,56 +46,9 @@ public class S3Adapter implements S3StoragePort {
 
     @Override
     public InputStream downloadObject(String serverName, String bucket, String key) {
-        GetObjectRequest request = GetObjectRequest.builder()
-                .bucket(bucket)
-                .key(key)
-                .build();
-        ResponseInputStream<GetObjectResponse> response = clientFor(serverName).getObject(request);
+        S3Client client = registry.clientFor(serverName);
+        GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
+        ResponseInputStream<GetObjectResponse> response = client.getObject(request);
         return response;
-    }
-
-    private S3Client clientFor(String serverName) {
-        S3Client client = s3Clients.get(serverName);
-        if (client == null) {
-            throw new IllegalArgumentException("Unknown S3 server: " + serverName);
-        }
-        return client;
-    }
-
-    private S3Client buildClient() throws NoSuchAlgorithmException, KeyManagementException
-    {
-        TrustManager[] trustAll = new TrustManager[]{
-                new X509TrustManager()
-                {
-                    @Override
-                    public void checkClientTrusted(X509Certificate[] chain, String authType)
-                    {
-                    }
-
-                    @Override
-                    public void checkServerTrusted(X509Certificate[] chain, String authType)
-                    {
-                    }
-
-                    @Override
-                    public X509Certificate[] getAcceptedIssuers()
-                    {
-                        return new X509Certificate[0];
-                    }
-                }
-        };
-
-        SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(null, trustAll, new SecureRandom());
-
-        return S3Client.builder()
-                .region(region)
-                .credentialsProvider(DefaultCredentialsProvider.create())
-                .httpClientBuilder(
-                        NettyNioAsyncHttpClient.builder()
-                                .sslContext(sslContext)
-                                .hostnameVerifier((hostname, session) -> true) // nur Test
-                )
-                .build();
     }
 }

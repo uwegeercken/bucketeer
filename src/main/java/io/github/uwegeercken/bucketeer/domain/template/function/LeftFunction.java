@@ -8,11 +8,23 @@ import java.util.List;
 @Component
 public class LeftFunction implements TemplateFunction {
 
-    @Override
-    public String name() { return "left"; }
+    @Override public String name() { return "left"; }
+    @Override public int expectedArgCount() { return 1; }
 
     @Override
-    public int expectedArgCount() { return 1; }
+    public String description() {
+        return "Returns the first N characters of the input. " +
+               "If the input is shorter than N, the full input is returned.";
+    }
+
+    @Override
+    public List<String> examples() {
+        return List.of(
+                "{left(key, 4)}          → e.g. \"ABCDEFGH\" → \"ABCD\"",
+                "{left(p3, 3)}           → first 3 chars of segment 3",
+                "{left(everyNth(key, 0, 2), 4)} → chained: everyNth result, first 4 chars"
+        );
+    }
 
     @Override
     public String apply(String resolvedRef, List<String> args) {

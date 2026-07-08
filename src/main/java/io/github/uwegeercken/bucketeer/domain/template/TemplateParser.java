@@ -31,12 +31,33 @@ public class TemplateParser {
     public List<Segment> parse(String template) {
         if (template == null || template.isBlank()) return List.of();
 
-        String[] parts = template.split("/", -1);
+        List<String> parts = splitSegments(template);
         List<Segment> segments = new ArrayList<>();
-        for (int i = 0; i < parts.length; i++) {
-            segments.add(parseSegment(i + 1, parts[i]));
+        for (int i = 0; i < parts.size(); i++) {
+            segments.add(parseSegment(i + 1, parts.get(i)));
         }
         return List.copyOf(segments);
+    }
+
+    /**
+     * Splits the template at '/' characters that are outside of { } braces.
+     * Slashes inside placeholders (e.g. date patterns like yyyy/MM/dd) are not treated as separators.
+     */
+    private List<String> splitSegments(String template) {
+        List<String> parts = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < template.length(); i++) {
+            char c = template.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+            else if (c == '/' && depth == 0) {
+                parts.add(template.substring(start, i));
+                start = i + 1;
+            }
+        }
+        parts.add(template.substring(start));
+        return parts;
     }
 
     private Segment parseSegment(int position, String raw) {

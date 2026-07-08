@@ -8,11 +8,22 @@ import java.util.List;
 @Component
 public class RightFunction implements TemplateFunction {
 
-    @Override
-    public String name() { return "right"; }
+    @Override public String name() { return "right"; }
+    @Override public int expectedArgCount() { return 1; }
 
     @Override
-    public int expectedArgCount() { return 1; }
+    public String description() {
+        return "Returns the last N characters of the input. " +
+               "If the input is shorter than N, the full input is returned.";
+    }
+
+    @Override
+    public List<String> examples() {
+        return List.of(
+                "{right(key, 4)}         → e.g. \"ABCDEFGH\" → \"EFGH\"",
+                "{right(key, 3)}         → e.g. \"ABCDEFGH\" → \"FGH\""
+        );
+    }
 
     @Override
     public String apply(String resolvedRef, List<String> args) {

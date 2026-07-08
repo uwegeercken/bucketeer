@@ -8,11 +8,24 @@ import java.util.List;
 @Component
 public class SubstringFunction implements TemplateFunction {
 
-    @Override
-    public String name() { return "substring"; }
+    @Override public String name() { return "substring"; }
+    @Override public int expectedArgCount() { return 2; }
 
     @Override
-    public int expectedArgCount() { return 2; }
+    public String description() {
+        return "Returns a substring starting at position start (0-based) with the given length. " +
+               "Truncates if the input is shorter than start + length. " +
+               "Returns an empty string if start is beyond the end of the input.";
+    }
+
+    @Override
+    public List<String> examples() {
+        return List.of(
+                "{substring(key, 2, 4)}  → e.g. \"ABCDEFGH\" → \"CDEF\"",
+                "{substring(key, 0, 8)}  → e.g. \"ABCDEFGH\" → \"ABCDEFGH\"",
+                "{substring(key, 4, 100)}→ e.g. \"ABCDEFGH\" → \"EFGH\" (truncated)"
+        );
+    }
 
     @Override
     public String apply(String resolvedRef, List<String> args) {
