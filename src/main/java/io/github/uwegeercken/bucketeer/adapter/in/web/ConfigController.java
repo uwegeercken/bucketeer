@@ -20,6 +20,7 @@ public class ConfigController {
     @GetMapping
     public String list(Model model) {
         model.addAttribute("servers", configService.findAll());
+        model.addAttribute("backUrl", "/");
         return "config/list";
     }
 
@@ -27,6 +28,7 @@ public class ConfigController {
     public String newForm(Model model) {
         model.addAttribute("server", new ServerConfig("", "", "us-east-1", "", "", true));
         model.addAttribute("isNew", true);
+        model.addAttribute("backUrl", "/config");
         return "config/form";
     }
 
@@ -38,6 +40,7 @@ public class ConfigController {
                 .orElseThrow(() -> new IllegalArgumentException("Server not found: " + name));
         model.addAttribute("server", server);
         model.addAttribute("isNew", false);
+        model.addAttribute("backUrl", "/config");
         return "config/form";
     }
 

@@ -24,15 +24,21 @@ public class GlobalModelAdvice {
 
     @ModelAttribute("serverNames")
     public List<String> serverNames() {
-        return bucketeerUseCase.serverNames();
+        try {
+            return bucketeerUseCase.serverNames();
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     @ModelAttribute("selectedServer")
     public String selectedServer() {
-        List<String> names = bucketeerUseCase.serverNames();
-        if (sessionContext.getSelectedServer() == null && !names.isEmpty()) {
-            sessionContext.setSelectedServer(names.getFirst());
-        }
+        try {
+            List<String> names = bucketeerUseCase.serverNames();
+            if (sessionContext.getSelectedServer() == null && !names.isEmpty()) {
+                sessionContext.setSelectedServer(names.getFirst());
+            }
+        } catch (Exception ignored) {}
         return sessionContext.getSelectedServer();
     }
 

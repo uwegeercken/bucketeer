@@ -22,6 +22,7 @@ public class HelpController {
     @GetMapping("/help")
     public String help(Model model) {
         model.addAttribute("functions", functions);
+        model.addAttribute("backUrl", "/");
         return "help";
     }
 }

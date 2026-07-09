@@ -7,9 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
-
-import java.util.List;
 
 /**
  * Catches exceptions from page-rendering controllers and re-populates the model
@@ -22,11 +21,15 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private final BucketeerUseCase bucketeerUseCase;
-    private final SessionContext sessionContext;
 
-    public GlobalExceptionHandler(BucketeerUseCase bucketeerUseCase, SessionContext sessionContext) {
+    public GlobalExceptionHandler(BucketeerUseCase bucketeerUseCase) {
         this.bucketeerUseCase = bucketeerUseCase;
-        this.sessionContext   = sessionContext;
+    }
+
+    /** Let Spring handle missing static resources (e.g. favicon.ico) normally. */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public void handleNoResource(NoResourceFoundException ex) throws NoResourceFoundException {
+        throw ex;
     }
 
     @ExceptionHandler(S3Exception.class)
