@@ -51,18 +51,10 @@ public class GlobalExceptionHandler {
     private ModelAndView errorView(String message, HttpServletRequest request) {
         ModelAndView mav = new ModelAndView("index");
         mav.addObject("errorMessage", message);
-
-        // re-populate common model attributes so the page renders correctly
-        List<String> serverNames = bucketeerUseCase.serverNames();
-        mav.addObject("serverNames", serverNames);
-        mav.addObject("selectedServer", sessionContext.getSelectedServer());
         mav.addObject("availableFunctions", bucketeerUseCase.availableFunctions());
-
-        // preserve form field values from the original request
         mav.addObject("bucket", request.getParameter("bucket"));
         mav.addObject("prefix", request.getParameter("prefix"));
         mav.addObject("key",    request.getParameter("key"));
-
         return mav;
     }
 }

@@ -25,7 +25,7 @@ public class ConfigController {
 
     @GetMapping("/server/new")
     public String newForm(Model model) {
-        model.addAttribute("server", new ServerConfig("", "", "us-east-1", "", ""));
+        model.addAttribute("server", new ServerConfig("", "", "us-east-1", "", "", true));
         model.addAttribute("isNew", true);
         return "config/form";
     }
@@ -48,10 +48,12 @@ public class ConfigController {
             @RequestParam String region,
             @RequestParam String accessKey,
             @RequestParam String secretKey,
+            @RequestParam(defaultValue = "false") boolean verifyCertificate,
             @RequestParam(defaultValue = "false") boolean test,
             RedirectAttributes redirect) {
 
-        ServerConfig server = new ServerConfig(name, endpoint, region, accessKey, secretKey);
+        ServerConfig server = new ServerConfig(name, endpoint, region,
+                accessKey, secretKey, verifyCertificate);
 
         if (test) {
             String error = configService.saveAndTest(server);

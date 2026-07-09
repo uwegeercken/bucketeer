@@ -9,10 +9,12 @@ public record ServerConfig(
         String endpoint,
         String region,
         String accessKey,
-        String secretKey
+        String secretKey,
+        boolean verifyCertificate
 ) {
-    /** Returns a copy with masked credentials for display purposes. */
-    public ServerConfig withMaskedCredentials() {
-        return new ServerConfig(name, endpoint, region, "***", "***");
+    /** Default constructor with certificate verification enabled. */
+    public ServerConfig(String name, String endpoint, String region,
+                        String accessKey, String secretKey) {
+        this(name, endpoint, region, accessKey, secretKey, true);
     }
 }

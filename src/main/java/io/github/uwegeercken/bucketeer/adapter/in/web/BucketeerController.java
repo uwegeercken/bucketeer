@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 
 @Controller
 public class BucketeerController {
@@ -32,16 +31,6 @@ public class BucketeerController {
         this.sessionContext = sessionContext;
     }
 
-    private void populateCommonModel(Model model) {
-        List<String> serverNames = bucketeerUseCase.serverNames();
-        if (sessionContext.getSelectedServer() == null && !serverNames.isEmpty()) {
-            sessionContext.setSelectedServer(serverNames.getFirst());
-        }
-        model.addAttribute("serverNames", serverNames);
-        model.addAttribute("selectedServer", sessionContext.getSelectedServer());
-        model.addAttribute("availableFunctions", bucketeerUseCase.availableFunctions());
-    }
-
     @GetMapping("/")
     public String index(
             @RequestParam(required = false) String bucket,
@@ -51,9 +40,9 @@ public class BucketeerController {
             @RequestParam(required = false) Boolean search,
             Model model) {
 
-        populateCommonModel(model);
         String currentServer = sessionContext.getSelectedServer();
 
+        model.addAttribute("availableFunctions", bucketeerUseCase.availableFunctions());
         model.addAttribute("bucket", bucket);
         model.addAttribute("prefix", prefix);
         model.addAttribute("key", key);

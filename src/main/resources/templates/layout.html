@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+
+<!--
+  Shared layout fragments used by all pages.
+  Usage:
+    <nav th:replace="~{layout :: header}"></nav>
+    <footer th:replace="~{layout :: footer}"></footer>
+-->
+
+<!-- Header fragment -->
+<nav th:fragment="header" class="navbar navbar-dark bg-dark mb-3">
+    <div class="container-fluid">
+        <!-- Left: app name -->
+        <a class="navbar-brand fw-bold" href="/" th:text="#{app.title}">Bucketeer</a>
+
+        <!-- Center: server selector -->
+        <form method="post" action="/session/server"
+              class="d-flex align-items-center gap-2 mx-auto">
+            <label class="text-secondary small" th:text="#{label.server}">Server</label>
+            <select name="serverName" class="form-select form-select-sm w-auto"
+                    onchange="this.form.submit()"
+                    th:if="${serverNames != null and !serverNames.isEmpty()}">
+                <option th:each="s : ${serverNames}"
+                        th:value="${s}"
+                        th:text="${s}"
+                        th:selected="${s == selectedServer}">
+                </option>
+            </select>
+            <span th:if="${serverNames == null or serverNames.isEmpty()}"
+                  class="text-secondary small fst-italic"
+                  th:text="#{header.noServers}">No servers configured</span>
+        </form>
+
+        <!-- Right: nav links -->
+        <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-outline-light" href="/config" th:text="#{nav.config}">Configuration</a>
+            <a class="btn btn-sm btn-outline-light" href="/help" th:text="#{nav.help}">Help</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Footer fragment -->
+<footer th:fragment="footer" class="bg-dark text-secondary mt-4 py-2">
+    <div class="container-fluid px-4 d-flex justify-content-between align-items-center"
+         style="font-size:0.75rem;">
+        <span th:text="#{app.title}">Bucketeer</span>
+        <span>
+            <span th:text="#{footer.version}">Version</span>
+            <span th:text="${appVersion}"></span>
+            &nbsp;|&nbsp;
+            <span th:text="#{footer.released}">Released</span>
+            <span th:text="${appReleaseDate}"></span>
+        </span>
+    </div>
+</footer>
+
+</html>

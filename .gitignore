@@ -33,3 +33,7 @@ replay_pid*
 /.idea/jarRepositories.xml
 /.idea/misc.xml
 /.idea/vcs.xml
+/target/classes/templates/config/form.html
+/target/classes/templates/config/list.html
+/target/classes/templates/help.html
+/target/classes/templates/layout.html

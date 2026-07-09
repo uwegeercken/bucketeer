@@ -69,6 +69,12 @@
             <artifactId>netty-nio-client</artifactId>
             <version>${aws.sdk.version}</version>
         </dependency>
+        <!-- URL connection client - used for SSL certificate bypass -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
 
         <!-- Configuration processor for @ConfigurationProperties -->
         <dependency>

@@ -13,16 +13,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Persists server configurations as a JSON file in the user home directory.
- * Credentials are stored encrypted.
- *
- * File format:
- * [
- *   { "name": "...", "endpoint": "...", "region": "...", "accessKey": "<encrypted>", "secretKey": "<encrypted>" },
- *   ...
- * ]
- */
 @Repository
 public class ServerConfigRepository {
 
@@ -43,7 +33,6 @@ public class ServerConfigRepository {
         return Files.exists(configPath);
     }
 
-    /** Loads all servers. Credentials are decrypted before returning. */
     public List<ServerConfig> loadAll() {
         if (!Files.exists(configPath)) return List.of();
         try {
@@ -53,7 +42,8 @@ public class ServerConfigRepository {
                     .map(e -> new ServerConfig(
                             e.name(), e.endpoint(), e.region(),
                             encryptor.decrypt(e.accessKey()),
-                            encryptor.decrypt(e.secretKey())))
+                            encryptor.decrypt(e.secretKey()),
+                            e.verifyCertificate()))
                     .toList();
         } catch (IOException e) {
             log.error("Failed to load server config from {}: {}", configPath, e.getMessage(), e);
@@ -61,7 +51,6 @@ public class ServerConfigRepository {
         }
     }
 
-    /** Saves all servers. Credentials are encrypted before writing. */
     public void saveAll(List<ServerConfig> servers) {
         try {
             Files.createDirectories(configPath.getParent());
@@ -69,7 +58,8 @@ public class ServerConfigRepository {
                     .map(s -> new JsonServerEntry(
                             s.name(), s.endpoint(), s.region(),
                             encryptor.encrypt(s.accessKey()),
-                            encryptor.encrypt(s.secretKey())))
+                            encryptor.encrypt(s.secretKey()),
+                            s.verifyCertificate()))
                     .toList();
             mapper.writeValue(configPath.toFile(), entries);
             log.info("Saved {} server(s) to {}", servers.size(), configPath);
@@ -95,12 +85,12 @@ public class ServerConfigRepository {
         return loadAll().stream().anyMatch(s -> s.name().equals(name));
     }
 
-    // Internal JSON structure - matches file format exactly
     private record JsonServerEntry(
             String name,
             String endpoint,
             String region,
             String accessKey,
-            String secretKey
+            String secretKey,
+            boolean verifyCertificate
     ) {}
 }
