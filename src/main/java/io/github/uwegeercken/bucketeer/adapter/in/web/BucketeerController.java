@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 @Controller
 public class BucketeerController {
@@ -47,6 +48,13 @@ public class BucketeerController {
         model.addAttribute("prefix", prefix);
         model.addAttribute("key", key);
 
+        // build tooltip text listing all functions with syntax
+        String tooltipText = "<strong>Available functions:</strong><br/>" +
+                bucketeerUseCase.availableFunctions().stream()
+                        .map(f -> "<code>{" + f + "(ref, ...)}</code>")
+                        .collect(java.util.stream.Collectors.joining("<br/>"));
+        model.addAttribute("tooltipText", tooltipText);
+
         if (Boolean.TRUE.equals(search) && currentServer != null && StringUtils.hasText(bucket)) {
             String resolvedPrefix = bucketeerUseCase.resolveTemplate(prefix, key);
             model.addAttribute("resolvedPrefix", resolvedPrefix);
@@ -58,10 +66,11 @@ public class BucketeerController {
 
             // determine the effective S3 prefix and optional key filter
             String s3Prefix = normalizedPrefix;
-            String keyFilter = null;
+            String keyFilter;
 
             if (StringUtils.hasText(key)) {
                 if (key.endsWith("*")) {
+                    keyFilter = null;
                     // wildcard: use key prefix as additional S3 prefix
                     s3Prefix = normalizedPrefix + key.substring(0, key.length() - 1);
                 } else {
@@ -70,18 +79,20 @@ public class BucketeerController {
                     keyFilter = key;
                 }
             }
+            else
+            {
+                keyFilter = null;
+            }
 
             ObjectListing listing = bucketeerUseCase.listObjects(currentServer, bucket, s3Prefix, token);
 
-            // for exact key: filter client-side to only matching object
-            if (keyFilter != null) {
-                String finalKeyFilter = normalizedPrefix + keyFilter;
-                listing = listing.withObjects(
-                        listing.objects().stream()
-                                .filter(obj -> obj.key().equals(finalKeyFilter))
-                                .toList()
-                );
-            }
+            // filter out folder entries (keys ending with '/') and apply exact key filter
+            listing = listing.withObjects(
+                    listing.objects().stream()
+                            .filter(obj -> !obj.key().endsWith("/"))
+                            .filter(obj -> keyFilter == null || obj.key().equals(normalizedPrefix + keyFilter))
+                            .toList()
+            );
 
             model.addAttribute("listing", listing);
         }
@@ -108,8 +119,26 @@ public class BucketeerController {
         try {
             return bucketeerUseCase.resolveTemplate(prefix, key);
         } catch (Exception e) {
-            return "";  // incomplete placeholder – return empty, not an error page
+            return "";
         }
+    }
+
+    /**
+     * Validates a prefix template and returns JSON: { "valid": true/false, "error": "..." }
+     */
+    @GetMapping(value = "/api/validate-prefix", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public java.util.Map<String, Object> validatePrefix(
+            @RequestParam(required = false) String prefix) {
+        if (!StringUtils.hasText(prefix)) {
+            return java.util.Map.of("valid", true, "error", "");
+        }
+        List<String> unknown = bucketeerUseCase.validateTemplate(prefix);
+        if (unknown.isEmpty()) {
+            return java.util.Map.of("valid", true, "error", "");
+        }
+        return java.util.Map.of("valid", false, "error",
+                "Unknown function(s): " + String.join(", ", unknown));
     }
 
     @GetMapping("/download")

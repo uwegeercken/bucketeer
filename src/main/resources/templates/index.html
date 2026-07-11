@@ -44,10 +44,20 @@
                            class="form-control form-control-sm font-monospace" th:value="${bucket}"/>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small fw-semibold" th:text="#{label.prefix}">Prefix</label>
+                    <label class="form-label small fw-semibold">
+                        <span th:text="#{label.prefix}">Prefix</span>
+                        <span id="prefixTooltip"
+                              class="ms-1 text-muted"
+                              style="cursor:help; font-size:0.8rem;"
+                              data-bs-toggle="tooltip"
+                              data-bs-placement="top"
+                              data-bs-html="true"
+                              th:attr="title=${tooltipText}">&#9432;</span>
+                    </label>
                     <input type="text" name="prefix" id="prefixInput"
                            class="form-control form-control-sm font-monospace"
                            th:value="${prefix}" oninput="updateResolvedPrefix()"/>
+                    <div id="prefixError" class="text-danger small mt-1" style="display:none;"></div>
                     <div class="placeholder-hint">
                         <span th:text="#{label.availableFunctions}">Functions:</span>
                         <span th:each="p,i : ${availableFunctions}">
@@ -64,7 +74,7 @@
                 </div>
             </div>
             <div class="mt-3 d-flex gap-2">
-                <button type="submit" class="btn btn-sm btn-primary" th:text="#{label.search}">Search</button>
+                <button type="submit" id="searchBtn" class="btn btn-sm btn-primary" th:text="#{label.search}">Search</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary"
                         onclick="clearForm()" th:text="#{btn.clear}">Clear</button>
             </div>
@@ -116,10 +126,41 @@
     function updateResolvedPrefix() {
         const prefix = document.getElementById('prefixInput').value;
         const key    = document.getElementById('keyInput').value;
-        if (!prefix) { document.getElementById('resolvedPrefix').textContent = ''; return; }
-        fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(key))
-            .then(r => r.text())
-            .then(resolved => { document.getElementById('resolvedPrefix').textContent = resolved; })
+        const errorEl  = document.getElementById('prefixError');
+        const prefixEl = document.getElementById('prefixInput');
+        const searchBtn = document.getElementById('searchBtn');
+
+        if (!prefix) {
+            document.getElementById('resolvedPrefix').textContent = '';
+            errorEl.style.display = 'none';
+            prefixEl.classList.remove('is-invalid', 'is-valid');
+            searchBtn.disabled = false;
+            return;
+        }
+
+        // validate
+        fetch('/api/validate-prefix?prefix=' + encodeURIComponent(prefix))
+            .then(r => r.json())
+            .then(result => {
+                if (result.valid) {
+                    errorEl.style.display = 'none';
+                    prefixEl.classList.remove('is-invalid');
+                    prefixEl.classList.add('is-valid');
+                    searchBtn.disabled = false;
+                    // resolve preview
+                    fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(key))
+                        .then(r => r.text())
+                        .then(resolved => { document.getElementById('resolvedPrefix').textContent = resolved; })
+                        .catch(() => {});
+                } else {
+                    errorEl.textContent = result.error;
+                    errorEl.style.display = 'block';
+                    prefixEl.classList.add('is-invalid');
+                    prefixEl.classList.remove('is-valid');
+                    searchBtn.disabled = true;
+                    document.getElementById('resolvedPrefix').textContent = '';
+                }
+            })
             .catch(() => {});
     }
 
@@ -192,11 +233,18 @@
     function clearForm() {
         ['bucketInput','prefixInput','keyInput'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('resolvedPrefix').textContent = '';
+        document.getElementById('prefixError').style.display = 'none';
+        document.getElementById('prefixInput').classList.remove('is-invalid', 'is-valid');
+        document.getElementById('searchBtn').disabled = false;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         renderFavorites();
         updateResolvedPrefix();
+
+        // initialize Bootstrap tooltips
+        document.querySelectorAll('[data-bs-toggle="tooltip"]')
+            .forEach(el => new bootstrap.Tooltip(el));
         document.getElementById('favoritePills').addEventListener('click', e => {
             const applyEl  = e.target.closest('.fav-apply');
             const deleteEl = e.target.closest('.fav-delete');
