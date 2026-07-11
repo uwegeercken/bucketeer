@@ -18,18 +18,20 @@ Open [http://localhost:8080](http://localhost:8080).
 
 ```yaml
 bucketeer:
-  servers:
-    - name: "Local Minio"
-      endpoint: http://localhost:9000
-      region: us-east-1
-      access-key: ${S3_ACCESS_KEY:minioadmin}
-      secret-key: ${S3_SECRET_KEY:minioadmin}
-    - name: "StorageGRID Prod"
-      endpoint: https://storagegrid.intern:10443
-      region: us-east-1
-      access-key: ${S3_ACCESS_KEY_PROD}
-      secret-key: ${S3_SECRET_KEY_PROD}
+  version: "0.1.0"
+  release-date: "2026-07-08"
+  config:
+    encryption-key: ${BUCKETEER_ENCRYPTION_KEY:changeme-please-set-env-var}
 ```
+
+S3 servers are configured at runtime via the **Configuration** page (`/config`), not in `application.yml`.
+Server credentials are stored encrypted in `~/.bucketeer/servers.json`.
+
+> **Important:** Set the `BUCKETEER_ENCRYPTION_KEY` environment variable before first use:
+> ```bash
+> export BUCKETEER_ENCRYPTION_KEY=your-secret-key
+> java -jar target/bucketeer-0.1.0.jar
+> ```
 
 ---
 
@@ -120,13 +122,13 @@ Lists all objects under that exact path.
 
 ---
 
-### 2. Shortened key pattern
+### 2. everyNth key pattern
 ```
 Template:  myprefix/{everyNth(key, 0, 2)}/{key}/
 Key:       MTIzLzQ1Ni83ODkvMDEy
 Result:    myprefix/MILQN8OkME/MTIzLzQ1Ni83ODkvMDEy/
 ```
-`shortenedKey` takes every other character (index 0, 2, 4, …) of the key.
+`everyNth(key, 0, 2)` takes every other character (index 0, 2, 4, …) of the key.
 Used for even distribution across S3 prefixes to avoid hotspots.
 
 ---
@@ -180,7 +182,7 @@ Result:    data/2026/07/04/MILQN8OkME/MTIzLzQ1Ni83ODkvMDEy/
 Template:  myprefix/{everyNth(key, 0, 2)}/
 Key:       ABCD*
 ```
-Lists all objects under `myprefix/<shortenedKey>/` whose key starts with `ABCD`.
+Lists all objects under `myprefix/<everyNth result>/` whose key starts with `ABCD`.
 
 ---
 
