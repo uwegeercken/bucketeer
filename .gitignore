@@ -37,3 +37,4 @@ replay_pid*
 /target/classes/templates/config/list.html
 /target/classes/templates/help.html
 /target/classes/templates/layout.html
+/target/classes/static/css/bucketeer.css
