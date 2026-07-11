@@ -43,8 +43,12 @@
         <div class="d-flex gap-2">
             <a th:if="${backUrl != null}" th:href="${backUrl}"
                class="btn btn-sm btn-outline-light" th:text="#{nav.back}">← Back</a>
-            <a class="btn btn-sm btn-outline-light" href="/config" th:text="#{nav.config}">Configuration</a>
-            <a class="btn btn-sm btn-outline-light" href="/help" th:text="#{nav.help}">Help</a>
+            <a class="btn btn-sm btn-outline-light" href="/config"
+               onclick="if(typeof saveFormState==='function') saveFormState()"
+               th:text="#{nav.config}">Configuration</a>
+            <a class="btn btn-sm btn-outline-light" href="/help"
+               onclick="if(typeof saveFormState==='function') saveFormState()"
+               th:text="#{nav.help}">Help</a>
         </div>
     </div>
 </nav>

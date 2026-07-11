@@ -43,16 +43,9 @@
                     <input type="text" name="bucket" id="bucketInput"
                            class="form-control form-control-sm font-monospace" th:value="${bucket}"/>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <label class="form-label small fw-semibold">
                         <span th:text="#{label.prefix}">Prefix</span>
-                        <span id="prefixTooltip"
-                              class="ms-1 text-muted"
-                              style="cursor:help; font-size:0.8rem;"
-                              data-bs-toggle="tooltip"
-                              data-bs-placement="top"
-                              data-bs-html="true"
-                              th:attr="title=${tooltipText}">&#9432;</span>
                     </label>
                     <input type="text" name="prefix" id="prefixInput"
                            class="form-control form-control-sm font-monospace"
@@ -66,17 +59,17 @@
                     </div>
                     <div class="resolved-prefix" id="resolvedPrefix" th:text="${resolvedPrefix}"></div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-semibold" th:text="#{label.key}">Key</label>
                     <input type="text" name="key" id="keyInput"
                            class="form-control form-control-sm font-monospace"
                            th:value="${key}" oninput="updateResolvedPrefix()"/>
                 </div>
-            </div>
-            <div class="mt-3 d-flex gap-2">
-                <button type="submit" id="searchBtn" class="btn btn-sm btn-primary" th:text="#{label.search}">Search</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary"
-                        onclick="clearForm()" th:text="#{btn.clear}">Clear</button>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">&nbsp;</label>
+                    <button type="submit" id="searchBtn" class="btn btn-sm btn-primary w-100 d-block"
+                            th:text="#{label.search}">Search</button>
+                </div>
             </div>
         </form>
     </div>
@@ -219,9 +212,9 @@
             const safeName  = escHtml(fav.name);
             const safeTitle = escHtml((fav.server||'') + ' / ' + (fav.bucket||'') + ' / ' + (fav.prefix||''));
             const safeKey   = escHtml(fav.name);
-            return `<span class="fav-pill" title="${safeTitle}">
+            return `<span class="fav-pill" title="${safeTitle}" style="display:inline-flex;background:#e9ecef;border:1px solid #adb5bd;border-radius:1rem;padding:0.2rem 0.6rem;color:#495057;font-size:0.78rem;cursor:pointer;align-items:center;gap:0.35rem;white-space:nowrap;">
                         <span class="fav-apply" data-fav="${safeKey}">${safeName}</span>
-                        <span class="del fav-delete" data-fav="${safeKey}">&times;</span>
+                        <span class="del fav-delete" data-fav="${safeKey}" style="color:#adb5bd;font-size:0.9rem;line-height:1;">&times;</span>
                     </span>`;
         }).join('');
     }
@@ -230,8 +223,29 @@
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    function saveFormState() {
+        sessionStorage.setItem('bkt_bucket', document.getElementById('bucketInput').value);
+        sessionStorage.setItem('bkt_prefix', document.getElementById('prefixInput').value);
+        sessionStorage.setItem('bkt_key',    document.getElementById('keyInput').value);
+    }
+
+    function restoreFormState() {
+        const bucket = sessionStorage.getItem('bkt_bucket');
+        const prefix = sessionStorage.getItem('bkt_prefix');
+        const key    = sessionStorage.getItem('bkt_key');
+        if (bucket && !document.getElementById('bucketInput').value)
+            document.getElementById('bucketInput').value = bucket;
+        if (prefix && !document.getElementById('prefixInput').value)
+            document.getElementById('prefixInput').value = prefix;
+        if (key && !document.getElementById('keyInput').value)
+            document.getElementById('keyInput').value = key;
+    }
+
     function clearForm() {
         ['bucketInput','prefixInput','keyInput'].forEach(id => document.getElementById(id).value = '');
+        sessionStorage.removeItem('bkt_bucket');
+        sessionStorage.removeItem('bkt_prefix');
+        sessionStorage.removeItem('bkt_key');
         document.getElementById('resolvedPrefix').textContent = '';
         document.getElementById('prefixError').style.display = 'none';
         document.getElementById('prefixInput').classList.remove('is-invalid', 'is-valid');
@@ -239,12 +253,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        restoreFormState();
         renderFavorites();
         updateResolvedPrefix();
 
-        // initialize Bootstrap tooltips
-        document.querySelectorAll('[data-bs-toggle="tooltip"]')
-            .forEach(el => new bootstrap.Tooltip(el));
         document.getElementById('favoritePills').addEventListener('click', e => {
             const applyEl  = e.target.closest('.fav-apply');
             const deleteEl = e.target.closest('.fav-delete');
