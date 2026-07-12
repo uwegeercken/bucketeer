@@ -204,6 +204,78 @@ Click a favorite pill to pre-fill the form. Click `×` to delete it.
 
 ---
 
+## S3 Query and Result Filtering
+
+When a search is started, Bucketeer fetches **all matching objects** from S3 by paginating through all result pages. The results are cached in an in-memory [DuckDB](https://duckdb.org/) database for the duration of the session.
+
+Once loading is complete, the results can be filtered without additional S3 requests:
+
+| Filter | Description |
+|--------|-------------|
+| **Name contains** | Substring match on the object key |
+| **Size min / max (KB)** | Filter by object size in kilobytes |
+| **Date from / to** | Filter by last-modified date |
+
+Filters are applied instantly with a short debounce delay. Pagination (100 objects per page) is available for large result sets.
+
+A progress indicator shows how many objects have been found while S3 pagination is still running.
+
+---
+
+## Parquet Export
+
+After a query, the current filtered result set can be exported as a **Parquet file** using the **Export Parquet** button. The active filters are applied to the export — what you see is what you get.
+
+The exported file is named automatically:
+```
+bucketeer-<bucket>-yyyyMMdd_HHmmss.parquet
+```
+
+The Parquet file contains the following columns:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `key` | VARCHAR | S3 object key |
+| `bucket` | VARCHAR | Bucket name |
+| `size_bytes` | BIGINT | Object size in bytes |
+| `last_modified` | TIMESTAMP | Last modification time |
+| `etag` | VARCHAR | S3 ETag |
+
+The file can be used directly with DuckDB, DuckLake, or any other Parquet-compatible tool:
+
+```sql
+-- DuckDB example
+SELECT * FROM 'bucketeer-mybucket-20260712_143000.parquet';
+
+-- aggregate example
+SELECT bucket, COUNT(*) as count, SUM(size_bytes)/1024/1024 as total_mb
+FROM 'bucketeer-mybucket-20260712_143000.parquet'
+GROUP BY bucket;
+```
+
+---
+
+## S3 Server Configuration
+
+S3 servers are managed at runtime via the **Configuration** page (`/config`). No restart is required after adding, editing or deleting a server.
+
+Each server entry supports:
+
+| Field | Description |
+|-------|-------------|
+| **Name** | Display name used in the server dropdown |
+| **Endpoint** | S3-compatible endpoint URL, e.g. `http://localhost:9000` |
+| **Region** | AWS region string, e.g. `us-east-1` (required but ignored by most S3-compatible servers) |
+| **Access Key** | S3 access key |
+| **Secret Key** | S3 secret key |
+| **Verify Certificate** | Uncheck for HTTPS servers without a valid certificate (e.g. StorageGRID without cert) |
+
+After saving, a **Save & Test** option verifies the connection by listing buckets before confirming.
+
+Server credentials are stored encrypted in `~/.bucketeer/servers.json`.
+
+---
+
 ## Adding a new function
 
 1. Create a class implementing `TemplateFunction` in `domain/template/function/`
