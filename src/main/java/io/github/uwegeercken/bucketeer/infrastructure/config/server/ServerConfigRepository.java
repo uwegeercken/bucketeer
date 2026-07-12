@@ -45,6 +45,10 @@ public class ServerConfigRepository {
                             encryptor.decrypt(e.secretKey()),
                             e.verifyCertificate()))
                     .toList();
+        } catch (CredentialEncryptor.EncryptionException e) {
+            log.error("Failed to decrypt server credentials - encryption key may have changed. " +
+                    "Please re-enter credentials via /config: {}", e.getMessage());
+            return List.of();
         } catch (IOException e) {
             log.error("Failed to load server config from {}: {}", configPath, e.getMessage(), e);
             return List.of();

@@ -20,18 +20,27 @@ Open [http://localhost:8080](http://localhost:8080).
 bucketeer:
   version: "0.1.0"
   release-date: "2026-07-08"
-  config:
-    encryption-key: ${BUCKETEER_ENCRYPTION_KEY:changeme-please-set-env-var}
 ```
 
 S3 servers are configured at runtime via the **Configuration** page (`/config`), not in `application.yml`.
 Server credentials are stored encrypted in `~/.bucketeer/servers.json`.
 
-> **Important:** Set the `BUCKETEER_ENCRYPTION_KEY` environment variable before first use:
-> ```bash
-> export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-> java -jar target/bucketeer-0.1.0.jar
-> ```
+### Encryption key
+
+Bucketeer encrypts S3 credentials at rest. The encryption key is resolved in this order:
+
+1. **Environment variable** `BUCKETEER_ENCRYPTION_KEY` – use this for production or shared deployments
+2. **Key file** `~/.bucketeer/encryption.key` – auto-loaded if present
+3. **Auto-generated** – on first run, a random 256-bit key is generated and saved to `~/.bucketeer/encryption.key`
+
+The auto-generated key means zero configuration for personal use. For production, set the environment variable:
+
+```bash
+export BUCKETEER_ENCRYPTION_KEY=your-secret-key
+java -jar target/bucketeer-0.1.0.jar
+```
+
+> **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
 
 ---
 

@@ -7,6 +7,7 @@ import io.github.uwegeercken.bucketeer.domain.template.PrefixTemplateEngine;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 @Service
 public class BucketeerService implements BucketeerUseCase {
@@ -42,5 +43,16 @@ public class BucketeerService implements BucketeerUseCase {
     @Override
     public ObjectListing listObjects(String serverName, String bucket, String resolvedPrefix, String continuationToken) {
         return s3StoragePort.listObjects(serverName, bucket, resolvedPrefix, continuationToken);
+    }
+
+    @Override
+    public void fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
+                                Consumer<ObjectListing> pageCallback) {
+        String token = null;
+        do {
+            ObjectListing page = s3StoragePort.listObjects(serverName, bucket, resolvedPrefix, token);
+            pageCallback.accept(page);
+            token = page.truncated() ? page.nextContinuationToken() : null;
+        } while (token != null);
     }
 }

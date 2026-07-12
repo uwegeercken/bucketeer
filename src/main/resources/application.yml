@@ -9,7 +9,5 @@ server:
   port: 8080
 
 bucketeer:
-  version: "0.1.0"
-  release-date: "2026-07-08"
-  config:
-    encryption-key: ${BUCKETEER_ENCRYPTION_KEY:changeme-please-set-env-var}
+  version: "0.1.1"
+  release-date: "2026-07-11"

@@ -75,10 +75,57 @@
     </div>
 
     <!-- Results -->
-    <div class="panel" th:if="${listing != null}">
+    <div class="panel" id="resultsPanel" th:if="${queryStarted}">
         <div class="panel-title" th:text="#{nav.results}">Results</div>
-        <div th:if="${listing.objects.isEmpty()}" class="text-muted small" th:text="#{msg.noObjects}"></div>
-        <table th:if="${!listing.objects.isEmpty()}"
+
+        <!-- Progress -->
+        <div id="queryProgress" class="mb-2">
+            <div class="d-flex align-items-center gap-2">
+                <div class="spinner-border spinner-border-sm text-primary" id="querySpinner"></div>
+                <span class="text-muted small" id="queryStatusText" th:text="#{msg.queryRunning}">Loading...</span>
+            </div>
+        </div>
+
+        <!-- Filter form -->
+        <div id="filterForm" class="mb-3" style="display:none;">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold" th:text="#{label.filterKey}">Name contains</label>
+                    <input type="text" id="filterKey" class="form-control form-control-sm font-monospace"
+                           oninput="applyFilter()"/>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold" th:text="#{label.filterSizeMin}">Size min (KB)</label>
+                    <input type="number" id="filterSizeMin" class="form-control form-control-sm"
+                           min="0" oninput="applyFilter()"/>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold" th:text="#{label.filterSizeMax}">Size max (KB)</label>
+                    <input type="number" id="filterSizeMax" class="form-control form-control-sm"
+                           min="0" oninput="applyFilter()"/>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold" th:text="#{label.filterDateFrom}">Date from</label>
+                    <input type="date" id="filterDateFrom" class="form-control form-control-sm"
+                           onchange="applyFilter()"/>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold" th:text="#{label.filterDateTo}">Date to</label>
+                    <input type="date" id="filterDateTo" class="form-control form-control-sm"
+                           onchange="applyFilter()"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result count + export -->
+        <div id="resultCount" style="display:none;" class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-muted small" id="resultCountText"></span>
+            <button class="btn btn-sm btn-outline-success" onclick="exportParquet()"
+                    th:text="#{btn.exportParquet}">Export Parquet</button>
+        </div>
+
+        <!-- Results table -->
+        <table id="resultsTable" style="display:none;"
                class="table table-sm table-hover table-bordered mb-2 results-table">
             <thead class="table-secondary">
             <tr>
@@ -88,23 +135,11 @@
                 <th style="width:90px"></th>
             </tr>
             </thead>
-            <tbody>
-            <tr th:each="obj : ${listing.objects}">
-                <td th:text="${obj.key}" class="text-break font-monospace"></td>
-                <td th:text="${#numbers.formatDecimal(obj.sizeBytes / 1024.0, 1, 2)}" class="text-end"></td>
-                <td th:text="${obj.lastModified}"></td>
-                <td>
-                    <a th:href="@{/download(bucket=${bucket},key=${obj.key})}"
-                       class="btn btn-sm btn-outline-secondary" th:text="#{label.download}">Download</a>
-                </td>
-            </tr>
-            </tbody>
+            <tbody id="resultsBody"></tbody>
         </table>
-        <div th:if="${listing.truncated}" class="d-flex align-items-center gap-2">
-            <span class="text-muted small" th:text="#{msg.truncated}"></span>
-            <a th:href="@{/(bucket=${bucket},prefix=${prefix},key=${key},token=${listing.nextContinuationToken},search=true)}"
-               class="btn btn-sm btn-outline-primary" th:text="#{btn.next}">Next</a>
-        </div>
+
+        <!-- Pagination -->
+        <div id="pagination" style="display:none;" class="d-flex align-items-center gap-2"></div>
     </div>
 
 </main>
@@ -113,16 +148,30 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script th:inline="javascript">
-    const currentServer = /*[[${selectedServer}]]*/ '';
-    const STORAGE_KEY   = 'bucketeer_favorites';
+    const currentServer  = /*[[${selectedServer}]]*/ '';
+    const currentBucket  = /*[[${bucket}]]*/ '';
+    const queryStarted   = /*[[${queryStarted}]]*/ false;
+    const labelDownload  = /*[[#{label.download}]]*/ 'Download';
+    const labelNoFav     = /*[[#{msg.noFavorites}]]*/ 'No favorites yet.';
+    const labelObjFound  = /*[[#{msg.objectsFound}]]*/ 'objects found...';
+    const labelObjTotal  = /*[[#{msg.objectsTotal}]]*/ 'objects loaded.';
+    const labelNoObj     = /*[[#{msg.noObjects}]]*/ 'No objects found.';
+    const labelQryErr    = /*[[#{msg.queryError}]]*/ 'Error:';
+    const labelObjMatch  = /*[[#{msg.objectsMatching}]]*/ 'objects matching filter';
+    const labelPage      = /*[[#{msg.page}]]*/ 'page';
+    const labelPrev      = /*[[#{btn.prev}]]*/ '\u2190 Previous';
+    const labelNext      = /*[[#{btn.next}]]*/ 'Next \u2192';
+
+    const STORAGE_KEY = 'bucketeer_favorites';
+
+    // --- Prefix validation ---
 
     function updateResolvedPrefix() {
-        const prefix = document.getElementById('prefixInput').value;
-        const key    = document.getElementById('keyInput').value;
-        const errorEl  = document.getElementById('prefixError');
-        const prefixEl = document.getElementById('prefixInput');
+        const prefix    = document.getElementById('prefixInput').value;
+        const key       = document.getElementById('keyInput').value;
+        const errorEl   = document.getElementById('prefixError');
+        const prefixEl  = document.getElementById('prefixInput');
         const searchBtn = document.getElementById('searchBtn');
-
         if (!prefix) {
             document.getElementById('resolvedPrefix').textContent = '';
             errorEl.style.display = 'none';
@@ -130,8 +179,6 @@
             searchBtn.disabled = false;
             return;
         }
-
-        // validate
         fetch('/api/validate-prefix?prefix=' + encodeURIComponent(prefix))
             .then(r => r.json())
             .then(result => {
@@ -140,7 +187,6 @@
                     prefixEl.classList.remove('is-invalid');
                     prefixEl.classList.add('is-valid');
                     searchBtn.disabled = false;
-                    // resolve preview
                     fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(key))
                         .then(r => r.text())
                         .then(resolved => { document.getElementById('resolvedPrefix').textContent = resolved; })
@@ -153,9 +199,10 @@
                     searchBtn.disabled = true;
                     document.getElementById('resolvedPrefix').textContent = '';
                 }
-            })
-            .catch(() => {});
+            }).catch(() => {});
     }
+
+    // --- Favorites ---
 
     function loadFavorites() {
         try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
@@ -180,7 +227,9 @@
     function applyFavorite(name) {
         const fav = loadFavorites().find(f => f.name === name);
         if (!fav) return;
-        if (fav.server && fav.server !== currentServer) {
+        const serverSelect = document.querySelector('select[name="serverName"]');
+        const knownServers = serverSelect ? Array.from(serverSelect.options).map(o => o.value) : [];
+        if (fav.server && fav.server !== currentServer && knownServers.includes(fav.server)) {
             const form = document.createElement('form');
             form.method = 'POST'; form.action = '/session/server';
             const inp = document.createElement('input');
@@ -203,19 +252,17 @@
         const list      = loadFavorites();
         const container = document.getElementById('favoritePills');
         if (list.length === 0) {
-            container.innerHTML = '<span class="text-muted small fst-italic" id="noFavMsg"></span>';
-            const el = document.getElementById('noFavMsg');
-            if (el) el.textContent = /*[[#{msg.noFavorites}]]*/ 'No favorites yet.';
+            container.innerHTML = '<span class="text-muted small fst-italic">' + escHtml(labelNoFav) + '</span>';
             return;
         }
         container.innerHTML = list.map(fav => {
             const safeName  = escHtml(fav.name);
             const safeTitle = escHtml((fav.server||'') + ' / ' + (fav.bucket||'') + ' / ' + (fav.prefix||''));
             const safeKey   = escHtml(fav.name);
-            return `<span class="fav-pill" title="${safeTitle}" style="display:inline-flex;background:#e9ecef;border:1px solid #adb5bd;border-radius:1rem;padding:0.2rem 0.6rem;color:#495057;font-size:0.78rem;cursor:pointer;align-items:center;gap:0.35rem;white-space:nowrap;">
-                        <span class="fav-apply" data-fav="${safeKey}">${safeName}</span>
-                        <span class="del fav-delete" data-fav="${safeKey}" style="color:#adb5bd;font-size:0.9rem;line-height:1;">&times;</span>
-                    </span>`;
+            return '<span class="fav-pill" title="' + safeTitle + '" style="display:inline-flex;background:#e9ecef;border:1px solid #adb5bd;border-radius:1rem;padding:0.2rem 0.6rem;color:#495057;font-size:0.78rem;cursor:pointer;align-items:center;gap:0.35rem;white-space:nowrap;">'
+                + '<span class="fav-apply" data-fav="' + safeKey + '">' + safeName + '</span>'
+                + '<span class="del fav-delete" data-fav="' + safeKey + '" style="color:#adb5bd;font-size:0.9rem;line-height:1;">&times;</span>'
+                + '</span>';
         }).join('');
     }
 
@@ -241,21 +288,121 @@
             document.getElementById('keyInput').value = key;
     }
 
-    function clearForm() {
-        ['bucketInput','prefixInput','keyInput'].forEach(id => document.getElementById(id).value = '');
-        sessionStorage.removeItem('bkt_bucket');
-        sessionStorage.removeItem('bkt_prefix');
-        sessionStorage.removeItem('bkt_key');
-        document.getElementById('resolvedPrefix').textContent = '';
-        document.getElementById('prefixError').style.display = 'none';
-        document.getElementById('prefixInput').classList.remove('is-invalid', 'is-valid');
-        document.getElementById('searchBtn').disabled = false;
+    // --- Query polling ---
+
+    let currentPage  = 0;
+    const PAGE_SIZE  = 100;
+    let pollInterval = null;
+
+    function startPolling() {
+        if (!queryStarted) return;
+        pollInterval = setInterval(async () => {
+            try {
+                const res  = await fetch('/api/query/status');
+                const data = await res.json();
+                const statusText = document.getElementById('queryStatusText');
+                if (data.status === 'RUNNING') {
+                    statusText.textContent = data.objectsFound + ' ' + labelObjFound;
+                } else if (data.status === 'DONE') {
+                    clearInterval(pollInterval);
+                    document.getElementById('querySpinner').style.display = 'none';
+                    if (data.objectsFound === 0) {
+                        statusText.textContent = labelNoObj;
+                    } else {
+                        statusText.textContent = data.objectsFound + ' ' + labelObjTotal;
+                        document.getElementById('filterForm').style.display = 'block';
+                        loadResults();
+                    }
+                } else if (data.status === 'ERROR') {
+                    clearInterval(pollInterval);
+                    document.getElementById('querySpinner').style.display = 'none';
+                    statusText.classList.add('text-danger');
+                    statusText.textContent = labelQryErr + ' ' + data.error;
+                }
+            } catch (e) { /* ignore */ }
+        }, 500);
+    }
+
+    async function loadResults() {
+        const params = new URLSearchParams({ page: currentPage, pageSize: PAGE_SIZE });
+        const keyFilter = document.getElementById('filterKey')?.value    || '';
+        const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
+        const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
+        const dateFrom  = document.getElementById('filterDateFrom')?.value || '';
+        const dateTo    = document.getElementById('filterDateTo')?.value   || '';
+        if (keyFilter)  params.append('keyFilter',  keyFilter);
+        if (minSizeKb)  params.append('minSizeKb',  minSizeKb);
+        if (maxSizeKb)  params.append('maxSizeKb',  maxSizeKb);
+        if (dateFrom)   params.append('dateFrom',   dateFrom);
+        if (dateTo)     params.append('dateTo',     dateTo);
+
+        const res  = await fetch('/api/query/results?' + params.toString());
+        const data = await res.json();
+
+        const tbody = document.getElementById('resultsBody');
+        tbody.innerHTML = data.rows.map(row =>
+            '<tr>'
+            + '<td class="text-break font-monospace small">' + escHtml(row.key) + '</td>'
+            + '<td class="text-end small">' + escHtml(row.sizeKb) + '</td>'
+            + '<td class="small">' + escHtml(row.lastModified) + '</td>'
+            + '<td><a href="/download?bucket=' + encodeURIComponent(currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary">' + escHtml(labelDownload) + '</a></td>'
+            + '</tr>'
+        ).join('');
+
+        document.getElementById('resultsTable').style.display = data.rows.length > 0 ? '' : 'none';
+
+        const countEl = document.getElementById('resultCount');
+        countEl.style.display = 'flex';
+        const pageInfo = data.total > PAGE_SIZE ? ' \u2013 ' + labelPage + ' ' + (currentPage + 1) : '';
+        document.getElementById('resultCountText').textContent = data.total + ' ' + labelObjMatch + pageInfo;
+
+        const pag = document.getElementById('pagination');
+        pag.style.display = data.total > PAGE_SIZE ? 'flex' : 'none';
+        pag.innerHTML = '';
+        if (currentPage > 0) {
+            const prev = document.createElement('button');
+            prev.className = 'btn btn-sm btn-outline-primary';
+            prev.textContent = labelPrev;
+            prev.onclick = () => { currentPage--; loadResults(); };
+            pag.appendChild(prev);
+        }
+        if (data.hasMore) {
+            const next = document.createElement('button');
+            next.className = 'btn btn-sm btn-outline-primary';
+            next.textContent = labelNext;
+            next.onclick = () => { currentPage++; loadResults(); };
+            pag.appendChild(next);
+        }
+    }
+
+    function exportParquet() {
+        const params = new URLSearchParams();
+        const keyFilter = document.getElementById('filterKey')?.value    || '';
+        const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
+        const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
+        const dateFrom  = document.getElementById('filterDateFrom')?.value || '';
+        const dateTo    = document.getElementById('filterDateTo')?.value   || '';
+        if (keyFilter)     params.append('keyFilter',  keyFilter);
+        if (minSizeKb)     params.append('minSizeKb',  minSizeKb);
+        if (maxSizeKb)     params.append('maxSizeKb',  maxSizeKb);
+        if (dateFrom)      params.append('dateFrom',   dateFrom);
+        if (dateTo)        params.append('dateTo',     dateTo);
+        if (currentBucket) params.append('bucket',     currentBucket);
+        window.location.href = '/api/query/export?' + params.toString();
+    }
+
+    let filterTimer = null;
+    function applyFilter() {
+        currentPage = 0;
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(loadResults, 300);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         restoreFormState();
         renderFavorites();
         updateResolvedPrefix();
+        startPolling();
 
         document.getElementById('favoritePills').addEventListener('click', e => {
             const applyEl  = e.target.closest('.fav-apply');

@@ -5,10 +5,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "bucketeer")
 public record S3Properties(
         String version,
-        String releaseDate,
-        ConfigProperties config
-) {
-    public record ConfigProperties(
-            String encryptionKey
-    ) {}
-}
+        String releaseDate
+) {}

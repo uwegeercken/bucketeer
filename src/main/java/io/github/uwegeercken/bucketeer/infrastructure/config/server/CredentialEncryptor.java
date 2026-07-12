@@ -15,8 +15,9 @@ import java.util.Base64;
 /**
  * Encrypts and decrypts credential strings using AES-256-GCM.
  *
- * The encryption key is derived from the configured passphrase using PBKDF2.
- * Each encrypted value contains its own random salt and IV, stored as a single Base64 string:
+ * The encryption key is provided by {@link EncryptionKeyProvider} and derived
+ * per-value using PBKDF2 with a random salt.
+ * Each encrypted value contains its own random salt and IV:
  *   Base64(salt[16] + iv[12] + ciphertext)
  */
 @Component
@@ -32,10 +33,8 @@ public class CredentialEncryptor {
 
     private final String passphrase;
 
-    public CredentialEncryptor(io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties props) {
-        this.passphrase = (props.config() != null && props.config().encryptionKey() != null)
-                ? props.config().encryptionKey()
-                : "bucketeer-default-key";
+    public CredentialEncryptor(EncryptionKeyProvider keyProvider) {
+        this.passphrase = keyProvider.getKey();
     }
 
     public String encrypt(String plaintext) {
@@ -51,9 +50,9 @@ public class CredentialEncryptor {
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes());
 
             byte[] combined = new byte[SALT_LENGTH + IV_LENGTH + ciphertext.length];
-            System.arraycopy(salt,       0, combined, 0,                        SALT_LENGTH);
-            System.arraycopy(iv,         0, combined, SALT_LENGTH,              IV_LENGTH);
-            System.arraycopy(ciphertext, 0, combined, SALT_LENGTH + IV_LENGTH,  ciphertext.length);
+            System.arraycopy(salt,       0, combined, 0,                       SALT_LENGTH);
+            System.arraycopy(iv,         0, combined, SALT_LENGTH,             IV_LENGTH);
+            System.arraycopy(ciphertext, 0, combined, SALT_LENGTH + IV_LENGTH, ciphertext.length);
 
             return Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
@@ -63,10 +62,10 @@ public class CredentialEncryptor {
 
     public String decrypt(String encrypted) {
         try {
-            byte[] combined    = Base64.getDecoder().decode(encrypted);
-            byte[] salt        = new byte[SALT_LENGTH];
-            byte[] iv          = new byte[IV_LENGTH];
-            byte[] ciphertext  = new byte[combined.length - SALT_LENGTH - IV_LENGTH];
+            byte[] combined   = Base64.getDecoder().decode(encrypted);
+            byte[] salt       = new byte[SALT_LENGTH];
+            byte[] iv         = new byte[IV_LENGTH];
+            byte[] ciphertext = new byte[combined.length - SALT_LENGTH - IV_LENGTH];
 
             System.arraycopy(combined, 0,                       salt,       0, SALT_LENGTH);
             System.arraycopy(combined, SALT_LENGTH,             iv,         0, IV_LENGTH);
