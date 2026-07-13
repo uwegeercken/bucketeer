@@ -124,6 +124,9 @@
                     th:text="#{btn.exportParquet}">Export Parquet</button>
         </div>
 
+        <!-- Pagination top -->
+        <div id="paginationTop" style="display:none;" class="d-flex align-items-center gap-1 mb-2"></div>
+
         <!-- Results table -->
         <table id="resultsTable" style="display:none;"
                class="table table-sm table-hover table-bordered mb-2 results-table">
@@ -138,8 +141,8 @@
             <tbody id="resultsBody"></tbody>
         </table>
 
-        <!-- Pagination -->
-        <div id="pagination" style="display:none;" class="d-flex align-items-center gap-2"></div>
+        <!-- Pagination bottom -->
+        <div id="paginationBottom" style="display:none;" class="d-flex align-items-center gap-1"></div>
     </div>
 
 </main>
@@ -351,28 +354,45 @@
 
         document.getElementById('resultsTable').style.display = data.rows.length > 0 ? '' : 'none';
 
+        const totalPages = Math.ceil(data.total / PAGE_SIZE);
         const countEl = document.getElementById('resultCount');
         countEl.style.display = 'flex';
-        const pageInfo = data.total > PAGE_SIZE ? ' \u2013 ' + labelPage + ' ' + (currentPage + 1) : '';
+        const pageInfo = totalPages > 1 ? ' \u2013 ' + (currentPage + 1) + ' / ' + totalPages : '';
         document.getElementById('resultCountText').textContent = data.total + ' ' + labelObjMatch + pageInfo;
 
-        const pag = document.getElementById('pagination');
-        pag.style.display = data.total > PAGE_SIZE ? 'flex' : 'none';
+        renderPagination('paginationTop',    data.total, totalPages);
+        renderPagination('paginationBottom', data.total, totalPages);
+    }
+
+    function renderPagination(elementId, total, totalPages) {
+        const pag = document.getElementById(elementId);
+        if (total <= PAGE_SIZE) { pag.style.display = 'none'; return; }
+        pag.style.display = 'flex';
         pag.innerHTML = '';
-        if (currentPage > 0) {
-            const prev = document.createElement('button');
-            prev.className = 'btn btn-sm btn-outline-primary';
-            prev.textContent = labelPrev;
-            prev.onclick = () => { currentPage--; loadResults(); };
-            pag.appendChild(prev);
-        }
-        if (data.hasMore) {
-            const next = document.createElement('button');
-            next.className = 'btn btn-sm btn-outline-primary';
-            next.textContent = labelNext;
-            next.onclick = () => { currentPage++; loadResults(); };
-            pag.appendChild(next);
-        }
+
+        const btn = (label, disabled, onclick) => {
+            const b = document.createElement('button');
+            b.className = 'btn btn-sm btn-outline-primary';
+            b.textContent = label;
+            b.disabled = disabled;
+            if (!disabled) b.onclick = onclick;
+            return b;
+        };
+
+        pag.appendChild(btn('\u00ab\u00ab', currentPage === 0,
+            () => { currentPage = 0; loadResults(); }));
+        pag.appendChild(btn('\u2039', currentPage === 0,
+            () => { currentPage--; loadResults(); }));
+
+        const info = document.createElement('span');
+        info.className = 'text-muted small px-2';
+        info.textContent = (currentPage + 1) + ' / ' + totalPages;
+        pag.appendChild(info);
+
+        pag.appendChild(btn('\u203a', currentPage >= totalPages - 1,
+            () => { currentPage++; loadResults(); }));
+        pag.appendChild(btn('\u00bb\u00bb', currentPage >= totalPages - 1,
+            () => { currentPage = totalPages - 1; loadResults(); }));
     }
 
     function exportParquet() {
