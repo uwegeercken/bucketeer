@@ -1,7 +1,8 @@
 # Bucketeer
 
-A web-based S3 object browser supporting listing, download, favorites, and flexible prefix templates.
-Supports Minio (development) and NetApp StorageGRID (production).
+A web-based S3 object browser supporting listing, filtering, download, export to parquet and favorites
+
+The S3 prefix and be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and date. functions can be nested.
 
 ---
 
@@ -9,20 +10,14 @@ Supports Minio (development) and NetApp StorageGRID (production).
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.1.0.jar
+java -jar target/bucketeer-0.2.0.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
 
-### Configuration (`application.yml`)
+### Configuration
 
-```yaml
-bucketeer:
-  version: "0.1.0"
-  release-date: "2026-07-08"
-```
-
-S3 servers are configured at runtime via the **Configuration** page (`/config`), not in `application.yml`.
+S3 servers are configured at runtime via the **Configuration** page (`/config`).
 Server credentials are stored encrypted in `~/.bucketeer/servers.json`.
 
 ### Encryption key
@@ -46,7 +41,7 @@ java -jar target/bucketeer-0.1.0.jar
 
 ## Prefix Templates
 
-Bucketeer uses a **prefix template** to compute the S3 path before listing objects.
+Prefixes may be entered literally to define a search. Bucketeer uses a **prefix template** to compute the S3 path before listing objects.
 A template is a path string where segments (separated by `/`) can contain **function placeholders**.
 
 ### Syntax
@@ -299,3 +294,6 @@ public class Md5Function implements TemplateFunction {
 ```
 
 Usage in template: `data/{md5(key)}/{key}/`
+
+## Last update
+last update uwe.geercken@web.de - 2026-07-14
