@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="#{settings.title}">Bucketeer – Konfiguration</title>
+    <th:block th:replace="~{layout :: styles}"></th:block>
+</head>
+<body>
+
+<nav th:replace="~{layout :: header}"></nav>
+
+<main class="container-fluid px-4">
+    <div class="panel" style="max-width: 600px;">
+        <div class="panel-title" th:text="#{settings.section.query}">Abfrage</div>
+
+        <div class="mb-4">
+            <label class="form-label fw-semibold small" th:text="#{settings.pageSize.label}">
+                Ergebnisse pro Seite
+            </label>
+            <div class="d-flex align-items-center gap-3">
+                <input type="number" id="pageSizeInput"
+                       class="form-control form-control-sm"
+                       style="width: 100px;"
+                       min="10" max="1000" step="10"/>
+                <span class="text-muted small" th:text="#{settings.pageSize.hint}">
+                    Min: 10, Max: 1000 (Default: 100)
+                </span>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-primary" onclick="saveSettings()"
+                    th:text="#{settings.save}">Speichern</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetSettings()"
+                    th:text="#{settings.reset}">Zurücksetzen</button>
+        </div>
+
+        <div id="saveMsg" class="text-success small mt-2" style="display:none;"
+             th:text="#{settings.saved}">Einstellungen gespeichert.</div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const SETTINGS_KEY  = 'bucketeer_settings';
+    const DEFAULT_PAGE_SIZE = 100;
+
+    function loadSettings() {
+        try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); }
+        catch { return {}; }
+    }
+
+    function saveSettings() {
+        const pageSize = parseInt(document.getElementById('pageSizeInput').value, 10);
+        if (isNaN(pageSize) || pageSize < 10 || pageSize > 1000) {
+            document.getElementById('pageSizeInput').classList.add('is-invalid');
+            return;
+        }
+        document.getElementById('pageSizeInput').classList.remove('is-invalid');
+        const settings = loadSettings();
+        settings.pageSize = pageSize;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        const msg = document.getElementById('saveMsg');
+        msg.style.display = 'block';
+        setTimeout(() => { msg.style.display = 'none'; }, 2000);
+    }
+
+    function resetSettings() {
+        localStorage.removeItem(SETTINGS_KEY);
+        document.getElementById('pageSizeInput').value = DEFAULT_PAGE_SIZE;
+        document.getElementById('pageSizeInput').classList.remove('is-invalid');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const settings = loadSettings();
+        document.getElementById('pageSizeInput').value = settings.pageSize || DEFAULT_PAGE_SIZE;
+    });
+</script>
+</body>
+</html>

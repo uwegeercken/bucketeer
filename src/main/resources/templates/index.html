@@ -294,7 +294,13 @@
     // --- Query polling ---
 
     let currentPage  = 0;
-    const PAGE_SIZE  = 100;
+    const SETTINGS_KEY = 'bucketeer_settings';
+    const PAGE_SIZE  = (() => {
+        try {
+            const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+            return s.pageSize && s.pageSize >= 10 && s.pageSize <= 1000 ? s.pageSize : 100;
+        } catch { return 100; }
+    })();
     let pollInterval = null;
 
     function startPolling() {

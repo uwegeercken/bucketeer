@@ -45,7 +45,10 @@
                class="btn btn-sm btn-outline-light" th:text="#{nav.back}">← Back</a>
             <a class="btn btn-sm btn-outline-light" href="/config"
                onclick="if(typeof saveFormState==='function') saveFormState()"
-               th:text="#{nav.config}">Configuration</a>
+               th:text="#{nav.servers}">Server</a>
+            <a class="btn btn-sm btn-outline-light" href="/settings"
+               onclick="if(typeof saveFormState==='function') saveFormState()"
+               th:text="#{nav.config}">Konfiguration</a>
             <a class="btn btn-sm btn-outline-light" href="/help"
                onclick="if(typeof saveFormState==='function') saveFormState()"
                th:text="#{nav.help}">Help</a>
