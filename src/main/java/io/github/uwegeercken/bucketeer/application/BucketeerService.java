@@ -26,6 +26,11 @@ public class BucketeerService implements BucketeerUseCase {
     }
 
     @Override
+    public List<String> listBuckets(String serverName) {
+        return s3StoragePort.listBuckets(serverName);
+    }
+
+    @Override
     public List<String> availableFunctions() {
         return templateEngine.availableFunctions();
     }

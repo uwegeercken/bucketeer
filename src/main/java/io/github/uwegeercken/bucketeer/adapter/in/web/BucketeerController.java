@@ -69,7 +69,6 @@ public class BucketeerController {
 
         if (Boolean.TRUE.equals(search) && currentServer != null && StringUtils.hasText(bucket)) {
             String resolvedPrefix = bucketeerUseCase.resolveTemplate(prefix, key);
-            model.addAttribute("resolvedPrefix", resolvedPrefix);
 
             String normalizedPrefix = StringUtils.hasText(resolvedPrefix) && !resolvedPrefix.endsWith("/")
                     ? resolvedPrefix + "/" : resolvedPrefix;
@@ -125,6 +124,19 @@ public class BucketeerController {
     public String selectServer(@RequestParam String serverName) {
         sessionContext.setSelectedServer(serverName);
         return "redirect:/";
+    }
+
+    @GetMapping(value = "/api/buckets", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public List<String> listBuckets() {
+        String server = sessionContext.getSelectedServer();
+        if (server == null) return List.of();
+        try {
+            return bucketeerUseCase.listBuckets(server);
+        } catch (Exception e) {
+            log.warn("Failed to list buckets for server {}: {}", server, e.getMessage());
+            return List.of();
+        }
     }
 
     @GetMapping(value = "/api/query/status", produces = MediaType.APPLICATION_JSON_VALUE)

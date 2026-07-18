@@ -26,6 +26,11 @@ public class S3Adapter implements S3StoragePort {
     }
 
     @Override
+    public List<String> listBuckets(String serverName) {
+        return registry.listBuckets(serverName);
+    }
+
+    @Override
     public ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken) {
         S3Client client = registry.clientFor(serverName);
 
