@@ -38,3 +38,9 @@ replay_pid*
 /target/classes/templates/help.html
 /target/classes/templates/layout.html
 /target/classes/static/css/bucketeer.css
+/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
+/target/maven-status/maven-compiler-plugin/testCompile/default-testCompile/createdFiles.lst
+/target/maven-status/maven-compiler-plugin/testCompile/default-testCompile/inputFiles.lst
+/target/surefire-reports/io.github.uwegeercken.bucketeer.domain.template.TemplateEngineTest.txt
+/target/surefire-reports/TEST-io.github.uwegeercken.bucketeer.domain.template.TemplateEngineTest.xml

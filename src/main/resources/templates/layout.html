@@ -41,7 +41,7 @@
 </th:block>
 
 <!-- Header fragment -->
-<nav th:fragment="header" class="navbar navbar-dark bg-dark mb-3">
+<nav th:fragment="header" class="navbar navbar-dark bg-dark mb-3 border-bottom border-secondary">
     <div class="container-fluid">
         <!-- Left: app name -->
         <a class="navbar-brand fw-bold" href="/" th:text="#{app.title}">Bucketeer</a>
@@ -86,7 +86,7 @@
 </nav>
 
 <!-- Footer fragment -->
-<footer th:fragment="footer" class="bg-dark text-secondary mt-4 py-2">
+<footer th:fragment="footer" class="bg-dark text-secondary mt-4 py-2 border-top border-secondary">
     <div class="container-fluid px-4 d-flex justify-content-between align-items-center"
          style="font-size:0.75rem;">
         <span th:text="#{app.title}">Bucketeer</span>
