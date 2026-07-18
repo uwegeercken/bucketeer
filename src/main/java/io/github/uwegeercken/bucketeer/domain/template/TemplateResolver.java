@@ -96,7 +96,11 @@ public class TemplateResolver {
         }
 
         validateArgCount(fn, params, call);
-        return fn.apply(resolvedRef, params);
+        String result = fn.apply(resolvedRef, params);
+        if (call.suffix() != null && !call.suffix().isEmpty()) {
+            result = result + call.suffix();
+        }
+        return result;
     }
 
     private String resolveRef(String ref, int currentPos, String[] resolved,

@@ -13,11 +13,11 @@
 
     <groupId>io.github.uwegeercken</groupId>
     <artifactId>bucketeer</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
     <packaging>jar</packaging>
 
     <name>bucketeer</name>
-    <description>A web-based S3 object browser supporting listing, download and favorites</description>
+    <description>A web-based S3 object browser supporting listing, filtering, download, export to parquet and favorites</description>
     <url>https://github.com/uwegeercken/bucketeer</url>
 
     <licenses>

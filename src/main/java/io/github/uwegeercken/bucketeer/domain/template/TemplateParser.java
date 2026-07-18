@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
  * Syntax:
  *   - Segments are separated by '/'
  *   - A segment wrapped in { } is a function call: {functionName(arg1, arg2, ...)}
+ *   - A function call can have a literal suffix: {left(key, 3)}-test
  *   - Arguments can be: "key", "pN", a literal value, or a nested function call
  *   - Nested calls: {upper(everyNth(key, 0, 2))}
  *   - \{ is an escaped literal '{'
@@ -67,7 +68,16 @@ public class TemplateParser {
         if (raw.startsWith("{") && raw.endsWith("}")) {
             String inner = raw.substring(1, raw.length() - 1).trim();
             return new Segment.FunctionCall(position, parseFunctionName(inner),
-                    parseArguments(parseArgumentString(inner)));
+                    parseArguments(parseArgumentString(inner)), "");
+        }
+        if (raw.startsWith("{")) {
+            int close = raw.indexOf('}');
+            if (close > 0) {
+                String inner = raw.substring(1, close).trim();
+                String suffix = raw.substring(close + 1);
+                return new Segment.FunctionCall(position, parseFunctionName(inner),
+                        parseArguments(parseArgumentString(inner)), suffix);
+            }
         }
         return new Segment.Literal(position, raw);
     }
@@ -107,7 +117,7 @@ public class TemplateParser {
             String argsPart = token.substring(paren + 1, token.length() - 1).trim();
             if (FUNCTION_NAME.matcher(name).matches()) {
                 List<Argument> nestedArgs = parseArguments(argsPart);
-                Segment.FunctionCall nested = new Segment.FunctionCall(-1, name, nestedArgs);
+                Segment.FunctionCall nested = new Segment.FunctionCall(-1, name, nestedArgs, "");
                 return new Argument.Nested(nested);
             }
         }
