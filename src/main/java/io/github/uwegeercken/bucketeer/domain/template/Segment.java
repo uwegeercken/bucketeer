@@ -19,6 +19,7 @@ public sealed interface Segment {
     record FunctionCall(
             int position,
             String functionName,
-            List<Argument> arguments
+            List<Argument> arguments,
+            String suffix
     ) implements Segment {}
 }

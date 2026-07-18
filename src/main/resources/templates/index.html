@@ -19,7 +19,7 @@
     </div>
 
     <!-- Favorites -->
-    <div class="panel">
+    <div class="panel" id="favoritesPanel">
         <div class="panel-title" th:text="#{nav.favorites}">Favorites</div>
         <div class="d-flex align-items-center flex-wrap gap-2">
             <div id="favoritePills" class="d-flex flex-wrap gap-1 flex-grow-1"></div>
@@ -33,31 +33,36 @@
     </div>
 
     <!-- Search -->
-    <div class="panel">
+    <div class="panel" id="searchPanel">
         <div class="panel-title" th:text="#{nav.search}">Search</div>
         <form method="get" action="/" id="searchForm">
             <input type="hidden" name="search" value="true"/>
-            <div class="row g-2 align-items-start">
+            <div class="row g-2 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold" th:text="#{label.bucket}">Bucket</label>
-                    <input type="text" name="bucket" id="bucketInput"
-                           class="form-control form-control-sm font-monospace" th:value="${bucket}"/>
+                    <select name="bucket" id="bucketInput"
+                            class="form-select form-select-sm font-monospace">
+                        <option value="">--</option>
+                    </select>
                 </div>
                 <div class="col-md-5">
                     <label class="form-label small fw-semibold">
                         <span th:text="#{label.prefix}">Prefix</span>
+                        <i class="bi bi-code-slash text-muted small ms-1"
+                           role="img" id="functionsIcon"
+                           th:attr="data-bs-content=${tooltipText}"
+                           data-bs-toggle="popover" data-bs-trigger="hover"
+                           data-bs-placement="right" data-bs-html="true"></i>
+                        <i class="bi bi-info-circle text-muted small ms-1"
+                           role="img" id="resolvedIcon"
+                           data-bs-toggle="popover" data-bs-trigger="hover"
+                           data-bs-placement="right" data-bs-html="true"
+                           data-bs-content=" "></i>
                     </label>
                     <input type="text" name="prefix" id="prefixInput"
                            class="form-control form-control-sm font-monospace"
                            th:value="${prefix}" oninput="updateResolvedPrefix()"/>
                     <div id="prefixError" class="text-danger small mt-1" style="display:none;"></div>
-                    <div class="placeholder-hint">
-                        <span th:text="#{label.availableFunctions}">Functions:</span>
-                        <span th:each="p,i : ${availableFunctions}">
-                            <code th:text="'{' + ${p} + '(...)}'"></code><span th:if="${!i.last}">, </span>
-                        </span>
-                    </div>
-                    <div class="resolved-prefix" id="resolvedPrefix" th:text="${resolvedPrefix}"></div>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold" th:text="#{label.key}">Key</label>
@@ -65,10 +70,12 @@
                            class="form-control form-control-sm font-monospace"
                            th:value="${key}" oninput="updateResolvedPrefix()"/>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small fw-semibold">&nbsp;</label>
-                    <button type="submit" id="searchBtn" class="btn btn-sm btn-primary w-100 d-block"
-                            th:text="#{label.search}">Search</button>
+                <div class="col-auto">
+                    <label class="form-label small fw-semibold invisible">&nbsp;</label>
+                    <button type="submit" id="searchBtn" class="btn btn-sm btn-outline-secondary btn-icon"
+                            th:title="#{label.search}" th:aria-label="#{label.search}">
+                        <i class="bi bi-search"></i>
+                    </button>
                 </div>
             </div>
         </form>
@@ -76,7 +83,19 @@
 
     <!-- Results -->
     <div class="panel" id="resultsPanel" th:if="${queryStarted}">
-        <div class="panel-title" th:text="#{nav.results}">Results</div>
+        <div class="panel-title d-flex align-items-center justify-content-between">
+            <span th:text="#{nav.results}">Results</span>
+            <div class="d-flex gap-1">
+                <button type="button" id="btnExport" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="exportParquet()" title="Export Parquet" disabled>
+                    <i class="bi bi-file-earmark-arrow-down"></i>
+                </button>
+                <button type="button" id="toggleMaximize" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="toggleMaximize()" title="Maximize / Restore">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
 
         <!-- Progress -->
         <div id="queryProgress" class="mb-2">
@@ -117,11 +136,9 @@
             </div>
         </div>
 
-        <!-- Result count + export -->
-        <div id="resultCount" style="display:none;" class="d-flex align-items-center justify-content-between mb-2">
+        <!-- Result count -->
+        <div id="resultCount" style="display:none;" class="mb-2">
             <span class="text-muted small" id="resultCountText"></span>
-            <button class="btn btn-sm btn-outline-success" onclick="exportParquet()"
-                    th:text="#{btn.exportParquet}">Export Parquet</button>
         </div>
 
         <!-- Pagination top -->
@@ -135,7 +152,7 @@
                 <th th:text="#{label.objectName}">Name</th>
                 <th class="text-end" style="width:110px" th:text="#{label.size}">Size (KB)</th>
                 <th style="width:210px" th:text="#{label.lastModified}">Last Modified</th>
-                <th style="width:90px"></th>
+                <th style="width:52px"></th>
             </tr>
             </thead>
             <tbody id="resultsBody"></tbody>
@@ -167,7 +184,36 @@
 
     const STORAGE_KEY = 'bucketeer_favorites';
 
+    // --- Bucket dropdown ---
+
+    async function loadBuckets(selectPreselected) {
+        const select = document.getElementById('bucketInput');
+        try {
+            const res = await fetch('/api/buckets');
+            const buckets = await res.json();
+            const current = selectPreselected || '';
+            select.innerHTML = '<option value="">--</option>'
+                + buckets.map(b => '<option value="' + escHtml(b) + '"'
+                    + (b === current ? ' selected' : '') + '>'
+                    + escHtml(b) + '</option>').join('');
+        } catch {
+            select.innerHTML = '<option value="">--</option>';
+        }
+    }
+
     // --- Prefix validation ---
+
+    function setResolvedPopover(text) {
+        const el = document.getElementById('resolvedIcon');
+        const existing = bootstrap.Popover.getInstance(el);
+        if (existing) existing.dispose();
+        new bootstrap.Popover(el, {
+            trigger: 'hover',
+            placement: 'right',
+            html: true,
+            content: text || '\u2013'
+        });
+    }
 
     function updateResolvedPrefix() {
         const prefix    = document.getElementById('prefixInput').value;
@@ -176,7 +222,7 @@
         const prefixEl  = document.getElementById('prefixInput');
         const searchBtn = document.getElementById('searchBtn');
         if (!prefix) {
-            document.getElementById('resolvedPrefix').textContent = '';
+            setResolvedPopover('');
             errorEl.style.display = 'none';
             prefixEl.classList.remove('is-invalid', 'is-valid');
             searchBtn.disabled = false;
@@ -192,7 +238,7 @@
                     searchBtn.disabled = false;
                     fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(key))
                         .then(r => r.text())
-                        .then(resolved => { document.getElementById('resolvedPrefix').textContent = resolved; })
+                        .then(resolved => { setResolvedPopover(resolved); })
                         .catch(() => {});
                 } else {
                     errorEl.textContent = result.error;
@@ -200,7 +246,7 @@
                     prefixEl.classList.add('is-invalid');
                     prefixEl.classList.remove('is-valid');
                     searchBtn.disabled = true;
-                    document.getElementById('resolvedPrefix').textContent = '';
+                    setResolvedPopover('');
                 }
             }).catch(() => {});
     }
@@ -241,6 +287,13 @@
             return;
         }
         document.getElementById('bucketInput').value = fav.bucket || '';
+        if (fav.bucket && !document.getElementById('bucketInput').querySelector('option[value="' + CSS.escape(fav.bucket) + '"]')) {
+            const opt = document.createElement('option');
+            opt.value = fav.bucket; opt.textContent = fav.bucket; opt.selected = true;
+            document.getElementById('bucketInput').appendChild(opt);
+        } else {
+            document.getElementById('bucketInput').value = fav.bucket || '';
+        }
         document.getElementById('prefixInput').value = fav.prefix || '';
         document.getElementById('keyInput').value    = fav.key    || '';
         updateResolvedPrefix();
@@ -283,8 +336,16 @@
         const bucket = sessionStorage.getItem('bkt_bucket');
         const prefix = sessionStorage.getItem('bkt_prefix');
         const key    = sessionStorage.getItem('bkt_key');
-        if (bucket && !document.getElementById('bucketInput').value)
-            document.getElementById('bucketInput').value = bucket;
+        if (bucket) {
+            const sel = document.getElementById('bucketInput');
+            if (sel.querySelector('option[value="' + CSS.escape(bucket) + '"]')) {
+                sel.value = bucket;
+            } else if (bucket && sel.options.length > 0) {
+                const opt = document.createElement('option');
+                opt.value = bucket; opt.textContent = bucket; opt.selected = true;
+                sel.appendChild(opt);
+            }
+        }
         if (prefix && !document.getElementById('prefixInput').value)
             document.getElementById('prefixInput').value = prefix;
         if (key && !document.getElementById('keyInput').value)
@@ -354,7 +415,7 @@
             + '<td class="text-break font-monospace small">' + escHtml(row.key) + '</td>'
             + '<td class="text-end small">' + escHtml(row.sizeKb) + '</td>'
             + '<td class="small">' + escHtml(row.lastModified) + '</td>'
-            + '<td><a href="/download?bucket=' + encodeURIComponent(currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary">' + escHtml(labelDownload) + '</a></td>'
+            + '<td><a href="/download?bucket=' + encodeURIComponent(currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a></td>'
             + '</tr>'
         ).join('');
 
@@ -365,6 +426,7 @@
         countEl.style.display = 'flex';
         const pageInfo = totalPages > 1 ? ' \u2013 ' + (currentPage + 1) + ' / ' + totalPages : '';
         document.getElementById('resultCountText').textContent = data.total + ' ' + labelObjMatch + pageInfo;
+        document.getElementById('btnExport').disabled = data.total === 0;
 
         renderPagination('paginationTop',    data.total, totalPages);
         renderPagination('paginationBottom', data.total, totalPages);
@@ -417,6 +479,23 @@
         window.location.href = '/api/query/export?' + params.toString();
     }
 
+    let maximized = false;
+    function toggleMaximize() {
+        maximized = !maximized;
+        const fav    = document.getElementById('favoritesPanel');
+        const search = document.getElementById('searchPanel');
+        const icon   = document.querySelector('#toggleMaximize i');
+        if (maximized) {
+            fav.style.display = 'none';
+            search.style.display = 'none';
+            icon.className = 'bi bi-fullscreen-exit';
+        } else {
+            fav.style.display = '';
+            search.style.display = '';
+            icon.className = 'bi bi-arrows-fullscreen';
+        }
+    }
+
     let filterTimer = null;
     function applyFilter() {
         currentPage = 0;
@@ -425,10 +504,17 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        restoreFormState();
-        renderFavorites();
-        updateResolvedPrefix();
-        startPolling();
+        document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+            new bootstrap.Popover(el);
+        });
+        setResolvedPopover('');
+
+        loadBuckets(currentBucket).then(() => {
+            restoreFormState();
+            renderFavorites();
+            updateResolvedPrefix();
+            startPolling();
+        });
 
         document.getElementById('favoritePills').addEventListener('click', e => {
             const applyEl  = e.target.closest('.fav-apply');

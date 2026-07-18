@@ -335,4 +335,34 @@ class TemplateEngineTest {
         assertThat(engine.validate("data/{upper(unknownFn(key))}/"))
                 .containsExactly("unknownFn");
     }
+
+    // --- Category 8: function call with literal suffix ---
+
+    @Test
+    @DisplayName("T30: {left(p2,5)}-test - function call with literal suffix")
+    void t30_functionWithSuffix() {
+        assertThat(engine.resolve("testdata/events/shard-00/{left(p2,5)}-test", "abcdefghij"))
+                .isEqualTo("testdata/events/shard-00/event-test");
+    }
+
+    @Test
+    @DisplayName("T31: {left(key,3)}suffix - function on key with literal suffix")
+    void t31_functionOnKeyWithSuffix() {
+        assertThat(engine.resolve("data/{left(key,3)}-output", "hello"))
+                .isEqualTo("data/hel-output");
+    }
+
+    @Test
+    @DisplayName("T32: {upper(key)}.json - function with literal extension")
+    void t32_functionWithExtension() {
+        assertThat(engine.resolve("files/{upper(key)}.json", "report"))
+                .isEqualTo("files/REPORT.json");
+    }
+
+    @Test
+    @DisplayName("T33: {left(p1,3)}-test/suffix - suffix then separator, ref to literal")
+    void t33_suffixThenSeparator() {
+        assertThat(engine.resolve("xxxxx/{left(p1,3)}-test/b", "xxxxxxxxx"))
+                .isEqualTo("xxxxx/xxx-test/b");
+    }
 }

@@ -9,6 +9,8 @@ public interface BucketeerUseCase {
 
     List<String> serverNames();
 
+    List<String> listBuckets(String serverName);
+
     List<String> availableFunctions();
 
     String resolveTemplate(String template, String key);

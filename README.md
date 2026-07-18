@@ -1,8 +1,8 @@
 # Bucketeer
 
-A web-based S3 object browser supporting listing, filtering, download, export to parquet and favorites
+A web-based S3 object browser supporting listing, filtering, download, export to parquet and favorites.
 
-The S3 prefix and be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and date. functions can be nested.
+The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and date. Functions can be nested and may have literal suffixes.
 
 ---
 
@@ -10,7 +10,7 @@ The S3 prefix and be typed in literally or generated dynamically using functions
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.2.0.jar
+java -jar target/bucketeer-0.3.0.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -32,10 +32,37 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.1.0.jar
+java -jar target/bucketeer-0.3.0.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
+
+---
+
+## UI Features
+
+### Dark Mode
+
+Click the moon/sun icon in the navigation bar to toggle between light and dark mode.
+The preference is saved in the browser and persists across sessions.
+
+### Bucket Dropdown
+
+The bucket selector is a dropdown populated from the configured S3 server.
+Select a server first, then choose a bucket from the list.
+
+### Favorites
+
+Favorites save a named combination of **server + bucket + prefix template + key** for quick reuse.
+They are stored in the browser's `localStorage` — no server-side state required.
+
+Click a favorite pill to pre-fill the form. Click `×` to delete it.
+
+### Results Panel
+
+- Click the maximize icon to expand the results panel to full width
+- Export Parquet is available in the results title bar when results are present
+- A resolved prefix popover shows the computed S3 path on hover
 
 ---
 
@@ -52,6 +79,7 @@ segment1/{functionName(ref, arg1, arg2)}/segment3/
 
 - A **literal** segment is used as-is: `myprefix`, `2024`, `ABCDEFGH`
 - A **placeholder** is wrapped in `{ }`: `{everyNth(key, 0, 2)}`
+- A placeholder can have a **literal suffix**: `{left(key, 3)}-test` → `hel-test`
 - Use `\{` to include a literal `{` in the path
 
 ### References
@@ -149,15 +177,34 @@ Result:    myprefix/ACEG/ABCDEFGH/
 
 ### 4. Multiple functions on the same literal
 ```
-Template:  data/{left(p3, 4)}/{everyNth(p3, 0, 2)}/ABCDEFGH/
+Template:  data/{left(p4, 4)}/{everyNth(p4, 0, 2)}/ABCDEFGH/
 Key:       (empty)
 Result:    data/ABCD/ACEG/ABCDEFGH/
 ```
-Both `p2` and `p3` reference the literal `ABCDEFGH` at position 4.
+Both `left` and `everyNth` reference the literal `ABCDEFGH` at position 4.
 
 ---
 
-### 5. Date-based partitioning
+### 5. Function with literal suffix
+```
+Template:  testdata/events/shard-00/{left(p2, 5)}-test
+Key:       (empty)
+Result:    testdata/events/shard-00/event-test
+```
+`p2` references segment 2 (`events`). The function result `event` is followed by the literal suffix `-test`.
+
+---
+
+### 6. Function suffix with extension
+```
+Template:  files/{upper(key)}.json
+Key:       report
+Result:    files/REPORT.json
+```
+
+---
+
+### 7. Date-based partitioning
 ```
 Template:  logs/{date(yyyy/MM/dd)}/
 Key:       (empty)
@@ -172,7 +219,7 @@ Result:    reports/2026/06/summary/
 
 ---
 
-### 6. Combined date and key
+### 8. Combined date and key
 ```
 Template:  data/{date(yyyy/MM/dd)}/{everyNth(key, 0, 2)}/{key}/
 Key:       MTIzLzQ1Ni83ODkvMDEy
@@ -181,21 +228,12 @@ Result:    data/2026/07/04/MILQN8OkME/MTIzLzQ1Ni83ODkvMDEy/
 
 ---
 
-### 7. Wildcard search
+### 9. Wildcard search
 ```
 Template:  myprefix/{everyNth(key, 0, 2)}/
 Key:       ABCD*
 ```
 Lists all objects under `myprefix/<everyNth result>/` whose key starts with `ABCD`.
-
----
-
-## Favorites
-
-Favorites save a named combination of **server + bucket + prefix template + key** for quick reuse.
-They are stored in the browser's `localStorage` — no server-side state required.
-
-Click a favorite pill to pre-fill the form. Click `×` to delete it.
 
 ---
 
@@ -296,4 +334,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-14
+last update uwe.geercken@web.de - 2026-07-18
