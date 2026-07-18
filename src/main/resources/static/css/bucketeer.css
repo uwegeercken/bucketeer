@@ -102,3 +102,24 @@ footer {
     font-size: 0.82rem;
     line-height: 1.7;
 }
+
+/* Dark mode overrides */
+[data-bs-theme="dark"] body {
+    background-color: var(--bs-body-bg);
+}
+[data-bs-theme="dark"] .panel {
+    background: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color);
+}
+[data-bs-theme="dark"] .fav-pill {
+    background: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color);
+    color: var(--bs-body-color);
+}
+[data-bs-theme="dark"] .fav-pill:hover {
+    background: var(--bs-secondary-bg);
+}
+[data-bs-theme="dark"] .syntax-block {
+    background: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color);
+}
