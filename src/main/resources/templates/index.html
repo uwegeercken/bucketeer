@@ -64,18 +64,17 @@
                            th:value="${prefix}" oninput="updateResolvedPrefix()"/>
                     <div id="prefixError" class="text-danger small mt-1" style="display:none;"></div>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-4">
                     <label class="form-label small fw-semibold" th:text="#{label.key}">Key</label>
-                    <input type="text" name="key" id="keyInput"
-                           class="form-control form-control-sm font-monospace"
-                           th:value="${key}" oninput="updateResolvedPrefix()"/>
-                </div>
-                <div class="col-auto">
-                    <label class="form-label small fw-semibold invisible">&nbsp;</label>
-                    <button type="submit" id="searchBtn" class="btn btn-sm btn-outline-secondary btn-icon"
-                            th:title="#{label.search}" th:aria-label="#{label.search}">
-                        <i class="bi bi-search"></i>
-                    </button>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="text" name="key" id="keyInput"
+                               class="form-control form-control-sm font-monospace"
+                               th:value="${key}" oninput="updateResolvedPrefix()"/>
+                        <button type="submit" id="searchBtn" class="btn btn-sm btn-outline-secondary btn-icon flex-shrink-0"
+                                th:title="#{label.search}" th:aria-label="#{label.search}">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </form>
