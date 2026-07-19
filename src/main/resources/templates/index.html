@@ -14,7 +14,7 @@
 
     <!-- Error -->
     <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show py-2" role="alert">
-        <strong>Fehler:</strong> <span th:text="${errorMessage}"></span>
+        <strong th:text="#{msg.error}">Fehler:</strong> <span th:text="${errorMessage}"></span>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 
@@ -87,11 +87,11 @@
             <span th:text="#{nav.results}">Results</span>
             <div class="d-flex gap-1">
                 <button type="button" id="btnExport" class="btn btn-sm btn-outline-secondary btn-icon"
-                        onclick="exportParquet()" title="Export Parquet" disabled>
+                        onclick="exportParquet()" th:title="#{btn.exportParquet}" disabled>
                     <i class="bi bi-file-earmark-arrow-down"></i>
                 </button>
                 <button type="button" id="toggleMaximize" class="btn btn-sm btn-outline-secondary btn-icon"
-                        onclick="toggleMaximize()" title="Maximize / Restore">
+                        onclick="toggleMaximize()" th:title="#{btn.toggleMaximize}">
                     <i class="bi bi-arrows-fullscreen"></i>
                 </button>
             </div>

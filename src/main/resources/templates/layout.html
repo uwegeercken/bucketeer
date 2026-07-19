@@ -69,7 +69,7 @@
             <a th:if="${backUrl != null}" th:href="${backUrl}"
                class="btn btn-sm btn-outline-light" th:text="#{nav.back}">← Back</a>
             <button class="btn btn-sm btn-outline-light" id="themeToggle"
-                    title="Toggle dark mode" onclick="toggleTheme()">
+                    th:title="#{label.themeToggle}" onclick="toggleTheme()">
                 <i class="bi bi-moon-stars" id="themeIcon"></i>
             </button>
             <a class="btn btn-sm btn-outline-light" href="/config"

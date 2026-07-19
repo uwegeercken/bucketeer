@@ -44,3 +44,6 @@ replay_pid*
 /target/maven-status/maven-compiler-plugin/testCompile/default-testCompile/inputFiles.lst
 /target/surefire-reports/io.github.uwegeercken.bucketeer.domain.template.TemplateEngineTest.txt
 /target/surefire-reports/TEST-io.github.uwegeercken.bucketeer.domain.template.TemplateEngineTest.xml
+/target/classes/templates/settings.html
+/target/maven-archiver/pom.properties
+/target/**/*

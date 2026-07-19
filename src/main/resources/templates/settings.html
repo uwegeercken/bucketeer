@@ -12,6 +12,18 @@
 
 <main class="container-fluid px-4">
     <div class="panel" style="max-width: 600px;">
+        <div class="panel-title" th:text="#{settings.section.language}">Sprache</div>
+        <div class="mb-4">
+            <label class="form-label fw-semibold small" th:text="#{settings.language.label}">Oberflächensprache</label>
+            <select class="form-select form-select-sm" style="width: 200px;"
+                    onchange="window.location.href='/settings?lang=' + this.value">
+                <option value="de" th:selected="${currentLang == 'de'}">Deutsch</option>
+                <option value="en" th:selected="${currentLang == 'en'}">English</option>
+            </select>
+        </div>
+
+        <hr class="border-secondary"/>
+
         <div class="panel-title" th:text="#{settings.section.query}">Abfrage</div>
 
         <div class="mb-4">
