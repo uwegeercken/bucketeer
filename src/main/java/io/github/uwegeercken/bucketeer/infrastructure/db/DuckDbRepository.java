@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * In-memory DuckDB repository for caching S3 object listings.
@@ -19,6 +21,15 @@ public class DuckDbRepository {
     private static final Logger log = LoggerFactory.getLogger(DuckDbRepository.class);
 
     private final Connection connection;
+
+    private static boolean isValidRegex(String pattern) {
+        try {
+            Pattern.compile(pattern);
+            return true;
+        } catch (PatternSyntaxException e) {
+            return false;
+        }
+    }
 
     public DuckDbRepository() {
         try {
@@ -102,9 +113,9 @@ public class DuckDbRepository {
 
         List<Object> params = new ArrayList<>();
 
-        if (keyFilter != null && !keyFilter.isBlank()) {
-            sql.append(" AND key LIKE ?");
-            params.add("%" + keyFilter + "%");
+        if (keyFilter != null && !keyFilter.isBlank() && isValidRegex(keyFilter)) {
+            sql.append(" AND regexp_matches(key, ?)");
+            params.add(keyFilter);
         }
         if (minSizeKb != null) {
             sql.append(" AND size_bytes >= ?");
@@ -168,9 +179,9 @@ public class DuckDbRepository {
         StringBuilder where = new StringBuilder("WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
-        if (keyFilter != null && !keyFilter.isBlank()) {
-            where.append(" AND key LIKE ?");
-            params.add("%" + keyFilter + "%");
+        if (keyFilter != null && !keyFilter.isBlank() && isValidRegex(keyFilter)) {
+            where.append(" AND regexp_matches(key, ?)");
+            params.add(keyFilter);
         }
         if (minSizeKb != null) {
             where.append(" AND size_bytes >= ?");
@@ -209,9 +220,9 @@ public class DuckDbRepository {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM objects WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
-        if (keyFilter != null && !keyFilter.isBlank()) {
-            sql.append(" AND key LIKE ?");
-            params.add("%" + keyFilter + "%");
+        if (keyFilter != null && !keyFilter.isBlank() && isValidRegex(keyFilter)) {
+            sql.append(" AND regexp_matches(key, ?)");
+            params.add(keyFilter);
         }
         if (minSizeKb != null) {
             sql.append(" AND size_bytes >= ?");

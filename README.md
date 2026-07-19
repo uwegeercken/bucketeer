@@ -10,7 +10,7 @@ The S3 prefix can be typed in literally or generated dynamically using functions
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.3.0.jar
+java -jar target/bucketeer-0.3.1.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -32,7 +32,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.3.0.jar
+java -jar target/bucketeer-0.3.1.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -245,7 +245,7 @@ Once loading is complete, the results can be filtered without additional S3 requ
 
 | Filter | Description |
 |--------|-------------|
-| **Name contains** | Substring match on the object key |
+| **Name contains** | [Regular expression](https://duckdb.org/docs/stable/sql/functions/regular_expressions.html) match on the object key |
 | **Size min / max (KB)** | Filter by object size in kilobytes |
 | **Date from / to** | Filter by last-modified date |
 
