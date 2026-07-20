@@ -363,33 +363,45 @@
     })();
     let pollInterval = null;
 
-    function startPolling() {
+    async function startPolling() {
         if (!queryStarted) return;
+        try {
+            const res  = await fetch('/api/query/status');
+            const data = await res.json();
+            if (data.status === 'DONE' || data.status === 'ERROR') {
+                handleQueryResult(data);
+                return;
+            }
+        } catch (e) { /* ignore */ }
         pollInterval = setInterval(async () => {
             try {
                 const res  = await fetch('/api/query/status');
                 const data = await res.json();
-                const statusText = document.getElementById('queryStatusText');
-                if (data.status === 'RUNNING') {
-                    statusText.textContent = data.objectsFound + ' ' + labelObjFound;
-                } else if (data.status === 'DONE') {
-                    clearInterval(pollInterval);
-                    document.getElementById('querySpinner').style.display = 'none';
-                    if (data.objectsFound === 0) {
-                        statusText.textContent = labelNoObj;
-                    } else {
-                        statusText.textContent = data.objectsFound + ' ' + labelObjTotal;
-                        document.getElementById('filterForm').style.display = 'block';
-                        loadResults();
-                    }
-                } else if (data.status === 'ERROR') {
-                    clearInterval(pollInterval);
-                    document.getElementById('querySpinner').style.display = 'none';
-                    statusText.classList.add('text-danger');
-                    statusText.textContent = labelQryErr + ' ' + data.error;
-                }
+                handleQueryResult(data);
             } catch (e) { /* ignore */ }
         }, 500);
+    }
+
+    function handleQueryResult(data) {
+        const statusText = document.getElementById('queryStatusText');
+        if (data.status === 'RUNNING') {
+            statusText.textContent = data.objectsFound + ' ' + labelObjFound;
+        } else if (data.status === 'DONE') {
+            clearInterval(pollInterval);
+            document.getElementById('querySpinner').style.display = 'none';
+            if (data.objectsFound === 0) {
+                statusText.textContent = labelNoObj;
+            } else {
+                statusText.textContent = data.objectsFound + ' ' + labelObjTotal;
+                document.getElementById('filterForm').style.display = 'block';
+                loadResults();
+            }
+        } else if (data.status === 'ERROR') {
+            clearInterval(pollInterval);
+            document.getElementById('querySpinner').style.display = 'none';
+            statusText.classList.add('text-danger');
+            statusText.textContent = labelQryErr + ' ' + data.error;
+        }
     }
 
     async function loadResults() {

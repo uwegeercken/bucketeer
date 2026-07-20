@@ -335,4 +335,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-18
+last update uwe.geercken@web.de - 2026-07-20

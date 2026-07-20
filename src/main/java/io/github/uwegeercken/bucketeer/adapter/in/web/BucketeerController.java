@@ -115,6 +115,11 @@ public class BucketeerController {
             });
 
             model.addAttribute("queryStarted", true);
+        } else {
+            QueryContext qc = (QueryContext) session.getAttribute(QueryContext.SESSION_KEY);
+            if (qc != null && qc.getStatus() == QueryContext.Status.DONE && duckDb.count() > 0) {
+                model.addAttribute("queryStarted", true);
+            }
         }
 
         return "index";
