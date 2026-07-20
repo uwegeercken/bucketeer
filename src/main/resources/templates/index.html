@@ -449,18 +449,18 @@
         pag.style.display = 'flex';
         pag.innerHTML = '';
 
-        const btn = (label, disabled, onclick) => {
+        const btn = (iconClass, disabled, onclick) => {
             const b = document.createElement('button');
-            b.className = 'btn btn-sm btn-outline-primary';
-            b.textContent = label;
+            b.className = 'btn btn-sm btn-outline-secondary btn-icon';
+            b.innerHTML = '<i class="bi ' + iconClass + '"></i>';
             b.disabled = disabled;
             if (!disabled) b.onclick = onclick;
             return b;
         };
 
-        pag.appendChild(btn('\u00ab\u00ab', currentPage === 0,
+        pag.appendChild(btn('bi-skip-start', currentPage === 0,
             () => { currentPage = 0; loadResults(); }));
-        pag.appendChild(btn('\u2039', currentPage === 0,
+        pag.appendChild(btn('bi-skip-backward', currentPage === 0,
             () => { currentPage--; loadResults(); }));
 
         const info = document.createElement('span');
@@ -468,9 +468,9 @@
         info.textContent = (currentPage + 1) + ' / ' + totalPages;
         pag.appendChild(info);
 
-        pag.appendChild(btn('\u203a', currentPage >= totalPages - 1,
+        pag.appendChild(btn('bi-skip-forward', currentPage >= totalPages - 1,
             () => { currentPage++; loadResults(); }));
-        pag.appendChild(btn('\u00bb\u00bb', currentPage >= totalPages - 1,
+        pag.appendChild(btn('bi-skip-end', currentPage >= totalPages - 1,
             () => { currentPage = totalPages - 1; loadResults(); }));
     }
 
