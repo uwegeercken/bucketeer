@@ -106,9 +106,13 @@ public class DuckDbRepository {
      * @param page           0-based page number
      * @param pageSize       number of results per page
      */
+    private static final java.util.Set<String> SORT_COLUMNS = java.util.Set.of("key", "size_bytes", "last_modified");
+    private static final java.util.Set<String> SORT_DIRS = java.util.Set.of("asc", "desc");
+
     public List<S3Object> query(String keyFilter, Long minSizeKb, Long maxSizeKb,
                                 String dateFrom, String dateTo,
-                                int page, int pageSize) {
+                                int page, int pageSize,
+                                String sortBy, String sortDir) {
         StringBuilder sql = new StringBuilder("SELECT key, bucket, size_bytes, last_modified, etag FROM objects WHERE 1=1");
 
         List<Object> params = new ArrayList<>();
@@ -134,7 +138,9 @@ public class DuckDbRepository {
             params.add(dateTo + " 23:59:59");
         }
 
-        sql.append(" ORDER BY key");
+        String col = (sortBy != null && SORT_COLUMNS.contains(sortBy)) ? sortBy : "key";
+        String dir = (sortDir != null && SORT_DIRS.contains(sortDir.toLowerCase())) ? sortDir.toLowerCase() : "asc";
+        sql.append(" ORDER BY ").append(col).append(" ").append(dir);
         sql.append(" LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add(page * pageSize);

@@ -35,7 +35,7 @@
     <!-- Search -->
     <div class="panel" id="searchPanel">
         <div class="panel-title" th:text="#{nav.search}">Search</div>
-        <form method="get" action="/" id="searchForm">
+        <form method="get" action="/" id="searchForm" onsubmit="sessionStorage.removeItem('bkt_sort_by');sessionStorage.removeItem('bkt_sort_dir');sortBy='key';sortDir='asc';">
             <input type="hidden" name="search" value="true"/>
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
@@ -148,9 +148,15 @@
                class="table table-sm table-hover table-bordered mb-2 results-table">
             <thead class="table-secondary">
             <tr>
-                <th th:text="#{label.objectName}">Name</th>
-                <th class="text-end" style="width:110px" th:text="#{label.size}">Size (KB)</th>
-                <th style="width:210px" th:text="#{label.lastModified}">Last Modified</th>
+                <th style="cursor:pointer;" onclick="toggleSort('key')" id="th-key">
+                    <span th:text="#{label.objectName}">Name</span> <i class="bi bi-arrow-down-up small text-muted"></i>
+                </th>
+                <th class="text-end" style="width:110px;cursor:pointer;" onclick="toggleSort('size_bytes')" id="th-size_bytes">
+                    <span th:text="#{label.size}">Size (KB)</span> <i class="bi bi-arrow-down-up small text-muted"></i>
+                </th>
+                <th style="width:210px;cursor:pointer;" onclick="toggleSort('last_modified')" id="th-last_modified">
+                    <span th:text="#{label.lastModified}">Last Modified</span> <i class="bi bi-arrow-down-up small text-muted"></i>
+                </th>
                 <th style="width:52px"></th>
             </tr>
             </thead>
@@ -329,12 +335,18 @@
         sessionStorage.setItem('bkt_bucket', document.getElementById('bucketInput').value);
         sessionStorage.setItem('bkt_prefix', document.getElementById('prefixInput').value);
         sessionStorage.setItem('bkt_key',    document.getElementById('keyInput').value);
+        sessionStorage.setItem('bkt_sort_by',  sortBy);
+        sessionStorage.setItem('bkt_sort_dir', sortDir);
     }
 
     function restoreFormState() {
         const bucket = sessionStorage.getItem('bkt_bucket');
         const prefix = sessionStorage.getItem('bkt_prefix');
         const key    = sessionStorage.getItem('bkt_key');
+        const savedSortBy  = sessionStorage.getItem('bkt_sort_by');
+        const savedSortDir = sessionStorage.getItem('bkt_sort_dir');
+        if (savedSortBy)  sortBy  = savedSortBy;
+        if (savedSortDir) sortDir = savedSortDir;
         if (bucket) {
             const sel = document.getElementById('bucketInput');
             if (sel.querySelector('option[value="' + CSS.escape(bucket) + '"]')) {
@@ -354,6 +366,8 @@
     // --- Query polling ---
 
     let currentPage  = 0;
+    let sortBy       = 'key';
+    let sortDir      = 'asc';
     const SETTINGS_KEY = 'bucketeer_settings';
     const PAGE_SIZE  = (() => {
         try {
@@ -405,7 +419,7 @@
     }
 
     async function loadResults() {
-        const params = new URLSearchParams({ page: currentPage, pageSize: PAGE_SIZE });
+        const params = new URLSearchParams({ page: currentPage, pageSize: PAGE_SIZE, sortBy: sortBy, sortDir: sortDir });
         const keyFilter = document.getElementById('filterKey')?.value    || '';
         const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
         const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
@@ -441,6 +455,7 @@
 
         renderPagination('paginationTop',    data.total, totalPages);
         renderPagination('paginationBottom', data.total, totalPages);
+        updateSortHeaders();
     }
 
     function renderPagination(elementId, total, totalPages) {
@@ -512,6 +527,33 @@
         currentPage = 0;
         clearTimeout(filterTimer);
         filterTimer = setTimeout(loadResults, 300);
+    }
+
+    function toggleSort(column) {
+        if (sortBy === column) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortBy = column;
+            sortDir = 'asc';
+        }
+        currentPage = 0;
+        updateSortHeaders();
+        loadResults();
+    }
+
+    function updateSortHeaders() {
+        ['key', 'size_bytes', 'last_modified'].forEach(col => {
+            const th = document.getElementById('th-' + col);
+            if (!th) return;
+            const icon = th.querySelector('i');
+            if (col === sortBy) {
+                icon.className = sortDir === 'asc'
+                    ? 'bi bi-arrow-up text-primary'
+                    : 'bi bi-arrow-down text-primary';
+            } else {
+                icon.className = 'bi bi-arrow-down-up small text-muted';
+            }
+        });
     }
 
     document.addEventListener('DOMContentLoaded', () => {

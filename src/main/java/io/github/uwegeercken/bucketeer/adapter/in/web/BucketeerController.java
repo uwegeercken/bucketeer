@@ -167,9 +167,11 @@ public class BucketeerController {
             @RequestParam(required = false) String dateFrom,
             @RequestParam(required = false) String dateTo,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int pageSize) {
+            @RequestParam(defaultValue = "100") int pageSize,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir) {
 
-        List<S3Object> results = duckDb.query(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo, page, pageSize);
+        List<S3Object> results = duckDb.query(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo, page, pageSize, sortBy, sortDir);
         long total = duckDb.queryCount(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
 
         List<Map<String, Object>> rows = results.stream()
