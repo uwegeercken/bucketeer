@@ -4,7 +4,7 @@ A web-based S3 object browser supporting listing, filtering, download, export to
 
 The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and date. Functions can be nested and may have literal suffixes.
 
-![img.png](img.png)
+![img_1.png](img_1.png)
 ---
 
 ## Running
