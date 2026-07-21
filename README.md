@@ -65,6 +65,31 @@ Click a favorite pill to pre-fill the form. Click `×` to delete it.
 - Export Parquet is available in the results title bar when results are present
 - A resolved prefix popover shows the computed S3 path on hover
 
+### Sorting
+
+Click any column header (**Name**, **Size**, **Last Modified**) to sort the results.
+Click the same header again to reverse the sort direction.
+
+- The active sort column is indicated by an up/down arrow
+- Sort state is preserved when navigating away and back (e.g. to Settings or Help)
+- A new search resets sorting to the default (Name, ascending)
+
+### Selection
+
+The selection lets you collect objects across multiple searches and download them all at once as a ZIP file.
+
+**Adding items:**
+- Select individual rows with the checkboxes and click the **cart-plus** icon
+- Or click the **cart-check** icon to add all currently filtered results
+
+**Selection page (`/cart`):**
+- Lists all collected items with name, server, bucket, size and date
+- **Download all as ZIP** – streams all items into a single zip archive
+- **Clear selection** – removes all items
+
+The selection persists across searches and page navigations within the same session.
+Duplicate items (same server + bucket + key) are not added twice.
+
 ---
 
 ## Prefix Templates

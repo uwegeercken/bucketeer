@@ -84,7 +84,17 @@
     <div class="panel" id="resultsPanel" th:if="${queryStarted}">
         <div class="panel-title d-flex align-items-center justify-content-between">
             <span th:text="#{nav.results}">Results</span>
-            <div class="d-flex gap-1">
+            <div class="d-flex gap-1 align-items-center">
+                <span id="cartBadge" class="badge bg-secondary" style="display:none;cursor:pointer;"
+                      onclick="window.location.href='/cart'" title="Selection"></span>
+                <button type="button" id="btnAddSelected" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="addSelectedToCart()" th:title="#{cart.addSelected}" disabled>
+                    <i class="bi bi-cart-plus"></i>
+                </button>
+                <button type="button" id="btnAddAll" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="addAllToCart()" th:title="#{cart.addAll}">
+                    <i class="bi bi-cart-check"></i>
+                </button>
                 <button type="button" id="btnExport" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="exportParquet()" th:title="#{btn.exportParquet}" disabled>
                     <i class="bi bi-file-earmark-arrow-down"></i>
@@ -148,6 +158,9 @@
                class="table table-sm table-hover table-bordered mb-2 results-table">
             <thead class="table-secondary">
             <tr>
+                <th style="width:40px;">
+                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"/>
+                </th>
                 <th style="cursor:pointer;" onclick="toggleSort('key')" id="th-key">
                     <span th:text="#{label.objectName}">Name</span> <i class="bi bi-arrow-down-up small text-muted"></i>
                 </th>
@@ -157,7 +170,7 @@
                 <th style="width:210px;cursor:pointer;" onclick="toggleSort('last_modified')" id="th-last_modified">
                     <span th:text="#{label.lastModified}">Last Modified</span> <i class="bi bi-arrow-down-up small text-muted"></i>
                 </th>
-                <th style="width:52px"></th>
+                <th style="width:90px"></th>
             </tr>
             </thead>
             <tbody id="resultsBody"></tbody>
@@ -437,12 +450,19 @@
         const tbody = document.getElementById('resultsBody');
         tbody.innerHTML = data.rows.map(row =>
             '<tr>'
+            + '<td><input type="checkbox" class="row-check" data-key="' + escHtml(row.key) + '"'
+            + ' data-sizebytes="' + row.sizeBytes + '"'
+            + ' data-lastmodified="' + escHtml(row.lastModified) + '"'
+            + ' onchange="updateAddSelectedBtn()"/></td>'
             + '<td class="text-break font-monospace small">' + escHtml(row.key) + '</td>'
             + '<td class="text-end small">' + escHtml(row.sizeKb) + '</td>'
             + '<td class="small">' + escHtml(row.lastModified) + '</td>'
-            + '<td><a href="/download?bucket=' + encodeURIComponent(currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a></td>'
+            + '<td class="d-flex gap-1">'
+            + '<a href="/download?bucket=' + encodeURIComponent(currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a>'
+            + '</td>'
             + '</tr>'
         ).join('');
+        document.getElementById('selectAll').checked = false;
 
         document.getElementById('resultsTable').style.display = data.rows.length > 0 ? '' : 'none';
 
@@ -556,6 +576,97 @@
         });
     }
 
+    // --- Cart ---
+
+    function toggleSelectAll(checked) {
+        document.querySelectorAll('.row-check').forEach(cb => cb.checked = checked);
+        updateAddSelectedBtn();
+    }
+
+    function updateAddSelectedBtn() {
+        const anyChecked = document.querySelectorAll('.row-check:checked').length > 0;
+        document.getElementById('btnAddSelected').disabled = !anyChecked;
+    }
+
+    function getSelectedItems() {
+        return Array.from(document.querySelectorAll('.row-check:checked')).map(cb => ({
+            serverName:   currentServer,
+            bucket:       currentBucket,
+            key:          cb.dataset.key,
+            sizeBytes:    parseInt(cb.dataset.sizebytes, 10),
+            lastModified: cb.dataset.lastmodified ? new Date(cb.dataset.lastmodified).toISOString() : null
+        }));
+    }
+
+    async function addToCart(items) {
+        const res = await fetch('/api/cart/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(items)
+        });
+        const data = await res.json();
+        updateCartBadge(data.count);
+    }
+
+    function addSelectedToCart() {
+        const items = getSelectedItems();
+        if (items.length === 0) return;
+        addToCart(items);
+        document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
+        document.getElementById('selectAll').checked = false;
+        updateAddSelectedBtn();
+    }
+
+    async function addAllToCart() {
+        let allItems = [];
+        let page = 0;
+        const pageSize = PAGE_SIZE;
+        while (true) {
+            const params = new URLSearchParams({ page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir });
+            const keyFilter = document.getElementById('filterKey')?.value || '';
+            const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
+            const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
+            const dateFrom = document.getElementById('filterDateFrom')?.value || '';
+            const dateTo = document.getElementById('filterDateTo')?.value || '';
+            if (keyFilter) params.append('keyFilter', keyFilter);
+            if (minSizeKb) params.append('minSizeKb', minSizeKb);
+            if (maxSizeKb) params.append('maxSizeKb', maxSizeKb);
+            if (dateFrom) params.append('dateFrom', dateFrom);
+            if (dateTo) params.append('dateTo', dateTo);
+            const res = await fetch('/api/query/results?' + params.toString());
+            const data = await res.json();
+            for (const row of data.rows) {
+                allItems.push({
+                    serverName:   currentServer,
+                    bucket:       currentBucket,
+                    key:          row.key,
+                    sizeBytes:    Math.round(parseFloat(row.sizeKb) * 1024),
+                    lastModified: row.lastModified ? new Date(row.lastModified).toISOString() : null
+                });
+            }
+            if (!data.hasMore) break;
+            page++;
+        }
+        if (allItems.length > 0) await addToCart(allItems);
+    }
+
+    async function updateCartBadge(count) {
+        if (count === undefined) {
+            try {
+                const res = await fetch('/api/cart/count');
+                const data = await res.json();
+                count = data.count;
+            } catch { count = 0; }
+        }
+        const badge = document.getElementById('cartBadge');
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'inline';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
             new bootstrap.Popover(el);
@@ -567,6 +678,7 @@
             renderFavorites();
             updateResolvedPrefix();
             startPolling();
+            updateCartBadge();
         });
 
         document.getElementById('favoritePills').addEventListener('click', e => {

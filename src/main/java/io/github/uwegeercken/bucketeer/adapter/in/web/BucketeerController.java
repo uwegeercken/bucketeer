@@ -178,6 +178,7 @@ public class BucketeerController {
                 .map(obj -> Map.<String, Object>of(
                         "key",          obj.key(),
                         "bucket",       obj.bucket(),
+                        "sizeBytes",    obj.sizeBytes(),
                         "sizeKb",       String.format("%.2f", obj.sizeBytes() / 1024.0),
                         "lastModified", obj.lastModified() != null ? obj.lastModified().toString() : "",
                         "etag",         obj.etag() != null ? obj.etag() : ""
