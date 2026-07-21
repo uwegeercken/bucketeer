@@ -1,4 +1,14 @@
 services:
+  bucketeer:
+    build: .
+    container_name: bucketeer
+    ports:
+      - "8080:8080"
+    volumes:
+      - bucketeer-data:/root/.bucketeer
+    depends_on:
+      - minio
+
   minio:
     image: minio/minio:latest
     container_name: minio
@@ -13,4 +23,5 @@ services:
       - minio-data:/data
 
 volumes:
+  bucketeer-data:
   minio-data:
