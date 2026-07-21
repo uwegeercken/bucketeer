@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="#{cart.title}">Bucketeer – Selection</title>
+    <th:block th:replace="~{layout :: styles}"></th:block>
+</head>
+<body>
+
+<nav th:replace="~{layout :: header}"></nav>
+
+<main class="container-fluid px-4">
+
+    <div class="panel">
+        <div class="panel-title d-flex align-items-center justify-content-between">
+            <span th:text="#{cart.title}">Selection</span>
+            <div class="d-flex gap-1">
+                <a href="/cart/download-all" class="btn btn-sm btn-outline-secondary btn-icon"
+                   th:classappend="${cartItems.isEmpty()} ? 'disabled' : ''"
+                   th:title="#{cart.downloadAll}" id="btnDownloadAll">
+                    <i class="bi bi-file-earmark-zip"></i>
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-icon"
+                        onclick="clearCart()" th:title="#{cart.clear}"
+                        th:disabled="${cartItems.isEmpty()}" id="btnClearCart">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+
+        <div th:if="${cartItems.isEmpty()}" class="text-muted small fst-italic" th:text="#{cart.empty}"></div>
+
+        <div th:if="${!cartItems.isEmpty()}" class="mb-2">
+            <span class="text-muted small" th:text="#{cart.itemCount(${cartItems.size()})}"></span>
+            &mdash;
+            <span class="text-muted small" th:text="#{cart.totalSize(${totalSizeKb})}"></span>
+        </div>
+
+        <table th:if="${!cartItems.isEmpty()}" class="table table-sm table-hover table-bordered mb-0 results-table">
+            <thead class="table-secondary">
+            <tr>
+                <th th:text="#{label.objectName}">Name</th>
+                <th th:text="#{cart.server}">Server</th>
+                <th th:text="#{cart.bucket}">Bucket</th>
+                <th class="text-end" style="width:110px" th:text="#{label.size}">Size (KB)</th>
+                <th style="width:210px" th:text="#{label.lastModified}">Last Modified</th>
+                <th style="width:52px"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item, iter : ${cartItems}">
+                <td class="text-break font-monospace small" th:text="${item.key()}"></td>
+                <td class="small" th:text="${item.serverName()}"></td>
+                <td class="small" th:text="${item.bucket()}"></td>
+                <td class="text-end small" th:text="${#numbers.formatDecimal(item.sizeBytes() / 1024.0, 1, 2)}"></td>
+                <td class="small" th:text="${item.lastModified() != null ? #temporals.format(item.lastModified(), 'yyyy-MM-dd HH:mm:ss') : ''}"></td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-icon"
+                            th:data-server="${item.serverName()}" th:data-bucket="${item.bucket()}"
+                            th:data-key="${item.key()}" onclick="removeItem(this)">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    const labelConfirmClear = /*[[#{cart.confirm.clear}]]*/ 'Clear all items from cart?';
+
+    function removeItem(btn) {
+        const item = {
+            serverName: btn.dataset.server,
+            bucket:     btn.dataset.bucket,
+            key:        btn.dataset.key
+        };
+        fetch('/api/cart/remove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        }).then(() => location.reload());
+    }
+
+    function clearCart() {
+        if (!confirm(labelConfirmClear)) return;
+        fetch('/api/cart/clear', { method: 'POST' })
+            .then(() => location.reload());
+    }
+</script>
+</body>
+</html>
