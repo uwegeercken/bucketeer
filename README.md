@@ -1,6 +1,6 @@
 # Bucketeer
 
-A web-based S3 object browser supporting listing, filtering, download, export to parquet and favorites.
+A web-based S3 object browser supporting listing, filtering, download, snapshots and favorites.
 
 The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and date. Functions can be nested and may have literal suffixes.
 
@@ -11,7 +11,7 @@ The S3 prefix can be typed in literally or generated dynamically using functions
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.3.1.jar
+java -jar target/bucketeer-0.4.0.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -33,7 +33,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.3.1.jar
+java -jar target/bucketeer-0.4.0.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -62,7 +62,6 @@ Click a favorite pill to pre-fill the form. Click `×` to delete it.
 ### Results Panel
 
 - Click the maximize icon to expand the results panel to full width
-- Export Parquet is available in the results title bar when results are present
 - A resolved prefix popover shows the computed S3 path on hover
 
 ### Sorting
@@ -281,36 +280,24 @@ A progress indicator shows how many objects have been found while S3 pagination 
 
 ---
 
-## Parquet Export
+## Snapshots
 
-After a query, the current filtered result set can be exported as a **Parquet file** using the **Export Parquet** button. The active filters are applied to the export — what you see is what you get.
+Snapshots save the complete result set of a query (all objects under the searched prefix) as a Parquet file with metadata. This allows comparing results over time to detect new, removed, or changed objects.
 
-The exported file is named automatically:
-```
-bucketeer-<bucket>-yyyyMMdd_HHmmss.parquet
-```
+**Saving a snapshot:**
+- Run a query, then click the **bookmark-plus** icon in the results title bar
+- The snapshot is auto-named from the query parameters (e.g. `my-bucket / data/2024/*`)
+- The snapshot stores all objects under the prefix (unfiltered)
 
-The Parquet file contains the following columns:
+**Snapshot page (`/snapshots`):**
+- Lists all saved snapshots with name, server, bucket, prefix, date and object count
+- **Compare** – shows a diff against the current query results (added, removed, changed objects)
+- **Delete** – removes a snapshot
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `key` | VARCHAR | S3 object key |
-| `bucket` | VARCHAR | Bucket name |
-| `size_bytes` | BIGINT | Object size in bytes |
-| `last_modified` | TIMESTAMP | Last modification time |
-| `etag` | VARCHAR | S3 ETag |
-
-The file can be used directly with DuckDB, DuckLake, or any other Parquet-compatible tool:
-
-```sql
--- DuckDB example
-SELECT * FROM 'bucketeer-mybucket-20260712_143000.parquet';
-
--- aggregate example
-SELECT bucket, COUNT(*) as count, SUM(size_bytes)/1024/1024 as total_mb
-FROM 'bucketeer-mybucket-20260712_143000.parquet'
-GROUP BY bucket;
-```
+**Retention:**
+- Snapshots are automatically cleaned up after a configurable number of days
+- Default: 30 days, configurable in **Settings** (`/settings`)
+- Retention is stored in `~/.bucketeer/settings.json`
 
 ---
 
@@ -360,4 +347,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-20
+last update uwe.geercken@web.de - 2026-07-21
