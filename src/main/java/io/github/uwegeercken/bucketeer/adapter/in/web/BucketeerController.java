@@ -94,6 +94,10 @@ public class BucketeerController {
             QueryContext qc = new QueryContext();
             session.setAttribute(QueryContext.SESSION_KEY, qc);
 
+            // store query parameters for snapshot matching
+            QueryParams qp = new QueryParams(currentServer, bucket, prefix, key, null, null, null);
+            session.setAttribute("bucketeer_query_params", qp);
+
             duckDb.clear();
             qc.start();
 
@@ -156,6 +160,14 @@ public class BucketeerController {
                 "objectsFound", qc.getObjectsFound(),
                 "error",        qc.getErrorMessage() != null ? qc.getErrorMessage() : ""
         );
+    }
+
+    @GetMapping(value = "/api/query/params", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, String> queryParams(HttpSession session) {
+        QueryParams qp = (QueryParams) session.getAttribute("bucketeer_query_params");
+        if (qp == null) return Map.of();
+        return qp.toMap();
     }
 
     @GetMapping(value = "/api/query/results", produces = MediaType.APPLICATION_JSON_VALUE)

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="#{snapshot.list}">Snapshots</title>
+    <th:block th:replace="~{layout :: styles}"></th:block>
+</head>
+<body>
+
+<nav th:replace="~{layout :: header}"></nav>
+
+<main class="container-fluid px-4">
+
+    <!-- Snapshot list -->
+    <div class="panel" id="snapshotsPanel">
+        <div class="panel-title d-flex align-items-center justify-content-between">
+            <span th:text="#{snapshot.list}">Snapshots</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
+                    onclick="loadSnapshots()" th:title="#{snapshot.list}">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+        <div id="snapshotList">
+            <span class="text-muted small fst-italic" th:text="#{snapshot.empty}">No snapshots saved yet.</span>
+        </div>
+    </div>
+
+    <!-- Diff -->
+    <div class="panel" id="diffPanel" style="display:none;">
+        <div class="panel-title d-flex align-items-center justify-content-between">
+            <span id="diffTitle">Diff</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
+                    onclick="document.getElementById('diffPanel').style.display='none'">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div id="diffSummary" class="mb-2"></div>
+        <div id="diffContent"></div>
+    </div>
+
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    const labelSnapshotNameH   = /*[[#{snapshot.name}]]*/ 'Name';
+    const labelSnapshotDate    = /*[[#{snapshot.date}]]*/ 'Saved';
+    const labelSnapshotCount   = /*[[#{snapshot.count}]]*/ 'Objects';
+    const labelSnapshotActions = /*[[#{snapshot.actions}]]*/ 'Actions';
+    const labelSnapshotCompare = /*[[#{snapshot.compare}]]*/ 'Compare with snapshot';
+    const labelSnapshotDelete  = /*[[#{snapshot.delete}]]*/ 'Delete snapshot';
+    const labelSnapshotConfirm = /*[[#{snapshot.confirm.delete}]]*/ 'Delete this snapshot?';
+    const labelSnapshotEmpty   = /*[[#{snapshot.empty}]]*/ 'No snapshots saved yet.';
+    const labelDiffAdded       = /*[[#{snapshot.diff.added}]]*/ 'Added';
+    const labelDiffRemoved     = /*[[#{snapshot.diff.removed}]]*/ 'Removed';
+    const labelDiffChanged     = /*[[#{snapshot.diff.changed}]]*/ 'Changed';
+    const labelDiffNoChanges   = /*[[#{snapshot.diff.noChanges}]]*/ 'No changes detected.';
+    const labelDiffTitle       = /*[[#{snapshot.diff.title}]]*/ 'Diff:';
+    const labelSnapshotServer  = /*[[#{snapshot.server}]]*/ 'Server';
+    const labelSnapshotBucket  = /*[[#{snapshot.bucket}]]*/ 'Bucket';
+    const labelSnapshotPrefix  = /*[[#{snapshot.prefix}]]*/ 'Prefix';
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function loadSnapshots() {
+        const container = document.getElementById('snapshotList');
+        try {
+            const res = await fetch('/api/snapshots');
+            const snapshots = await res.json();
+            if (snapshots.length === 0) {
+                container.innerHTML = '<span class="text-muted small fst-italic">' + escHtml(labelSnapshotEmpty) + '</span>';
+                return;
+            }
+            container.innerHTML = '<table class="table table-sm table-hover mb-1"><thead class="table-secondary"><tr>'
+                + '<th>' + escHtml(labelSnapshotNameH) + '</th>'
+                + '<th>' + escHtml(labelSnapshotServer) + '</th>'
+                + '<th>' + escHtml(labelSnapshotBucket) + '</th>'
+                + '<th>' + escHtml(labelSnapshotPrefix) + '</th>'
+                + '<th>' + escHtml(labelSnapshotDate) + '</th>'
+                + '<th class="text-end">' + escHtml(labelSnapshotCount) + '</th>'
+                + '<th>' + escHtml(labelSnapshotActions) + '</th>'
+                + '</tr></thead><tbody>'
+                + snapshots.map(s => '<tr>'
+                    + '<td class="small">' + escHtml(s.name) + '</td>'
+                    + '<td class="small">' + escHtml(s.serverName) + '</td>'
+                    + '<td class="small">' + escHtml(s.bucket) + '</td>'
+                    + '<td class="small font-monospace">' + escHtml(s.prefix) + '</td>'
+                    + '<td class="small">' + new Date(s.createdAt).toLocaleString() + '</td>'
+                    + '<td class="text-end small">' + s.rowCount + '</td>'
+                    + '<td class="d-flex gap-1">'
+                    + '<button class="btn btn-sm btn-outline-primary btn-icon" title="' + escHtml(labelSnapshotCompare) + '" onclick="compareSnapshot(\'' + s.id + '\', \'' + escHtml(s.name) + '\')"><i class="bi bi-arrow-left-right"></i></button>'
+                    + '<button class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelSnapshotDelete) + '" onclick="deleteSnapshot(\'' + s.id + '\')"><i class="bi bi-trash"></i></button>'
+                    + '</td></tr>')
+                .join('')
+                + '</tbody></table>';
+        } catch {
+            container.innerHTML = '<span class="text-muted small">Error loading snapshots</span>';
+        }
+    }
+
+    async function deleteSnapshot(id) {
+        if (!confirm(labelSnapshotConfirm)) return;
+        await fetch('/api/snapshots/' + id, { method: 'DELETE' });
+        loadSnapshots();
+    }
+
+    async function compareSnapshot(id, name) {
+        const panel = document.getElementById('diffPanel');
+        const titleEl = document.getElementById('diffTitle');
+        const summaryEl = document.getElementById('diffSummary');
+        const contentEl = document.getElementById('diffContent');
+        panel.style.display = 'block';
+        titleEl.textContent = labelDiffTitle + ' ' + name;
+        summaryEl.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div> Comparing...';
+        contentEl.innerHTML = '';
+
+        try {
+            const res = await fetch('/api/snapshots/' + id + '/compare', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) {
+                summaryEl.innerHTML = '<span class="text-danger">' + escHtml(data.error) + '</span>';
+                return;
+            }
+
+            const addedCount = data.added.length;
+            const removedCount = data.removed.length;
+            const changedCount = data.changed.length;
+
+            if (addedCount === 0 && removedCount === 0 && changedCount === 0) {
+                summaryEl.innerHTML = '<span class="text-success">' + escHtml(labelDiffNoChanges) + '</span>';
+                return;
+            }
+
+            summaryEl.innerHTML = '<span class="badge bg-success me-1">+' + addedCount + ' ' + escHtml(labelDiffAdded) + '</span>'
+                + '<span class="badge bg-danger me-1">-' + removedCount + ' ' + escHtml(labelDiffRemoved) + '</span>'
+                + '<span class="badge bg-warning text-dark me-1">~' + changedCount + ' ' + escHtml(labelDiffChanged) + '</span>';
+
+            let html = '';
+
+            if (addedCount > 0) {
+                html += '<h6 class="text-success mt-2">' + escHtml(labelDiffAdded) + ' (' + addedCount + ')</h6>';
+                html += '<table class="table table-sm table-bordered mb-2"><thead class="table-success"><tr>'
+                    + '<th>Name</th><th class="text-end">Size (KB)</th><th>Last Modified</th></tr></thead><tbody>'
+                    + data.added.map(r => '<tr><td class="text-break font-monospace small">' + escHtml(r.key) + '</td>'
+                        + '<td class="text-end small">' + (r.size_bytes != null ? (r.size_bytes / 1024).toFixed(2) : '') + '</td>'
+                        + '<td class="small">' + (r.last_modified || '') + '</td></tr>').join('')
+                    + '</tbody></table>';
+            }
+
+            if (removedCount > 0) {
+                html += '<h6 class="text-danger mt-2">' + escHtml(labelDiffRemoved) + ' (' + removedCount + ')</h6>';
+                html += '<table class="table table-sm table-bordered mb-2"><thead class="table-danger"><tr>'
+                    + '<th>Name</th><th class="text-end">Size (KB)</th><th>Last Modified</th></tr></thead><tbody>'
+                    + data.removed.map(r => '<tr><td class="text-break font-monospace small">' + escHtml(r.key) + '</td>'
+                        + '<td class="text-end small">' + (r.size_bytes != null ? (r.size_bytes / 1024).toFixed(2) : '') + '</td>'
+                        + '<td class="small">' + (r.last_modified || '') + '</td></tr>').join('')
+                    + '</tbody></table>';
+            }
+
+            if (changedCount > 0) {
+                html += '<h6 class="text-warning mt-2">' + escHtml(labelDiffChanged) + ' (' + changedCount + ')</h6>';
+                html += '<table class="table table-sm table-bordered mb-2"><thead class="table-warning"><tr>'
+                    + '<th>Name</th><th class="text-end">Old Size (KB)</th><th class="text-end">New Size (KB)</th><th>Old Modified</th><th>New Modified</th></tr></thead><tbody>'
+                    + data.changed.map(r => '<tr><td class="text-break font-monospace small">' + escHtml(r.key) + '</td>'
+                        + '<td class="text-end small">' + (r.old_size_bytes != null ? (r.old_size_bytes / 1024).toFixed(2) : '') + '</td>'
+                        + '<td class="text-end small">' + (r.new_size_bytes != null ? (r.new_size_bytes / 1024).toFixed(2) : '') + '</td>'
+                        + '<td class="small">' + (r.old_last_modified || '') + '</td>'
+                        + '<td class="small">' + (r.new_last_modified || '') + '</td></tr>').join('')
+                    + '</tbody></table>';
+            }
+
+            contentEl.innerHTML = html;
+        } catch (e) {
+            summaryEl.innerHTML = '<span class="text-danger">Comparison failed: ' + escHtml(e.message) + '</span>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSnapshots();
+    });
+</script>
+</body>
+</html>

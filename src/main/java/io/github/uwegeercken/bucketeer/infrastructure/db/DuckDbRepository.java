@@ -7,7 +7,9 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -221,6 +223,82 @@ public class DuckDbRepository {
             throw new RuntimeException("Parquet export failed: " + e.getMessage(), e);
         }
     }
+    /** Exports all current objects to a Parquet file (for snapshot creation). */
+    public long exportAllToParquet(String exportPath) {
+        String sql = "COPY (SELECT key, bucket, size_bytes, last_modified, etag FROM objects ORDER BY key) TO '"
+                + exportPath + "' (FORMAT PARQUET)";
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(sql);
+            return count();
+        } catch (SQLException e) {
+            log.error("Failed to export all to Parquet: {}", e.getMessage(), e);
+            throw new RuntimeException("Parquet export failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Compares the current in-memory objects table with a snapshot parquet file.
+     * Returns a DiffResult with added, removed, and changed objects.
+     */
+    public DiffResult diffWithSnapshot(String snapshotParquetPath) {
+        try (Statement stmt = connection.createStatement()) {
+            // Create temporary table from parquet
+            stmt.execute("CREATE OR REPLACE TEMPORARY TABLE snapshot_data AS "
+                    + "SELECT * FROM read_parquet('" + snapshotParquetPath + "')");
+
+            // Added: in current, not in snapshot
+            List<Map<String, Object>> added = queryDiff(
+                    "SELECT o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
+                            + "FROM objects o LEFT JOIN snapshot_data s ON o.key = s.key "
+                            + "WHERE s.key IS NULL ORDER BY o.key");
+
+            // Removed: in snapshot, not in current
+            List<Map<String, Object>> removed = queryDiff(
+                    "SELECT s.key, s.bucket, s.size_bytes, s.last_modified, s.etag "
+                            + "FROM snapshot_data s LEFT JOIN objects o ON s.key = o.key "
+                            + "WHERE o.key IS NULL ORDER BY s.key");
+
+            // Changed: same key, different size or last_modified
+            List<Map<String, Object>> changed = queryDiff(
+                    "SELECT o.key, o.bucket, o.size_bytes AS new_size_bytes, o.last_modified AS new_last_modified, "
+                            + "s.size_bytes AS old_size_bytes, s.last_modified AS old_last_modified "
+                            + "FROM objects o INNER JOIN snapshot_data s ON o.key = s.key "
+                            + "WHERE o.size_bytes != s.size_bytes "
+                            + "OR o.last_modified != s.last_modified "
+                            + "ORDER BY o.key");
+
+            stmt.execute("DROP TABLE IF EXISTS snapshot_data");
+
+            return new DiffResult(added, removed, changed);
+        } catch (SQLException e) {
+            log.error("Failed to compare with snapshot: {}", e.getMessage(), e);
+            throw new RuntimeException("Snapshot comparison failed: " + e.getMessage(), e);
+        }
+    }
+
+    private List<Map<String, Object>> queryDiff(String sql) throws SQLException {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            ResultSetMetaData meta = rs.getMetaData();
+            int colCount = meta.getColumnCount();
+            while (rs.next()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                for (int i = 1; i <= colCount; i++) {
+                    row.put(meta.getColumnLabel(i), rs.getObject(i));
+                }
+                rows.add(row);
+            }
+        }
+        return rows;
+    }
+
+    public record DiffResult(
+            List<Map<String, Object>> added,
+            List<Map<String, Object>> removed,
+            List<Map<String, Object>> changed
+    ) {}
+
     public long queryCount(String keyFilter, Long minSizeKb, Long maxSizeKb,
                            String dateFrom, String dateTo) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM objects WHERE 1=1");

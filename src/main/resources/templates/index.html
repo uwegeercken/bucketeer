@@ -95,9 +95,9 @@
                         onclick="addAllToCart()" th:title="#{cart.addAll}">
                     <i class="bi bi-cart-check"></i>
                 </button>
-                <button type="button" id="btnExport" class="btn btn-sm btn-outline-secondary btn-icon"
-                        onclick="exportParquet()" th:title="#{btn.exportParquet}" disabled>
-                    <i class="bi bi-file-earmark-arrow-down"></i>
+                <button type="button" id="btnSaveSnapshot" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="saveSnapshot()" th:title="#{snapshot.save}" disabled>
+                    <i class="bi bi-bookmark-plus"></i>
                 </button>
                 <button type="button" id="toggleMaximize" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="toggleMaximize()" th:title="#{btn.toggleMaximize}">
@@ -180,6 +180,8 @@
         <div id="paginationBottom" style="display:none;" class="d-flex align-items-center gap-1"></div>
     </div>
 
+
+
 </main>
 
 <footer th:replace="~{layout :: footer}"></footer>
@@ -199,6 +201,7 @@
     const labelPage      = /*[[#{msg.page}]]*/ 'page';
     const labelPrev      = /*[[#{btn.prev}]]*/ '\u2190 Previous';
     const labelNext      = /*[[#{btn.next}]]*/ 'Next \u2192';
+    const labelSnapshotSave = /*[[#{snapshot.save}]]*/ 'Save snapshot';
 
     const STORAGE_KEY = 'bucketeer_favorites';
 
@@ -471,7 +474,7 @@
         countEl.style.display = 'flex';
         const pageInfo = totalPages > 1 ? ' \u2013 ' + (currentPage + 1) + ' / ' + totalPages : '';
         document.getElementById('resultCountText').textContent = data.total + ' ' + labelObjMatch + pageInfo;
-        document.getElementById('btnExport').disabled = data.total === 0;
+        document.getElementById('btnSaveSnapshot').disabled = data.total === 0;
 
         renderPagination('paginationTop',    data.total, totalPages);
         renderPagination('paginationBottom', data.total, totalPages);
@@ -507,22 +510,6 @@
             () => { currentPage++; loadResults(); }));
         pag.appendChild(btn('bi-skip-end', currentPage >= totalPages - 1,
             () => { currentPage = totalPages - 1; loadResults(); }));
-    }
-
-    function exportParquet() {
-        const params = new URLSearchParams();
-        const keyFilter = document.getElementById('filterKey')?.value    || '';
-        const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
-        const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
-        const dateFrom  = document.getElementById('filterDateFrom')?.value || '';
-        const dateTo    = document.getElementById('filterDateTo')?.value   || '';
-        if (keyFilter)     params.append('keyFilter',  keyFilter);
-        if (minSizeKb)     params.append('minSizeKb',  minSizeKb);
-        if (maxSizeKb)     params.append('maxSizeKb',  maxSizeKb);
-        if (dateFrom)      params.append('dateFrom',   dateFrom);
-        if (dateTo)        params.append('dateTo',     dateTo);
-        if (currentBucket) params.append('bucket',     currentBucket);
-        window.location.href = '/api/query/export?' + params.toString();
     }
 
     let maximized = false;
@@ -664,6 +651,22 @@
             badge.style.display = 'inline';
         } else {
             badge.style.display = 'none';
+        }
+    }
+
+    // --- Snapshots ---
+
+    async function saveSnapshot() {
+        const res = await fetch('/api/snapshots', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (res.ok) {
+            window.location.href = '/snapshots';
+        } else {
+            alert(data.error || 'Failed to save snapshot');
         }
     }
 

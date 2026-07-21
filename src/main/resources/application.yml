@@ -11,3 +11,5 @@ server:
 bucketeer:
   version: "0.3.2"
   release-date: "2026-07-21"
+  snapshots:
+    retention-days: 30
