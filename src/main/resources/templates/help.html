@@ -31,6 +31,16 @@
             <div class="panel">
                 <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                <h6>0.5.0 <small class="text-muted">2026-07-22</small></h6>
+                <ul>
+                    <li>Key Check — upload a CSV file with keys to verify their existence in S3</li>
+                    <li>Configurable CSV delimiter (comma, semicolon, pipe, tab) and header row support</li>
+                    <li>Parallel HEAD requests for fast existence checks</li>
+                    <li>Export results as CSV with same format as input</li>
+                </ul>
+
+                <hr/>
+
                 <h6>0.4.0 <small class="text-muted">2026-07-21</small></h6>
                 <ul>
                     <li>Snapshot &amp; Diff — save query results as snapshots, compare against current state to detect added, removed and changed objects</li>

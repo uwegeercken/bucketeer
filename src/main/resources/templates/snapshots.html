@@ -69,18 +69,35 @@
     const labelSnapshotServer  = /*[[#{snapshot.server}]]*/ 'Server';
     const labelSnapshotBucket  = /*[[#{snapshot.bucket}]]*/ 'Bucket';
     const labelSnapshotPrefix  = /*[[#{snapshot.prefix}]]*/ 'Prefix';
+    const labelSnapshotNoQuery = /*[[#{snapshot.noQuery}]]*/ 'No query executed yet.';
 
     let currentDiffSnapshotId = null;
+    let currentQueryParams = null;
 
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    function isComparable(snapshot) {
+        if (!currentQueryParams) return false;
+        const sServer = snapshot.serverName || '';
+        const sBucket = snapshot.bucket || '';
+        const sPrefix = snapshot.prefix || '';
+        const qServer = currentQueryParams.serverName || '';
+        const qBucket = currentQueryParams.bucket || '';
+        const qPrefix = currentQueryParams.prefix || '';
+        return sServer === qServer && sBucket === qBucket && sPrefix === qPrefix;
+    }
+
     async function loadSnapshots() {
         const container = document.getElementById('snapshotList');
         try {
-            const res = await fetch('/api/snapshots');
-            const snapshots = await res.json();
+            const [snapRes, paramsRes] = await Promise.all([
+                fetch('/api/snapshots'),
+                fetch('/api/query/params')
+            ]);
+            const snapshots = await snapRes.json();
+            currentQueryParams = await paramsRes.json();
             if (snapshots.length === 0) {
                 container.innerHTML = '<span class="text-muted small fst-italic">' + escHtml(labelSnapshotEmpty) + '</span>';
                 return;
@@ -94,18 +111,23 @@
                 + '<th class="text-end">' + escHtml(labelSnapshotCount) + '</th>'
                 + '<th>' + escHtml(labelSnapshotActions) + '</th>'
                 + '</tr></thead><tbody>'
-                + snapshots.map(s => '<tr>'
-                    + '<td class="small">' + escHtml(s.name) + '</td>'
-                    + '<td class="small">' + escHtml(s.serverName) + '</td>'
-                    + '<td class="small">' + escHtml(s.bucket) + '</td>'
-                    + '<td class="small font-monospace">' + escHtml(s.prefix) + '</td>'
-                    + '<td class="small">' + new Date(s.createdAt).toLocaleString() + '</td>'
-                    + '<td class="text-end small">' + s.rowCount + '</td>'
-                    + '<td class="d-flex gap-1">'
-                    + '<button class="btn btn-sm btn-outline-primary btn-icon" title="' + escHtml(labelSnapshotCompare) + '" onclick="compareSnapshot(\'' + s.id + '\', \'' + escHtml(s.name) + '\')"><i class="bi bi-arrow-left-right"></i></button>'
-                    + '<button class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelSnapshotDelete) + '" onclick="deleteSnapshot(\'' + s.id + '\')"><i class="bi bi-trash"></i></button>'
-                    + '</td></tr>')
-                .join('')
+                + snapshots.map(s => {
+                    const comparable = isComparable(s);
+                    const compareBtn = comparable
+                        ? '<button class="btn btn-sm btn-outline-primary btn-icon" title="' + escHtml(labelSnapshotCompare) + '" onclick="compareSnapshot(\'' + s.id + '\', \'' + escHtml(s.name) + '\')"><i class="bi bi-arrow-left-right"></i></button>'
+                        : '<button class="btn btn-sm btn-outline-secondary btn-icon disabled" title="' + escHtml(labelSnapshotNoQuery) + '"><i class="bi bi-arrow-left-right"></i></button>';
+                    return '<tr>'
+                        + '<td class="small">' + escHtml(s.name) + '</td>'
+                        + '<td class="small">' + escHtml(s.serverName) + '</td>'
+                        + '<td class="small">' + escHtml(s.bucket) + '</td>'
+                        + '<td class="small font-monospace">' + escHtml(s.prefix) + '</td>'
+                        + '<td class="small">' + new Date(s.createdAt).toLocaleString() + '</td>'
+                        + '<td class="text-end small">' + s.rowCount + '</td>'
+                        + '<td class="d-flex gap-1">'
+                        + compareBtn
+                        + '<button class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelSnapshotDelete) + '" onclick="deleteSnapshot(\'' + s.id + '\')"><i class="bi bi-trash"></i></button>'
+                        + '</td></tr>';
+                }).join('')
                 + '</tbody></table>';
         } catch {
             container.innerHTML = '<span class="text-muted small">Error loading snapshots</span>';

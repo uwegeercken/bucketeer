@@ -14,4 +14,6 @@ public interface S3StoragePort {
     ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken);
 
     InputStream downloadObject(String serverName, String bucket, String key);
+
+    io.github.uwegeercken.bucketeer.domain.model.HeadObjectResult headObject(String serverName, String bucket, String key);
 }

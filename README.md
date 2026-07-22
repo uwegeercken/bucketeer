@@ -11,7 +11,7 @@ The S3 prefix can be typed in literally or generated dynamically using functions
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.4.0.jar
+java -jar target/bucketeer-0.5.0.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -33,7 +33,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.4.0.jar
+java -jar target/bucketeer-0.5.0.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -301,6 +301,31 @@ Snapshots save the complete result set of a query (all objects under the searche
 
 ---
 
+## Key Check
+
+The Key Check page (`/keycheck`) verifies whether keys from a CSV file exist in S3.
+
+**Usage:**
+- Select a server (navbar) and bucket
+- Upload a CSV file with one key per line
+- Choose the delimiter (comma, semicolon, pipe, tab)
+- Indicate whether the CSV has a header row
+- Click **Check** to run HEAD requests against S3
+
+**Results:**
+- Table shows each key with status (exists / missing), size, last modified, and ETag
+- Summary badges: count of existing and missing keys
+- Export results as CSV with the same delimiter and header format as the input
+
+**Export format:**
+```
+key,exists,size_bytes,last_modified,etag
+data/file1.parquet,true,12345,2026-07-22T10:00:00Z,"abc123"
+data/file2.parquet,false,,,
+```
+
+---
+
 ## S3 Server Configuration
 
 S3 servers are managed at runtime via the **Configuration** page (`/config`). No restart is required after adding, editing or deleting a server.
@@ -347,4 +372,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-21
+last update uwe.geercken@web.de - 2026-07-22

@@ -89,16 +89,18 @@
                       onclick="window.location.href='/cart'" title="Selection"></span>
                 <button type="button" id="btnAddSelected" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="addSelectedToCart()" th:title="#{cart.addSelected}" disabled>
-                    <i class="bi bi-cart-plus"></i>
+                    <i class="bi bi-plus-square"></i>
                 </button>
                 <button type="button" id="btnAddAll" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="addAllToCart()" th:title="#{cart.addAll}">
-                    <i class="bi bi-cart-check"></i>
+                    <i class="bi bi-check2-square"></i>
                 </button>
                 <button type="button" id="btnSaveSnapshot" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="saveSnapshot()" th:title="#{snapshot.save}" disabled>
                     <i class="bi bi-bookmark-plus"></i>
                 </button>
+                <a href="/snapshots" class="btn btn-sm btn-outline-secondary btn-icon"
+                   th:title="#{nav.snapshots}"><i class="bi bi-bookmarks"></i></a>
                 <button type="button" id="toggleMaximize" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="toggleMaximize()" th:title="#{btn.toggleMaximize}">
                     <i class="bi bi-arrows-fullscreen"></i>

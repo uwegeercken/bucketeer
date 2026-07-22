@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="#{keycheck.title}">Bucketeer – Key Check</title>
+    <th:block th:replace="~{layout :: styles}"></th:block>
+</head>
+<body>
+
+<nav th:replace="~{layout :: header}"></nav>
+
+<main class="container-fluid px-4">
+
+    <!-- Upload form -->
+    <div class="panel" id="uploadPanel">
+        <div class="panel-title" th:text="#{keycheck.upload.title}">Check keys from CSV file</div>
+        <form id="checkForm" onsubmit="return startCheck(event)">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" th:text="#{label.bucket}">Bucket</label>
+                    <select id="bucketInput" class="form-select form-select-sm font-monospace">
+                        <option value="">--</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" th:text="#{keycheck.delimiter}">Delimiter</label>
+                    <select id="delimiterInput" class="form-select form-select-sm">
+                        <option value=",">Comma (,)</option>
+                        <option value="semicolon">Semicolon (;)</option>
+                        <option value="pipe">Pipe (|)</option>
+                        <option value="tab">Tab</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" id="hasHeaderInput">
+                        <label class="form-check-label small" th:text="#{keycheck.hasHeader}" for="hasHeaderInput">CSV has header row</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" th:text="#{keycheck.file}">CSV file</label>
+                    <input type="file" class="form-control form-control-sm" id="fileInput" accept=".csv,.txt,.tsv" required>
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-sm btn-primary w-100" id="checkBtn"
+                            th:text="#{keycheck.check}">Check</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Progress -->
+    <div class="panel" id="progressPanel" style="display:none;">
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary"></div>
+            <span id="progressText">Processing...</span>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="panel" id="resultsPanel" style="display:none;">
+        <div class="panel-title d-flex align-items-center justify-content-between">
+            <span id="resultsTitle" th:text="#{keycheck.results}">Results</span>
+            <button type="button" class="btn btn-sm btn-outline-success btn-icon"
+                    id="exportBtn" style="display:none;"
+                    onclick="exportCsv()" th:title="#{keycheck.export}">
+                <i class="bi bi-download"></i>
+            </button>
+        </div>
+        <div id="summary" class="mb-2"></div>
+        <div id="resultsTable"></div>
+    </div>
+
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    const labelKeycheckTitle       = /*[[#{keycheck.title}]]*/ 'Key Check';
+    const labelKeycheckResults     = /*[[#{keycheck.results}]]*/ 'Results';
+    const labelKeycheckExists      = /*[[#{keycheck.exists}]]*/ 'Exists';
+    const labelKeycheckMissing     = /*[[#{keycheck.missing}]]*/ 'Missing';
+    const labelKeycheckProcessed   = /*[[#{keycheck.processed}]]*/ 'Processed';
+    const labelKeycheckTotal       = /*[[#{keycheck.total}]]*/ 'Total';
+    const labelKeycheckName        = /*[[#{label.objectName}]]*/ 'Name';
+    const labelKeycheckSize        = /*[[#{label.size}]]*/ 'Size (KB)';
+    const labelKeycheckLastModified = /*[[#{label.lastModified}]]*/ 'Last Modified';
+    const labelKeycheckEtag        = /*[[#{keycheck.etag}]]*/ 'ETag';
+    const labelKeycheckStatus      = /*[[#{keycheck.status}]]*/ 'Status';
+    const labelKeycheckExport      = /*[[#{keycheck.export}]]*/ 'Export CSV';
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function loadBuckets() {
+        try {
+            const res = await fetch('/api/buckets');
+            const buckets = await res.json();
+            const select = document.getElementById('bucketInput');
+            select.innerHTML = '<option value="">--</option>'
+                + buckets.map(b => '<option value="' + escHtml(b) + '">' + escHtml(b) + '</option>').join('');
+        } catch {}
+    }
+
+    async function startCheck(e) {
+        e.preventDefault();
+        const file = document.getElementById('fileInput').files[0];
+        const bucket = document.getElementById('bucketInput').value;
+        const delimiter = document.getElementById('delimiterInput').value;
+        const hasHeader = document.getElementById('hasHeaderInput').checked;
+
+        if (!file || !bucket) return;
+
+        const progressPanel = document.getElementById('progressPanel');
+        const progressText = document.getElementById('progressText');
+        const resultsPanel = document.getElementById('resultsPanel');
+        const checkBtn = document.getElementById('checkBtn');
+
+        progressPanel.style.display = 'block';
+        resultsPanel.style.display = 'none';
+        checkBtn.disabled = true;
+        progressText.textContent = escHtml(labelKeycheckProcessed) + '...';
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('bucket', bucket);
+        formData.append('delimiter', delimiter);
+        formData.append('hasHeader', hasHeader);
+
+        try {
+            const res = await fetch('/api/keycheck/check', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            progressPanel.style.display = 'none';
+            checkBtn.disabled = false;
+
+            if (data.error) {
+                progressText.textContent = escHtml(data.error);
+                progressPanel.style.display = 'block';
+                return;
+            }
+
+            showResults(data);
+        } catch (err) {
+            progressPanel.style.display = 'none';
+            checkBtn.disabled = false;
+            progressText.textContent = 'Error: ' + escHtml(err.message);
+            progressPanel.style.display = 'block';
+        }
+    }
+
+    function showResults(data) {
+        const panel = document.getElementById('resultsPanel');
+        const summaryEl = document.getElementById('summary');
+        const tableEl = document.getElementById('resultsTable');
+        const exportBtn = document.getElementById('exportBtn');
+
+        panel.style.display = 'block';
+        exportBtn.style.display = data.results.length > 0 ? '' : 'none';
+
+        summaryEl.innerHTML = '<span class="badge bg-success me-1">' + escHtml(labelKeycheckExists) + ': ' + data.existCount + '</span>'
+            + '<span class="badge bg-danger me-1">' + escHtml(labelKeycheckMissing) + ': ' + data.missingCount + '</span>'
+            + '<span class="text-muted small ms-2">' + escHtml(labelKeycheckProcessed) + ': ' + data.processed + ' / ' + data.total + '</span>';
+
+        if (data.results.length === 0) {
+            tableEl.innerHTML = '<span class="text-muted small fst-italic">No results.</span>';
+            return;
+        }
+
+        let html = '<table class="table table-sm table-bordered mb-1"><thead class="table-secondary"><tr>'
+            + '<th>' + escHtml(labelKeycheckStatus) + '</th>'
+            + '<th>' + escHtml(labelKeycheckName) + '</th>'
+            + '<th class="text-end">' + escHtml(labelKeycheckSize) + '</th>'
+            + '<th>' + escHtml(labelKeycheckLastModified) + '</th>'
+            + '<th>' + escHtml(labelKeycheckEtag) + '</th>'
+            + '</tr></thead><tbody>';
+
+        for (const r of data.results) {
+            const rowClass = r.exists ? '' : 'table-danger';
+            const statusIcon = r.exists
+                ? '<i class="bi bi-check-circle-fill text-success"></i>'
+                : '<i class="bi bi-x-circle-fill text-danger"></i>';
+            const sizeKb = r.sizeBytes != null ? (r.sizeBytes / 1024).toFixed(2) : '';
+
+            html += '<tr class="' + rowClass + '">'
+                + '<td class="text-center">' + statusIcon + '</td>'
+                + '<td class="text-break font-monospace small">' + escHtml(r.key) + '</td>'
+                + '<td class="text-end small">' + sizeKb + '</td>'
+                + '<td class="small">' + escHtml(r.lastModified) + '</td>'
+                + '<td class="small text-muted">' + escHtml(r.etag) + '</td>'
+                + '</tr>';
+        }
+
+        html += '</tbody></table>';
+        tableEl.innerHTML = html;
+    }
+
+    function exportCsv() {
+        const delimiter = document.getElementById('delimiterInput').value;
+        const hasHeader = document.getElementById('hasHeaderInput').checked;
+        window.location.href = '/api/keycheck/export?delimiter=' + encodeURIComponent(delimiter) + '&hasHeader=' + hasHeader;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadBuckets();
+    });
+</script>
+</body>
+</html>
