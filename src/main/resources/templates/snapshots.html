@@ -30,10 +30,17 @@
     <div class="panel" id="diffPanel" style="display:none;">
         <div class="panel-title d-flex align-items-center justify-content-between">
             <span id="diffTitle">Diff</span>
-            <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
-                    onclick="document.getElementById('diffPanel').style.display='none'">
-                <i class="bi bi-x-lg"></i>
-            </button>
+            <div class="d-flex gap-1">
+                <button type="button" class="btn btn-sm btn-outline-success btn-icon"
+                        id="diffDownloadBtn" style="display:none;"
+                        onclick="downloadDiff()" th:title="#{snapshot.diff.download}">
+                    <i class="bi bi-download"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="document.getElementById('diffPanel').style.display='none'">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
         </div>
         <div id="diffSummary" class="mb-2"></div>
         <div id="diffContent"></div>
@@ -58,9 +65,12 @@
     const labelDiffChanged     = /*[[#{snapshot.diff.changed}]]*/ 'Changed';
     const labelDiffNoChanges   = /*[[#{snapshot.diff.noChanges}]]*/ 'No changes detected.';
     const labelDiffTitle       = /*[[#{snapshot.diff.title}]]*/ 'Diff:';
+    const labelDiffDownload    = /*[[#{snapshot.diff.download}]]*/ 'Download diff';
     const labelSnapshotServer  = /*[[#{snapshot.server}]]*/ 'Server';
     const labelSnapshotBucket  = /*[[#{snapshot.bucket}]]*/ 'Bucket';
     const labelSnapshotPrefix  = /*[[#{snapshot.prefix}]]*/ 'Prefix';
+
+    let currentDiffSnapshotId = null;
 
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -108,12 +118,20 @@
         loadSnapshots();
     }
 
+    function downloadDiff() {
+        if (!currentDiffSnapshotId) return;
+        window.location.href = '/api/snapshots/' + currentDiffSnapshotId + '/diff/download';
+    }
+
     async function compareSnapshot(id, name) {
         const panel = document.getElementById('diffPanel');
         const titleEl = document.getElementById('diffTitle');
         const summaryEl = document.getElementById('diffSummary');
         const contentEl = document.getElementById('diffContent');
+        const downloadBtn = document.getElementById('diffDownloadBtn');
         panel.style.display = 'block';
+        downloadBtn.style.display = 'none';
+        currentDiffSnapshotId = id;
         titleEl.textContent = labelDiffTitle + ' ' + name;
         summaryEl.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div> Comparing...';
         contentEl.innerHTML = '';
@@ -134,6 +152,8 @@
                 summaryEl.innerHTML = '<span class="text-success">' + escHtml(labelDiffNoChanges) + '</span>';
                 return;
             }
+
+            downloadBtn.style.display = '';
 
             summaryEl.innerHTML = '<span class="badge bg-success me-1">+' + addedCount + ' ' + escHtml(labelDiffAdded) + '</span>'
                 + '<span class="badge bg-danger me-1">-' + removedCount + ' ' + escHtml(labelDiffRemoved) + '</span>'

@@ -5,6 +5,10 @@ import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -125,6 +129,40 @@ public class SnapshotController {
             log.error("Failed to compare with snapshot {}: {}", id, e.getMessage(), e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Comparison failed: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/api/snapshots/{id}/diff/download")
+    public ResponseEntity<Resource> downloadDiff(@PathVariable String id, HttpSession session) {
+        QueryParams qp = (QueryParams) session.getAttribute("bucketeer_query_params");
+        if (qp == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        SnapshotMeta meta = snapshotRepo.findById(id);
+        if (meta == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Path parquetPath = meta.dataPath(snapshotRepo.getSnapshotsDir());
+        if (!parquetPath.toFile().exists()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            java.io.File tmpFile = java.io.File.createTempFile("bucketeer-diff-", ".parquet");
+            tmpFile.deleteOnExit();
+            duckDb.exportDiffToParquet(parquetPath.toString(), tmpFile.getAbsolutePath());
+
+            String filename = "diff-" + meta.name().replaceAll("[^a-zA-Z0-9._-]", "_") + ".parquet";
+            FileSystemResource resource = new FileSystemResource(tmpFile);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.parseMediaType("application/octet-stream"))
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("Failed to export diff: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 

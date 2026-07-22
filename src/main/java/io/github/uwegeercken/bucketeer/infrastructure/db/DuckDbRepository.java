@@ -293,6 +293,35 @@ public class DuckDbRepository {
         return rows;
     }
 
+    /**
+     * Exports the diff between current objects and a snapshot to a single Parquet file.
+     * Includes a 'status' column with values: added, removed, changed.
+     */
+    public long exportDiffToParquet(String snapshotParquetPath, String exportPath) {
+        String sql = "COPY ("
+                + "SELECT 'added' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
+                + "FROM objects o LEFT JOIN read_parquet('" + snapshotParquetPath + "') s ON o.key = s.key "
+                + "WHERE s.key IS NULL "
+                + "UNION ALL "
+                + "SELECT 'removed' AS status, s.key, s.bucket, s.size_bytes, s.last_modified, s.etag "
+                + "FROM read_parquet('" + snapshotParquetPath + "') s LEFT JOIN objects o ON s.key = o.key "
+                + "WHERE o.key IS NULL "
+                + "UNION ALL "
+                + "SELECT 'changed' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
+                + "FROM objects o INNER JOIN read_parquet('" + snapshotParquetPath + "') s ON o.key = s.key "
+                + "WHERE o.size_bytes != s.size_bytes OR o.last_modified != s.last_modified "
+                + "ORDER BY status, key"
+                + ") TO '" + exportPath + "' (FORMAT PARQUET)";
+
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(sql);
+            return count();
+        } catch (SQLException e) {
+            log.error("Failed to export diff to Parquet: {}", e.getMessage(), e);
+            throw new RuntimeException("Diff export failed: " + e.getMessage(), e);
+        }
+    }
+
     public record DiffResult(
             List<Map<String, Object>> added,
             List<Map<String, Object>> removed,
