@@ -36,8 +36,8 @@ public class BucketeerService implements BucketeerUseCase {
     }
 
     @Override
-    public String resolveTemplate(String template, String key) {
-        return templateEngine.resolve(template, key);
+    public String resolveTemplate(String template, String key, String bucket) {
+        return templateEngine.resolve(template, key, bucket);
     }
 
     @Override

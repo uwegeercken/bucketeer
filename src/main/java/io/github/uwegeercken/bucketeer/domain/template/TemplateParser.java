@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 public class TemplateParser {
 
     private static final Pattern FUNCTION_NAME = Pattern.compile("[a-zA-Z][a-zA-Z0-9]*");
-    private static final Pattern REF_PATTERN   = Pattern.compile("key|p\\d+");
+    private static final Pattern REF_PATTERN   = Pattern.compile("key|bucket|p\\d+");
 
     /**
      * Parses the template into segments.

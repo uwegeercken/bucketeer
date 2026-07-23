@@ -31,6 +31,18 @@
             <div class="panel">
                 <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                <h6>0.5.1 <small class="text-muted">2026-07-23</small></h6>
+                <ul>
+                    <li>Prefix template: <code>{bucket}</code> reference to use the bucket name in templates</li>
+                    <li>Prefix template: <code>{repeat(ref)}</code> function to copy a segment, key or bucket value directly</li>
+                    <li>Diff export changed from Parquet to CSV</li>
+                    <li>Server switch now clears results and form state</li>
+                    <li>Favorites: larger pill size, reliable click handling</li>
+                    <li>Key Check: fixed spinner stuck on empty/invalid CSV files</li>
+                </ul>
+
+                <hr/>
+
                 <h6>0.5.0 <small class="text-muted">2026-07-22</small></h6>
                 <ul>
                     <li>Key Check — upload a CSV file with keys to verify their existence in S3</li>
@@ -44,7 +56,7 @@
                 <h6>0.4.0 <small class="text-muted">2026-07-21</small></h6>
                 <ul>
                     <li>Snapshot &amp; Diff — save query results as snapshots, compare against current state to detect added, removed and changed objects</li>
-                    <li>Download diff as Parquet file</li>
+                    <li>Download diff as CSV file</li>
                     <li>Selection — collect objects across multiple queries and download as ZIP</li>
                     <li>Sorting of query results (by name, size, date)</li>
                     <li>Query state preserved across page navigation</li>
@@ -114,6 +126,7 @@
                     </thead>
                     <tbody>
                     <tr><td><code>key</code></td><td th:text="#{help.syntax.ref.key}"></td></tr>
+                    <tr><td><code>bucket</code></td><td th:text="#{help.syntax.ref.bucket}"></td></tr>
                     <tr><td><code>p1, p2, … pN</code></td><td th:text="#{help.syntax.ref.pN}"></td></tr>
                     </tbody>
                 </table>
@@ -125,7 +138,9 @@
                     {upper(everyNth(key, 0, 2))}      → everyNth result in uppercase<br/>
                     {lower(left(key, 5))}              → first 5 chars in lowercase<br/>
                     {left(everyNth(key, 0, 2), 4)}     → everyNth result, first 4 chars<br/>
-                    {upper(everyNth(p3, 0, 2))}        → everyNth on literal segment 3, uppercased
+                    {upper(everyNth(p3, 0, 2))}        → everyNth on literal segment 3, uppercased<br/>
+                    {repeat(p4)}                        → copies the value of segment 4 directly<br/>
+                    {upper(repeat(p2))}                 → segment 2 value in uppercase
                 </div>
 
                 <h6 class="mt-3" th:text="#{help.syntax.wildcard}">Wildcard</h6>

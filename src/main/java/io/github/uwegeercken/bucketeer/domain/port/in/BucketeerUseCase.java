@@ -13,7 +13,7 @@ public interface BucketeerUseCase {
 
     List<String> availableFunctions();
 
-    String resolveTemplate(String template, String key);
+    String resolveTemplate(String template, String key, String bucket);
 
     List<String> validateTemplate(String template);
 

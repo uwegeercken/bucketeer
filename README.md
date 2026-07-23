@@ -1,8 +1,14 @@
 # Bucketeer
 
-A web-based S3 object browser supporting listing, filtering, download, snapshots and favorites.
+A web-based S3 object browser supporting listing, filtering, download, snapshots and favorites. Query results may
+be compared to snapshots and the differences may be exported.
 
-The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and date. Functions can be nested and may have literal suffixes.
+Query results can be collected across multiple queries and help to do bulk downloads of
+S3 files. 
+
+The user can upload a CSV file containing keys to check if the specified keys exist on the S3 server.
+
+The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth, repeat and date. Functions can be nested and may have literal suffixes.
 
 ![img_1.png](img_1.png)
 ---
@@ -111,9 +117,10 @@ segment1/{functionName(ref, arg1, arg2)}/segment3/
 
 Inside a function call, the first argument is a **reference**:
 
-| Reference | Meaning |
-|-----------|---------|
-| `key`     | The key value entered by the user |
+| Reference            | Meaning                                          |
+|----------------------|--------------------------------------------------|
+| `key`                | The key value entered by the user                |
+| `bucket`             | The selected bucket name                         |
 | `p1`, `p2`, ... `pN` | The value of segment N in the template (1-based) |
 
 **Rules for `pN`:**
@@ -122,16 +129,17 @@ Inside a function call, the first argument is a **reference**:
 
 ### Functions
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `everyNth(ref, start, step)` | 1 ref + 2 args | Characters at index start, start+step, start+2*step, … |
-| `left(ref, n)` | 1 ref + 1 arg | First `n` characters; truncates if shorter |
-| `right(ref, n)` | 1 ref + 1 arg | Last `n` characters; truncates if shorter |
+| Function | Signature | Description                                               |
+|----------|-----------|-----------------------------------------------------------|
+| `everyNth(ref, start, step)` | 1 ref + 2 args | Characters at index start, start+step, start+2*step, …    |
+| `left(ref, n)` | 1 ref + 1 arg | First `n` characters; truncates if shorter                |
+| `right(ref, n)` | 1 ref + 1 arg | Last `n` characters; truncates if shorter                 |
 | `substring(ref, start, len)` | 1 ref + 2 args | From `start` (0-based), length `len`; truncates if needed |
-| `upper(ref)` | 1 ref | Uppercase |
-| `lower(ref)` | 1 ref | Lowercase |
-| `date(pattern)` | no ref | Current date/time formatted with `pattern` |
-| `date(pattern, offset)` | no ref | Current date/time ± offset |
+| `upper(ref)` | 1 ref | Uppercase                                                 |
+| `lower(ref)` | 1 ref | Lowercase                                                 |
+| `repeat(ref)` | 1 ref | Returns the reference value unchanged (identity)          |
+| `date(pattern)` | no ref | Current date/time formatted with `pattern`                |
+| `date(pattern, offset)` | no ref | Current date/time ± offset                                |
 
 **Date patterns** use Java `DateTimeFormatter` syntax: `yyyy/MM/dd`, `yyyyMMdd`, `yyyy/MM`, etc.
 
@@ -262,6 +270,39 @@ Lists all objects under `myprefix/<everyNth result>/` whose key starts with `ABC
 
 ---
 
+### 10. Bucket name in path
+```
+Template:  {upper(bucket)}/{date(yyyy/MM/dd)}/
+Bucket:    my-bucket
+Result:    MY-BUCKET/2026/07/23/
+```
+
+---
+
+### 11. Repeat a segment
+```
+Template:  abc/{repeat(p4)}/ghi/jkl
+p4:        jkl
+Result:    abc/jkl/ghi/jkl
+```
+`repeat(p4)` copies the value of segment 4 into the current position.
+
+---
+
+### 12. Repeat key or bucket
+```
+Template:  {repeat(key)}/archive/
+Key:       doc.pdf
+Result:    doc.pdf/archive/
+```
+```
+Template:  {repeat(bucket)}/data/
+Bucket:    my-bucket
+Result:    my-bucket/data/
+```
+
+---
+
 ## S3 Query and Result Filtering
 
 When a search is started, Bucketeer fetches **all matching objects** from S3 by paginating through all result pages. The results are cached in an in-memory [DuckDB](https://duckdb.org/) database for the duration of the session.
@@ -372,4 +413,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-22
+last update uwe.geercken@web.de - 2026-07-23

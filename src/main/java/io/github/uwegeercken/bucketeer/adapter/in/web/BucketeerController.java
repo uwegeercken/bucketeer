@@ -68,7 +68,7 @@ public class BucketeerController {
         model.addAttribute("tooltipText", tooltipText);
 
         if (Boolean.TRUE.equals(search) && currentServer != null && StringUtils.hasText(bucket)) {
-            String resolvedPrefix = bucketeerUseCase.resolveTemplate(prefix, key);
+            String resolvedPrefix = bucketeerUseCase.resolveTemplate(prefix, key, bucket);
 
             String normalizedPrefix = StringUtils.hasText(resolvedPrefix) && !resolvedPrefix.endsWith("/")
                     ? resolvedPrefix + "/" : resolvedPrefix;
@@ -259,10 +259,11 @@ public class BucketeerController {
     @ResponseBody
     public String resolvePrefix(
             @RequestParam(required = false) String prefix,
-            @RequestParam(required = false) String key) {
+            @RequestParam(required = false) String key,
+            @RequestParam(required = false) String bucket) {
         if (!StringUtils.hasText(prefix)) return "";
         try {
-            return bucketeerUseCase.resolveTemplate(prefix, key);
+            return bucketeerUseCase.resolveTemplate(prefix, key, bucket);
         } catch (Exception e) {
             return "";
         }

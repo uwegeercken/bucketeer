@@ -259,7 +259,8 @@
                     prefixEl.classList.remove('is-invalid');
                     prefixEl.classList.add('is-valid');
                     searchBtn.disabled = false;
-                    fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(key))
+                    const bucketVal = document.getElementById('bucketInput').value;
+                    fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(key) + '&bucket=' + encodeURIComponent(bucketVal))
                         .then(r => r.text())
                         .then(resolved => { setResolvedPopover(resolved); })
                         .catch(() => {});

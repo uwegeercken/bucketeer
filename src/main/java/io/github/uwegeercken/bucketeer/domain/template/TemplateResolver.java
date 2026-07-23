@@ -17,8 +17,9 @@ import java.util.stream.Collectors;
  *   - Segments are resolved left to right
  *   - Literals are always immediately available as pN references
  *   - FunctionCall arguments are resolved recursively before the function is applied:
- *       Ref("key")  → user-supplied key
- *       Ref("pN")   → resolved value of segment N
+ *   Ref("key")    → user-supplied key
+ *       Ref("bucket") → bucket name
+ *       Ref("pN")     → resolved value of segment N
  *       Literal     → its string value
  *       Nested      → recursively resolved function call result
  *   - pN may reference any Literal segment at any position,
@@ -34,7 +35,7 @@ public class TemplateResolver {
                 .collect(Collectors.toMap(TemplateFunction::name, Function.identity()));
     }
 
-    public String resolve(List<Segment> segments, String key) {
+    public String resolve(List<Segment> segments, String key, String bucket) {
         if (segments.isEmpty()) return "";
 
         String[] resolved = new String[segments.size()];
@@ -49,7 +50,7 @@ public class TemplateResolver {
         // second pass: resolve function calls left to right
         for (int i = 0; i < segments.size(); i++) {
             if (segments.get(i) instanceof Segment.FunctionCall call) {
-                resolved[i] = resolveCall(call, resolved, key, segments);
+                resolved[i] = resolveCall(call, resolved, key, bucket, segments);
             }
         }
 
@@ -69,7 +70,7 @@ public class TemplateResolver {
     // --- private ---
 
     private String resolveCall(Segment.FunctionCall call, String[] resolved,
-                               String key, List<Segment> segments) {
+                               String key, String bucket, List<Segment> segments) {
         TemplateFunction fn = functions.get(call.functionName());
         if (fn == null) throw new TemplateParseException(
                 "Unknown function '" + call.functionName() + "'" +
@@ -84,10 +85,10 @@ public class TemplateResolver {
         if (!args.isEmpty()) {
             Argument first = args.getFirst();
             if (first instanceof Argument.Ref ref) {
-                resolvedRef = resolveRef(ref.value(), call.position(), resolved, segments, key);
+                resolvedRef = resolveRef(ref.value(), call.position(), resolved, segments, key, bucket);
                 args.subList(1, args.size()).forEach(a -> params.add(resolveLiteralArg(a)));
             } else if (first instanceof Argument.Nested nested) {
-                resolvedRef = resolveCall(nested.call(), resolved, key, segments);
+                resolvedRef = resolveCall(nested.call(), resolved, key, bucket, segments);
                 args.subList(1, args.size()).forEach(a -> params.add(resolveLiteralArg(a)));
             } else {
                 // no ref - all args are literals (e.g. date)
@@ -104,8 +105,9 @@ public class TemplateResolver {
     }
 
     private String resolveRef(String ref, int currentPos, String[] resolved,
-                              List<Segment> segments, String key) {
+                              List<Segment> segments, String key, String bucket) {
         if (ref.equals("key")) return key != null ? key : "";
+        if (ref.equals("bucket")) return bucket != null ? bucket : "";
 
         int refPos = Integer.parseInt(ref.substring(1));
         if (refPos < 1 || refPos > segments.size()) throw new TemplateParseException(

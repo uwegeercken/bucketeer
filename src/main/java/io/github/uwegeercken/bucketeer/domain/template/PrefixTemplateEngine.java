@@ -20,9 +20,9 @@ public class PrefixTemplateEngine {
     }
 
     /** Parses and resolves the template in one step. */
-    public String resolve(String template, String key) {
+    public String resolve(String template, String key, String bucket) {
         List<Segment> segments = parser.parse(template);
-        return resolver.resolve(segments, key);
+        return resolver.resolve(segments, key, bucket);
     }
 
     /** Returns unknown function names found in the template. Empty = valid. */
