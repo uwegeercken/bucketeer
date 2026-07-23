@@ -343,9 +343,9 @@
             const safeName  = escHtml(fav.name);
             const safeTitle = escHtml((fav.server||'') + ' / ' + (fav.bucket||'') + ' / ' + (fav.prefix||''));
             const safeKey   = escHtml(fav.name);
-            return '<span class="fav-pill" title="' + safeTitle + '" style="display:inline-flex;background:#e9ecef;border:1px solid #adb5bd;border-radius:1rem;padding:0.2rem 0.6rem;color:#495057;font-size:0.78rem;cursor:pointer;align-items:center;gap:0.35rem;white-space:nowrap;">'
+            return '<span class="fav-pill" title="' + safeTitle + '">'
                 + '<span class="fav-apply" data-fav="' + safeKey + '">' + safeName + '</span>'
-                + '<span class="del fav-delete" data-fav="' + safeKey + '" style="color:#adb5bd;font-size:0.9rem;line-height:1;">&times;</span>'
+                + '<span class="fav-delete" data-fav="' + safeKey + '">&times;</span>'
                 + '</span>';
         }).join('');
     }
@@ -697,10 +697,9 @@
                 deleteFavorite(deleteEl.dataset.fav);
                 return;
             }
-            const pill = e.target.closest('.fav-pill');
-            if (pill) {
-                const favName = pill.querySelector('.fav-apply')?.dataset.fav;
-                if (favName) applyFavorite(favName);
+            const applyEl = e.target.closest('.fav-apply');
+            if (applyEl) {
+                applyFavorite(applyEl.dataset.fav);
             }
         });
     });

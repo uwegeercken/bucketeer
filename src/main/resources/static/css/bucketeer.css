@@ -41,15 +41,15 @@ footer {
 
 /* Favorites */
 .fav-pill {
-    font-size: 0.78rem;
-    padding: 0.2rem 0.6rem;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.75rem;
     border-radius: 1rem;
     border: 1px solid #adb5bd;
     background: #e9ecef;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.4rem;
     white-space: nowrap;
     color: #495057;
 }
@@ -58,13 +58,13 @@ footer {
     background: #dee2e6;
 }
 
-.fav-pill .del {
+.fav-pill .fav-delete {
     color: #adb5bd;
-    font-size: 0.9rem;
+    font-size: 1rem;
     line-height: 1;
 }
 
-.fav-pill .del:hover {
+.fav-pill .fav-delete:hover {
     color: #dc3545;
 }
 
