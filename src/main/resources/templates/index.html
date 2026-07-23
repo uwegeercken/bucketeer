@@ -692,10 +692,16 @@
         });
 
         document.getElementById('favoritePills').addEventListener('click', e => {
-            const applyEl  = e.target.closest('.fav-apply');
             const deleteEl = e.target.closest('.fav-delete');
-            if (applyEl)  applyFavorite(applyEl.dataset.fav);
-            if (deleteEl) deleteFavorite(deleteEl.dataset.fav);
+            if (deleteEl) {
+                deleteFavorite(deleteEl.dataset.fav);
+                return;
+            }
+            const pill = e.target.closest('.fav-pill');
+            if (pill) {
+                const favName = pill.querySelector('.fav-apply')?.dataset.fav;
+                if (favName) applyFavorite(favName);
+            }
         });
     });
 </script>
