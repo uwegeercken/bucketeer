@@ -150,15 +150,15 @@ public class SnapshotController {
         }
 
         try {
-            java.io.File tmpFile = java.io.File.createTempFile("bucketeer-diff-", ".parquet");
+            java.io.File tmpFile = java.io.File.createTempFile("bucketeer-diff-", ".csv");
             tmpFile.deleteOnExit();
-            duckDb.exportDiffToParquet(parquetPath.toString(), tmpFile.getAbsolutePath());
+            duckDb.exportDiffToCsv(parquetPath.toString(), tmpFile.getAbsolutePath());
 
-            String filename = "diff-" + meta.name().replaceAll("[^a-zA-Z0-9._-]", "_") + ".parquet";
+            String filename = "diff-" + meta.name().replaceAll("[^a-zA-Z0-9._-]", "_") + ".csv";
             FileSystemResource resource = new FileSystemResource(tmpFile);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                    .contentType(MediaType.parseMediaType("application/octet-stream"))
+                    .contentType(MediaType.parseMediaType("text/csv"))
                     .body(resource);
         } catch (Exception e) {
             log.error("Failed to export diff: {}", e.getMessage(), e);

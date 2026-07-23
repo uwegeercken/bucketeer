@@ -294,10 +294,10 @@ public class DuckDbRepository {
     }
 
     /**
-     * Exports the diff between current objects and a snapshot to a single Parquet file.
+     * Exports the diff between current objects and a snapshot to a CSV file.
      * Includes a 'status' column with values: added, removed, changed.
      */
-    public long exportDiffToParquet(String snapshotParquetPath, String exportPath) {
+    public void exportDiffToCsv(String snapshotParquetPath, String exportPath) {
         String sql = "COPY ("
                 + "SELECT 'added' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
                 + "FROM objects o LEFT JOIN read_parquet('" + snapshotParquetPath + "') s ON o.key = s.key "
@@ -311,13 +311,12 @@ public class DuckDbRepository {
                 + "FROM objects o INNER JOIN read_parquet('" + snapshotParquetPath + "') s ON o.key = s.key "
                 + "WHERE o.size_bytes != s.size_bytes OR o.last_modified != s.last_modified "
                 + "ORDER BY status, key"
-                + ") TO '" + exportPath + "' (FORMAT PARQUET)";
+                + ") TO '" + exportPath + "' (FORMAT CSV, HEADER 1)";
 
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
-            return count();
         } catch (SQLException e) {
-            log.error("Failed to export diff to Parquet: {}", e.getMessage(), e);
+            log.error("Failed to export diff to CSV: {}", e.getMessage(), e);
             throw new RuntimeException("Diff export failed: " + e.getMessage(), e);
         }
     }

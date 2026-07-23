@@ -35,7 +35,7 @@
     <!-- Search -->
     <div class="panel" id="searchPanel">
         <div class="panel-title" th:text="#{nav.search}">Search</div>
-        <form method="get" action="/" id="searchForm" onsubmit="sessionStorage.removeItem('bkt_sort_by');sessionStorage.removeItem('bkt_sort_dir');sortBy='key';sortDir='asc';">
+        <form method="get" action="/" id="searchForm" onsubmit="saveFormState();sessionStorage.removeItem('bkt_sort_by');sessionStorage.removeItem('bkt_sort_dir');sortBy='key';sortDir='asc';">
             <input type="hidden" name="search" value="true"/>
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
@@ -302,6 +302,9 @@
         const serverSelect = document.querySelector('select[name="serverName"]');
         const knownServers = serverSelect ? Array.from(serverSelect.options).map(o => o.value) : [];
         if (fav.server && fav.server !== currentServer && knownServers.includes(fav.server)) {
+            sessionStorage.removeItem('bkt_bucket');
+            sessionStorage.removeItem('bkt_prefix');
+            sessionStorage.removeItem('bkt_key');
             const form = document.createElement('form');
             form.method = 'POST'; form.action = '/session/server';
             const inp = document.createElement('input');
@@ -309,7 +312,9 @@
             form.appendChild(inp); document.body.appendChild(form); form.submit();
             return;
         }
-        document.getElementById('bucketInput').value = fav.bucket || '';
+        sessionStorage.removeItem('bkt_bucket');
+        sessionStorage.removeItem('bkt_prefix');
+        sessionStorage.removeItem('bkt_key');
         if (fav.bucket && !document.getElementById('bucketInput').querySelector('option[value="' + CSS.escape(fav.bucket) + '"]')) {
             const opt = document.createElement('option');
             opt.value = fav.bucket; opt.textContent = fav.bucket; opt.selected = true;

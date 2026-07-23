@@ -53,9 +53,14 @@
     <!-- Progress -->
     <div class="panel" id="progressPanel" style="display:none;">
         <div class="d-flex align-items-center gap-2">
-            <div class="spinner-border spinner-border-sm text-primary"></div>
+            <div class="spinner-border spinner-border-sm text-primary" id="progressSpinner"></div>
             <span id="progressText">Processing...</span>
         </div>
+    </div>
+
+    <!-- Error -->
+    <div class="panel alert alert-danger mb-2" id="errorPanel" style="display:none;">
+        <span id="errorText"></span>
     </div>
 
     <!-- Results -->
@@ -117,10 +122,12 @@
         const progressPanel = document.getElementById('progressPanel');
         const progressText = document.getElementById('progressText');
         const resultsPanel = document.getElementById('resultsPanel');
+        const errorPanel = document.getElementById('errorPanel');
         const checkBtn = document.getElementById('checkBtn');
 
         progressPanel.style.display = 'block';
         resultsPanel.style.display = 'none';
+        errorPanel.style.display = 'none';
         checkBtn.disabled = true;
         progressText.textContent = escHtml(labelKeycheckProcessed) + '...';
 
@@ -138,8 +145,8 @@
             checkBtn.disabled = false;
 
             if (data.error) {
-                progressText.textContent = escHtml(data.error);
-                progressPanel.style.display = 'block';
+                document.getElementById('errorText').textContent = escHtml(data.error);
+                errorPanel.style.display = 'block';
                 return;
             }
 
@@ -147,8 +154,8 @@
         } catch (err) {
             progressPanel.style.display = 'none';
             checkBtn.disabled = false;
-            progressText.textContent = 'Error: ' + escHtml(err.message);
-            progressPanel.style.display = 'block';
+            document.getElementById('errorText').textContent = 'Error: ' + escHtml(err.message);
+            errorPanel.style.display = 'block';
         }
     }
 
