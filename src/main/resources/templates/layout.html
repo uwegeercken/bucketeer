@@ -48,11 +48,10 @@
 
         <!-- Center: server selector -->
         <form method="post" action="/session/server"
-              class="d-flex align-items-center gap-2 mx-auto"
-              onsubmit="sessionStorage.removeItem('bkt_bucket');sessionStorage.removeItem('bkt_prefix');sessionStorage.removeItem('bkt_key');">
+              class="d-flex align-items-center gap-2 mx-auto">
             <label class="text-secondary small" th:text="#{label.server}">Server</label>
             <select name="serverName" class="form-select form-select-sm w-auto"
-                    onchange="this.form.submit()"
+                    onchange="sessionStorage.removeItem('bkt_bucket');sessionStorage.removeItem('bkt_prefix');sessionStorage.removeItem('bkt_key');this.form.submit()"
                     th:if="${serverNames != null and !serverNames.isEmpty()}">
                 <option th:each="s : ${serverNames}"
                         th:value="${s}"
