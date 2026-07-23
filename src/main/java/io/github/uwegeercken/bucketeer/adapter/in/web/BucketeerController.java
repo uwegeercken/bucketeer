@@ -130,8 +130,11 @@ public class BucketeerController {
     }
 
     @PostMapping("/session/server")
-    public String selectServer(@RequestParam String serverName) {
+    public String selectServer(@RequestParam String serverName, HttpSession session) {
         sessionContext.setSelectedServer(serverName);
+        duckDb.clear();
+        session.removeAttribute(QueryContext.SESSION_KEY);
+        session.removeAttribute("bucketeer_query_params");
         return "redirect:/";
     }
 
