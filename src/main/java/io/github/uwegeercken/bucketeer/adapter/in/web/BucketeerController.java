@@ -81,7 +81,7 @@ public class BucketeerController {
                     s3Prefix = normalizedPrefix + key.substring(0, key.length() - 1);
                 } else {
                     s3Prefix = normalizedPrefix + key;
-                    keyFilter = key;
+                    keyFilter = s3Prefix;
                 }
             }
 
