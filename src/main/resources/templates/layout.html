@@ -76,6 +76,10 @@
                th:title="#{nav.cart}"><i class="bi bi-list-check"></i></a>
             <a class="btn btn-sm btn-outline-light" href="/keycheck"
                th:title="#{nav.keycheck}"><i class="bi bi-clipboard-check"></i></a>
+            <button class="btn btn-sm btn-outline-light" id="toolsBtn"
+                    th:title="#{nav.tools}" onclick="var m=new bootstrap.Modal(document.getElementById('toolsModal'));m.show();">
+                <i class="bi bi-wrench"></i>
+            </button>
             <a class="btn btn-sm btn-outline-light" href="/config"
                onclick="if(typeof saveFormState==='function') saveFormState()"
                th:title="#{nav.servers}"><i class="bi bi-server"></i></a>
@@ -103,6 +107,110 @@
             <span th:text="${appReleaseDate}"></span>
         </span>
     </div>
-</footer>
 
-</html>
+    <!-- Tools Modal -->
+    <div class="modal fade" id="toolsModal" tabindex="-1" aria-labelledby="toolsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="toolsModalLabel" th:text="#{tools.panel.title}">Text Tools</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold" th:text="#{tools.input}">Input</label>
+                        <textarea id="toolsInput" class="form-control form-control-sm font-monospace" rows="4"
+                                  placeholder="Paste or type text..."></textarea>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-1 mb-3">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('b64enc')"
+                                th:text="#{tools.encode.base64}">Base64 Encode</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('b64dec')"
+                                th:text="#{tools.decode.base64}">Base64 Decode</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('urlenc')"
+                                th:text="#{tools.encode.url}">URL Encode</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('urldec')"
+                                th:text="#{tools.decode.url}">URL Decode</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('sha256')"
+                                th:text="#{tools.hash.sha256}">SHA-256</button>
+                    </div>
+
+                    <div id="toolsError" class="alert alert-danger py-1 px-2 mb-2" style="display:none; font-size:0.82rem;"></div>
+
+                    <div>
+                        <label class="form-label small fw-semibold" th:text="#{tools.output}">Output</label>
+                        <textarea id="toolsOutput" class="form-control form-control-sm font-monospace" rows="4" readonly></textarea>
+                        <div class="d-flex align-items-center gap-2 mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="toolsCopyResult()">
+                                <i class="bi bi-clipboard-check me-1"></i><span th:text="#{tools.copyResult}">Copy Result</span>
+                            </button>
+                            <span id="toolsCopied" class="text-success small" style="display:none;" th:text="#{tools.copied}">Copied!</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tools Modal Script -->
+    <script th:inline="javascript">
+        (function() {
+            var msg = {
+                errorDecode: /*[[#{tools.error.decode}]]*/ 'Invalid input',
+                errorEmpty:  /*[[#{tools.error.empty}]]*/  'No input text'
+            };
+
+            window.toolsCopyResult = function() {
+                var output = document.getElementById('toolsOutput').value;
+                if (!output) return;
+                navigator.clipboard.writeText(output).then(function() {
+                    var el = document.getElementById('toolsCopied');
+                    el.style.display = 'inline';
+                    setTimeout(function() { el.style.display = 'none'; }, 1500);
+                });
+            };
+
+            window.toolsTransform = function(action) {
+                var input = document.getElementById('toolsInput').value;
+                var errEl = document.getElementById('toolsError');
+                errEl.style.display = 'none';
+
+                if (!input) { errEl.textContent = msg.errorEmpty; errEl.style.display = 'block'; return; }
+
+                try {
+                    var result = '';
+                    switch (action) {
+                        case 'b64enc':
+                            result = btoa(unescape(encodeURIComponent(input)));
+                            break;
+                        case 'b64dec':
+                            result = decodeURIComponent(escape(atob(input)));
+                            break;
+                        case 'urlenc':
+                            result = encodeURIComponent(input);
+                            break;
+                        case 'urldec':
+                            result = decodeURIComponent(input);
+                            break;
+                        case 'sha256':
+                            var bytes = new TextEncoder().encode(input);
+                            result = crypto.subtle.digest('SHA-256', bytes).then(function(buf) {
+                                return Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2,'0'); }).join('');
+                            });
+                            break;
+                    }
+                    if (action === 'sha256') {
+                        result.then(function(hex) { document.getElementById('toolsOutput').value = hex; });
+                    } else {
+                        document.getElementById('toolsOutput').value = result;
+                    }
+                } catch(e) {
+                    errEl.textContent = msg.errorDecode;
+                    errEl.style.display = 'block';
+                }
+            };
+        })();
+    </script>
+</footer>
