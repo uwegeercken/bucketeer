@@ -17,7 +17,7 @@ The S3 prefix can be typed in literally or generated dynamically using functions
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.5.0.jar
+java -jar target/bucketeer-0.5.3.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -39,7 +39,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.5.0.jar
+java -jar target/bucketeer-0.5.3.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -367,6 +367,24 @@ data/file2.parquet,false,,,
 
 ---
 
+## Text Tools
+
+The Tools modal (wrench icon in the navbar) provides quick encoding, decoding and hashing operations.
+
+**Supported operations:**
+
+| Button | Action |
+|--------|--------|
+| **Base64 Encode** | Encodes text to Base64 |
+| **Base64 Decode** | Decodes Base64 to text |
+| **URL Encode** | Encodes text to URL-safe format |
+| **URL Decode** | Decodes URL-encoded text |
+| **SHA-256** | Computes the SHA-256 hex digest |
+
+**Multi-line input:** Each line is processed independently. Results are joined with newlines, so you can encode/decode/hash multiple values at once.
+
+---
+
 ## S3 Server Configuration
 
 S3 servers are managed at runtime via the **Configuration** page (`/config`). No restart is required after adding, editing or deleting a server.
@@ -413,4 +431,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-23
+last update uwe.geercken@web.de - 2026-07-25
