@@ -120,7 +120,7 @@
                     <div class="mb-3">
                         <label class="form-label small fw-semibold" th:text="#{tools.input}">Input</label>
                         <textarea id="toolsInput" class="form-control form-control-sm font-monospace" rows="4"
-                                  placeholder="Paste or type text..."></textarea>
+                                  placeholder="Paste or type text... (one value per line)"></textarea>
                     </div>
 
                     <div class="d-flex flex-wrap gap-1 mb-3">
@@ -180,31 +180,28 @@
                 if (!input) { errEl.textContent = msg.errorEmpty; errEl.style.display = 'block'; return; }
 
                 try {
-                    var result = '';
-                    switch (action) {
-                        case 'b64enc':
-                            result = btoa(unescape(encodeURIComponent(input)));
-                            break;
-                        case 'b64dec':
-                            result = decodeURIComponent(escape(atob(input)));
-                            break;
-                        case 'urlenc':
-                            result = encodeURIComponent(input);
-                            break;
-                        case 'urldec':
-                            result = decodeURIComponent(input);
-                            break;
-                        case 'sha256':
-                            var bytes = new TextEncoder().encode(input);
-                            result = crypto.subtle.digest('SHA-256', bytes).then(function(buf) {
+                    var lines = input.split('\n');
+                    if (action === 'sha256') {
+                        var promises = lines.map(function(line) {
+                            var bytes = new TextEncoder().encode(line);
+                            return crypto.subtle.digest('SHA-256', bytes).then(function(buf) {
                                 return Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2,'0'); }).join('');
                             });
-                            break;
-                    }
-                    if (action === 'sha256') {
-                        result.then(function(hex) { document.getElementById('toolsOutput').value = hex; });
+                        });
+                        Promise.all(promises).then(function(results) {
+                            document.getElementById('toolsOutput').value = results.join('\n');
+                        });
                     } else {
-                        document.getElementById('toolsOutput').value = result;
+                        var results = lines.map(function(line) {
+                            switch (action) {
+                                case 'b64enc': return btoa(unescape(encodeURIComponent(line)));
+                                case 'b64dec': return decodeURIComponent(escape(atob(line)));
+                                case 'urlenc': return encodeURIComponent(line);
+                                case 'urldec': return decodeURIComponent(line);
+                                default: return line;
+                            }
+                        });
+                        document.getElementById('toolsOutput').value = results.join('\n');
                     }
                 } catch(e) {
                     errEl.textContent = msg.errorDecode;
