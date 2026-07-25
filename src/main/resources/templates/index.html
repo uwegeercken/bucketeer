@@ -462,6 +462,7 @@
         tbody.innerHTML = data.rows.map(row =>
             '<tr>'
             + '<td><input type="checkbox" class="row-check" data-key="' + escHtml(row.key) + '"'
+            + ' data-bucket="' + escHtml(row.bucket) + '"'
             + ' data-sizebytes="' + row.sizeBytes + '"'
             + ' data-lastmodified="' + escHtml(row.lastModified) + '"'
             + ' onchange="updateAddSelectedBtn()"/></td>'
@@ -469,7 +470,7 @@
             + '<td class="text-end small">' + escHtml(row.sizeKb) + '</td>'
             + '<td class="small">' + escHtml(row.lastModified) + '</td>'
             + '<td class="d-flex gap-1">'
-            + '<a href="/download?bucket=' + encodeURIComponent(currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a>'
+            + '<a href="/download?bucket=' + encodeURIComponent(row.bucket || currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a>'
             + '</td>'
             + '</tr>'
         ).join('');
@@ -586,7 +587,7 @@
     function getSelectedItems() {
         return Array.from(document.querySelectorAll('.row-check:checked')).map(cb => ({
             serverName:   currentServer,
-            bucket:       currentBucket,
+            bucket:       cb.dataset.bucket || currentBucket,
             key:          cb.dataset.key,
             sizeBytes:    parseInt(cb.dataset.sizebytes, 10),
             lastModified: cb.dataset.lastmodified ? new Date(cb.dataset.lastmodified).toISOString() : null
@@ -633,9 +634,9 @@
             for (const row of data.rows) {
                 allItems.push({
                     serverName:   currentServer,
-                    bucket:       currentBucket,
+                    bucket:       row.bucket || currentBucket,
                     key:          row.key,
-                    sizeBytes:    Math.round(parseFloat(row.sizeKb) * 1024),
+                    sizeBytes:    row.sizeBytes,
                     lastModified: row.lastModified ? new Date(row.lastModified).toISOString() : null
                 });
             }
