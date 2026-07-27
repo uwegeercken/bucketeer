@@ -84,10 +84,10 @@
         if (!currentQueryParams) return false;
         const sServer = snapshot.serverName || '';
         const sBucket = snapshot.bucket || '';
-        const sPrefix = snapshot.prefix || '';
+        const sPrefix = (snapshot.prefix || '').replace(/\/+$/, '');
         const qServer = currentQueryParams.serverName || '';
         const qBucket = currentQueryParams.bucket || '';
-        const qPrefix = currentQueryParams.prefix || '';
+        const qPrefix = (currentQueryParams.prefix || '').replace(/\/+$/, '');
         return sServer === qServer && sBucket === qBucket && sPrefix === qPrefix;
     }
 
