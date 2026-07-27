@@ -35,7 +35,7 @@
     <!-- Search -->
     <div class="panel" id="searchPanel">
         <div class="panel-title" th:text="#{nav.search}">Search</div>
-        <form method="get" action="/" id="searchForm" onsubmit="saveFormState();sessionStorage.removeItem('bkt_sort_by');sessionStorage.removeItem('bkt_sort_dir');sortBy='key';sortDir='asc';">
+        <form method="get" action="/" id="searchForm" class="pb-2" onsubmit="saveFormState();sessionStorage.removeItem('bkt_sort_by');sessionStorage.removeItem('bkt_sort_dir');sortBy='key';sortDir='asc';">
             <input type="hidden" name="search" value="true"/>
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
@@ -59,10 +59,13 @@
                            data-bs-placement="right" data-bs-html="true"
                            data-bs-content=" "></i>
                     </label>
-                    <input type="text" name="prefix" id="prefixInput"
-                           class="form-control form-control-sm font-monospace"
-                           th:value="${prefix}" oninput="updateResolvedPrefix()"/>
-                    <div id="prefixError" class="text-danger small mt-1" style="display:none;"></div>
+                    <div class="position-relative">
+                        <input type="text" name="prefix" id="prefixInput"
+                               class="form-control form-control-sm font-monospace"
+                               th:value="${prefix}" oninput="updateResolvedPrefix()"/>
+                        <div id="prefixError" class="text-danger small position-absolute start-0 end-0 px-1 py-1"
+                             style="display:none; top:100%; z-index:10; background:inherit;"></div>
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small fw-semibold" th:text="#{label.key}">Key</label>
