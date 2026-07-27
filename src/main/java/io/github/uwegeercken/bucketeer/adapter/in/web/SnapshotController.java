@@ -91,7 +91,8 @@ public class SnapshotController {
                         "rowCount",  m.rowCount(),
                         "serverName", m.serverName() != null ? m.serverName() : "",
                         "bucket",    m.bucket() != null ? m.bucket() : "",
-                        "prefix",    m.prefix() != null ? m.prefix() : ""
+                        "prefix",    m.prefix() != null ? m.prefix() : "",
+                        "fileName",  m.dataPath(Path.of(".")).getFileName().toString()
                 ))
                 .toList();
     }
@@ -174,6 +175,38 @@ public class SnapshotController {
             return ResponseEntity.badRequest().body(Map.of("error", "Snapshot not found"));
         }
         return ResponseEntity.ok(Map.of("deleted", true));
+    }
+
+    @PostMapping("/api/snapshots/{id}/reveal")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> revealSnapshot(@PathVariable String id) {
+        SnapshotMeta meta = snapshotRepo.findById(id);
+        if (meta == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Snapshot not found"));
+        }
+
+        Path parquetPath = meta.dataPath(snapshotRepo.getSnapshotsDir());
+        if (!parquetPath.toFile().exists()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "File not found"));
+        }
+
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            String[] cmd;
+            if (os.contains("mac")) {
+                cmd = new String[]{"open", "-R", parquetPath.toAbsolutePath().toString()};
+            } else if (os.contains("win")) {
+                cmd = new String[]{"cmd", "/c", "explorer", "/select,", parquetPath.toAbsolutePath().toString()};
+            } else {
+                cmd = new String[]{"xdg-open", parquetPath.getParent().toAbsolutePath().toString()};
+            }
+            Runtime.getRuntime().exec(cmd);
+            return ResponseEntity.ok(Map.of("ok", true));
+        } catch (Exception e) {
+            log.error("Failed to reveal file: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to open file manager: " + e.getMessage()));
+        }
     }
 
     private static String autoName(QueryParams qp) {

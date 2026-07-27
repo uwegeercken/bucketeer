@@ -80,6 +80,10 @@
                     th:title="#{nav.tools}" onclick="var m=new bootstrap.Modal(document.getElementById('toolsModal'));m.show();">
                 <i class="bi bi-wrench"></i>
             </button>
+            <button class="btn btn-sm btn-outline-light" id="snapshotsBtn"
+                    th:title="#{nav.snapshots}" onclick="openSnapshotsModal();">
+                <i class="bi bi-bookmarks"></i>
+            </button>
             <a class="btn btn-sm btn-outline-light" href="/config"
                onclick="if(typeof saveFormState==='function') saveFormState()"
                th:title="#{nav.servers}"><i class="bi bi-server"></i></a>
@@ -154,6 +158,21 @@
         </div>
     </div>
 
+    <!-- Snapshots Modal -->
+    <div class="modal fade" id="snapshotsModal" tabindex="-1" aria-labelledby="snapshotsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="snapshotsModalLabel" th:text="#{snapshot.list}">Snapshots</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="snapshotsModalBody">
+                    <span class="text-muted small fst-italic" th:text="#{snapshot.empty}">No snapshots saved yet.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Tools Modal Script -->
     <script th:inline="javascript">
         (function() {
@@ -209,5 +228,80 @@
                 }
             };
         })();
+    </script>
+
+    <!-- Snapshots Modal Script -->
+    <script th:inline="javascript">
+        var snapLabels = {
+            name:      /*[[#{snapshot.name}]]*/       'Name',
+            server:    /*[[#{snapshot.server}]]*/     'Server',
+            bucket:    /*[[#{snapshot.bucket}]]*/     'Bucket',
+            prefix:    /*[[#{snapshot.prefix}]]*/     'Prefix',
+            fileName:  /*[[#{snapshot.fileName}]]*/   'File',
+            date:      /*[[#{snapshot.date}]]*/       'Saved',
+            count:     /*[[#{snapshot.count}]]*/      'Objects',
+            actions:   /*[[#{snapshot.actions}]]*/    'Actions',
+            delete:    /*[[#{snapshot.delete}]]*/     'Delete snapshot',
+            reveal:    /*[[#{snapshot.reveal}]]*/     'Open in file manager',
+            confirm:   /*[[#{snapshot.confirm.delete}]]*/ 'Delete this snapshot?',
+            empty:     /*[[#{snapshot.empty}]]*/      'No snapshots saved yet.'
+        };
+
+        function escHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        window.openSnapshotsModal = async function() {
+            var body = document.getElementById('snapshotsModalBody');
+            body.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div>';
+            var modal = new bootstrap.Modal(document.getElementById('snapshotsModal'));
+            modal.show();
+
+            try {
+                var res = await fetch('/api/snapshots');
+                var snapshots = await res.json();
+                if (snapshots.length === 0) {
+                    body.innerHTML = '<span class="text-muted small fst-italic">' + escHtml(snapLabels.empty) + '</span>';
+                    return;
+                }
+                body.innerHTML = '<table class="table table-sm table-hover mb-1"><thead class="table-secondary"><tr>'
+                    + '<th>' + escHtml(snapLabels.name) + '</th>'
+                    + '<th>' + escHtml(snapLabels.server) + '</th>'
+                    + '<th>' + escHtml(snapLabels.bucket) + '</th>'
+                    + '<th>' + escHtml(snapLabels.prefix) + '</th>'
+                    + '<th>' + escHtml(snapLabels.fileName) + '</th>'
+                    + '<th>' + escHtml(snapLabels.date) + '</th>'
+                    + '<th class="text-end">' + escHtml(snapLabels.count) + '</th>'
+                    + '<th>' + escHtml(snapLabels.actions) + '</th>'
+                    + '</tr></thead><tbody>'
+                    + snapshots.map(function(s) {
+                        return '<tr>'
+                            + '<td class="small">' + escHtml(s.name) + '</td>'
+                            + '<td class="small">' + escHtml(s.serverName) + '</td>'
+                            + '<td class="small">' + escHtml(s.bucket) + '</td>'
+                            + '<td class="small font-monospace">' + escHtml(s.prefix) + '</td>'
+                            + '<td class="small font-monospace">' + escHtml(s.fileName) + '</td>'
+                            + '<td class="small">' + new Date(s.createdAt).toLocaleString() + '</td>'
+                            + '<td class="text-end small">' + s.rowCount + '</td>'
+                            + '<td class="d-flex gap-1">'
+                            + '<button class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(snapLabels.reveal) + '" onclick="snapReveal(\'' + s.id + '\')"><i class="bi bi-folder2-open"></i></button>'
+                            + '<button class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(snapLabels.delete) + '" onclick="snapDelete(\'' + s.id + '\')"><i class="bi bi-trash"></i></button>'
+                            + '</td></tr>';
+                    }).join('')
+                    + '</tbody></table>';
+            } catch {
+                body.innerHTML = '<span class="text-muted small">Error loading snapshots</span>';
+            }
+        };
+
+        async function snapDelete(id) {
+            if (!confirm(snapLabels.confirm)) return;
+            await fetch('/api/snapshots/' + id, { method: 'DELETE' });
+            openSnapshotsModal();
+        }
+
+        async function snapReveal(id) {
+            await fetch('/api/snapshots/' + id + '/reveal', { method: 'POST' });
+        }
     </script>
 </footer>

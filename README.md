@@ -17,7 +17,7 @@ The S3 prefix can be typed in literally or generated dynamically using functions
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.5.3.jar
+java -jar target/bucketeer-0.5.4.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -39,7 +39,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.5.3.jar
+java -jar target/bucketeer-0.5.4.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -431,4 +431,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-25
+last update uwe.geercken@web.de - 2026-07-27
