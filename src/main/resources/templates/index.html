@@ -116,6 +116,7 @@
             <div class="d-flex align-items-center gap-2">
                 <div class="spinner-border spinner-border-sm text-primary" id="querySpinner"></div>
                 <span class="text-muted small" id="queryStatusText" th:text="#{msg.queryRunning}">Loading...</span>
+                <span class="text-muted small" id="queryTimer" style="display:none;"></span>
             </div>
         </div>
 
@@ -403,9 +404,35 @@
         } catch { return 100; }
     })();
     let pollInterval = null;
+    let queryStartTime = null;
+    let queryTimerInterval = null;
+
+    function formatElapsed(ms) {
+        const sec = Math.floor(ms / 1000);
+        if (sec <= 60) return sec + 's';
+        const min = Math.floor(sec / 60);
+        const rem = sec % 60;
+        return min + 'm ' + rem + 's';
+    }
+
+    function startTimer() {
+        queryStartTime = Date.now();
+        const timerEl = document.getElementById('queryTimer');
+        timerEl.style.display = '';
+        timerEl.textContent = '0s';
+        queryTimerInterval = setInterval(function() {
+            timerEl.textContent = formatElapsed(Date.now() - queryStartTime);
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(queryTimerInterval);
+        queryTimerInterval = null;
+    }
 
     async function startPolling() {
         if (!queryStarted) return;
+        startTimer();
         try {
             const res  = await fetch('/api/query/status');
             const data = await res.json();
@@ -429,6 +456,7 @@
             statusText.textContent = data.objectsFound + ' ' + labelObjFound;
         } else if (data.status === 'DONE') {
             clearInterval(pollInterval);
+            stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
             if (data.objectsFound === 0) {
                 statusText.textContent = labelNoObj;
@@ -439,6 +467,7 @@
             }
         } else if (data.status === 'ERROR') {
             clearInterval(pollInterval);
+            stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
             statusText.classList.add('text-danger');
             statusText.textContent = labelQryErr + ' ' + data.error;
