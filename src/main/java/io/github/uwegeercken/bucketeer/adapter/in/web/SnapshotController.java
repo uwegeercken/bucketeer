@@ -97,65 +97,77 @@ public class SnapshotController {
                 .toList();
     }
 
-    @PostMapping("/api/snapshots/{id}/compare")
+    @PostMapping("/api/snapshots/compare")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> compareSnapshot(
-            @PathVariable String id,
-            HttpSession session) {
+    public ResponseEntity<Map<String, Object>> compareSnapshots(
+            @RequestBody List<String> ids) {
 
-        QueryParams qp = (QueryParams) session.getAttribute("bucketeer_query_params");
-        if (qp == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "No query executed yet"));
+        if (ids == null || ids.size() != 2) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Exactly two snapshot IDs required"));
         }
 
-        SnapshotMeta meta = snapshotRepo.findById(id);
-        if (meta == null) {
+        SnapshotMeta meta1 = snapshotRepo.findById(ids.get(0));
+        SnapshotMeta meta2 = snapshotRepo.findById(ids.get(1));
+        if (meta1 == null || meta2 == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Snapshot not found"));
         }
 
-        Path parquetPath = meta.dataPath(snapshotRepo.getSnapshotsDir());
-        if (!parquetPath.toFile().exists()) {
+        String s1 = meta1.serverName() != null ? meta1.serverName() : "";
+        String s2 = meta2.serverName() != null ? meta2.serverName() : "";
+        String b1 = meta1.bucket() != null ? meta1.bucket() : "";
+        String b2 = meta2.bucket() != null ? meta2.bucket() : "";
+        String p1 = meta1.prefix() != null ? meta1.prefix().replaceAll("/+$", "") : "";
+        String p2 = meta2.prefix() != null ? meta2.prefix().replaceAll("/+$", "") : "";
+        if (!s1.equals(s2) || !b1.equals(b2) || !p1.equals(p2)) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "Snapshots must have the same server, bucket and prefix"));
+        }
+
+        Path path1 = meta1.dataPath(snapshotRepo.getSnapshotsDir());
+        Path path2 = meta2.dataPath(snapshotRepo.getSnapshotsDir());
+        if (!path1.toFile().exists() || !path2.toFile().exists()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Snapshot data file not found"));
         }
 
         try {
-            DuckDbRepository.DiffResult diff = duckDb.diffWithSnapshot(parquetPath.toString());
+            DuckDbRepository.DiffResult diff = duckDb.diffTwoSnapshots(path1.toString(), path2.toString());
             return ResponseEntity.ok(Map.<String, Object>of(
-                    "snapshotId",   meta.id(),
-                    "snapshotName", meta.name(),
-                    "added",        diff.added(),
-                    "removed",      diff.removed(),
-                    "changed",      diff.changed()));
+                    "snapshot1Name", meta1.name(),
+                    "snapshot2Name", meta2.name(),
+                    "added",         diff.added(),
+                    "removed",       diff.removed(),
+                    "changed",       diff.changed()));
         } catch (Exception e) {
-            log.error("Failed to compare with snapshot {}: {}", id, e.getMessage(), e);
+            log.error("Failed to compare snapshots {} and {}: {}", ids.get(0), ids.get(1), e.getMessage(), e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Comparison failed: " + e.getMessage()));
         }
     }
 
-    @GetMapping("/api/snapshots/{id}/diff/download")
-    public ResponseEntity<Resource> downloadDiff(@PathVariable String id, HttpSession session) {
-        QueryParams qp = (QueryParams) session.getAttribute("bucketeer_query_params");
-        if (qp == null) {
+    @GetMapping("/api/snapshots/diff/download")
+    public ResponseEntity<Resource> downloadDiff(
+            @RequestParam String id1,
+            @RequestParam String id2) {
+
+        SnapshotMeta meta1 = snapshotRepo.findById(id1);
+        SnapshotMeta meta2 = snapshotRepo.findById(id2);
+        if (meta1 == null || meta2 == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        SnapshotMeta meta = snapshotRepo.findById(id);
-        if (meta == null) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        Path parquetPath = meta.dataPath(snapshotRepo.getSnapshotsDir());
-        if (!parquetPath.toFile().exists()) {
+        Path path1 = meta1.dataPath(snapshotRepo.getSnapshotsDir());
+        Path path2 = meta2.dataPath(snapshotRepo.getSnapshotsDir());
+        if (!path1.toFile().exists() || !path2.toFile().exists()) {
             return ResponseEntity.badRequest().build();
         }
 
         try {
             java.io.File tmpFile = java.io.File.createTempFile("bucketeer-diff-", ".csv");
             tmpFile.deleteOnExit();
-            duckDb.exportDiffToCsv(parquetPath.toString(), tmpFile.getAbsolutePath());
+            duckDb.exportDiffToCsvTwoSnapshots(path1.toString(), path2.toString(), tmpFile.getAbsolutePath());
 
-            String filename = "diff-" + meta.name().replaceAll("[^a-zA-Z0-9._-]", "_") + ".csv";
+            String filename = "diff-" + meta1.name().replaceAll("[^a-zA-Z0-9._-]", "_")
+                    + "-vs-" + meta2.name().replaceAll("[^a-zA-Z0-9._-]", "_") + ".csv";
             FileSystemResource resource = new FileSystemResource(tmpFile);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

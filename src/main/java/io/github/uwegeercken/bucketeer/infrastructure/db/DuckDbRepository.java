@@ -321,6 +321,72 @@ public class DuckDbRepository {
         }
     }
 
+    /**
+     * Compares two snapshot parquet files.
+     * snapshot1 is treated as "old", snapshot2 as "new".
+     */
+    public DiffResult diffTwoSnapshots(String snapshot1Path, String snapshot2Path) {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("CREATE OR REPLACE TEMPORARY TABLE snap_old AS "
+                    + "SELECT * FROM read_parquet('" + snapshot1Path + "')");
+            stmt.execute("CREATE OR REPLACE TEMPORARY TABLE snap_new AS "
+                    + "SELECT * FROM read_parquet('" + snapshot2Path + "')");
+
+            List<Map<String, Object>> added = queryDiff(
+                    "SELECT n.key, n.bucket, n.size_bytes, n.last_modified, n.etag "
+                            + "FROM snap_new n LEFT JOIN snap_old o ON n.key = o.key "
+                            + "WHERE o.key IS NULL ORDER BY n.key");
+
+            List<Map<String, Object>> removed = queryDiff(
+                    "SELECT o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
+                            + "FROM snap_old o LEFT JOIN snap_new n ON o.key = n.key "
+                            + "WHERE n.key IS NULL ORDER BY o.key");
+
+            List<Map<String, Object>> changed = queryDiff(
+                    "SELECT n.key, n.bucket, n.size_bytes AS new_size_bytes, n.last_modified AS new_last_modified, "
+                            + "o.size_bytes AS old_size_bytes, o.last_modified AS old_last_modified "
+                            + "FROM snap_new n INNER JOIN snap_old o ON n.key = o.key "
+                            + "WHERE n.size_bytes != o.size_bytes "
+                            + "OR n.last_modified != o.last_modified "
+                            + "ORDER BY n.key");
+
+            stmt.execute("DROP TABLE IF EXISTS snap_old");
+            stmt.execute("DROP TABLE IF EXISTS snap_new");
+
+            return new DiffResult(added, removed, changed);
+        } catch (SQLException e) {
+            log.error("Failed to compare snapshots: {}", e.getMessage(), e);
+            throw new RuntimeException("Snapshot comparison failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Exports the diff between two snapshot parquet files to a CSV file.
+     */
+    public void exportDiffToCsvTwoSnapshots(String snapshot1Path, String snapshot2Path, String exportPath) {
+        String sql = "COPY ("
+                + "SELECT 'added' AS status, n.key, n.bucket, n.size_bytes, n.last_modified, n.etag "
+                + "FROM read_parquet('" + snapshot2Path + "') n LEFT JOIN read_parquet('" + snapshot1Path + "') o ON n.key = o.key "
+                + "WHERE o.key IS NULL "
+                + "UNION ALL "
+                + "SELECT 'removed' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
+                + "FROM read_parquet('" + snapshot1Path + "') o LEFT JOIN read_parquet('" + snapshot2Path + "') n ON o.key = n.key "
+                + "WHERE n.key IS NULL "
+                + "UNION ALL "
+                + "SELECT 'changed' AS status, n.key, n.bucket, n.size_bytes, n.last_modified, n.etag "
+                + "FROM read_parquet('" + snapshot2Path + "') n INNER JOIN read_parquet('" + snapshot1Path + "') o ON n.key = o.key "
+                + "WHERE n.size_bytes != o.size_bytes OR n.last_modified != o.last_modified "
+                + "ORDER BY status, key"
+                + ") TO '" + exportPath + "' (FORMAT CSV, HEADER 1)";
+
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(sql);
+        } catch (SQLException e) {
+            log.error("Failed to export diff to CSV: {}", e.getMessage(), e);
+            throw new RuntimeException("Diff export failed: " + e.getMessage(), e);
+        }
+    }
+
     public record DiffResult(
             List<Map<String, Object>> added,
             List<Map<String, Object>> removed,

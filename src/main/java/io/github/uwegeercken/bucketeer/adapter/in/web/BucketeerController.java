@@ -165,14 +165,6 @@ public class BucketeerController {
         );
     }
 
-    @GetMapping(value = "/api/query/params", produces = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseBody
-    public Map<String, String> queryParams(HttpSession session) {
-        QueryParams qp = (QueryParams) session.getAttribute("bucketeer_query_params");
-        if (qp == null) return Map.of();
-        return qp.toMap();
-    }
-
     @GetMapping(value = "/api/query/results", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public Map<String, Object> queryResults(

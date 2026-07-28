@@ -16,10 +16,16 @@
     <div class="panel" id="snapshotsPanel">
         <div class="panel-title d-flex align-items-center justify-content-between">
             <span th:text="#{snapshot.list}">Snapshots</span>
-            <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
-                    onclick="loadSnapshots()" th:title="#{snapshot.list}">
-                <i class="bi bi-arrow-clockwise"></i>
-            </button>
+            <div class="d-flex gap-1">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="compareBtn" disabled
+                        onclick="compareSelected()" th:title="#{snapshot.compare}">
+                    <i class="bi bi-arrow-left-right me-1"></i><span th:text="#{snapshot.compareSelected}">Compare selected</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="loadSnapshots()" th:title="#{snapshot.list}">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
         </div>
         <div id="snapshotList">
             <span class="text-muted small fst-italic" th:text="#{snapshot.empty}">No snapshots saved yet.</span>
@@ -57,6 +63,7 @@
     const labelSnapshotCount   = /*[[#{snapshot.count}]]*/ 'Objects';
     const labelSnapshotActions = /*[[#{snapshot.actions}]]*/ 'Actions';
     const labelSnapshotCompare = /*[[#{snapshot.compare}]]*/ 'Compare with snapshot';
+    const labelSnapshotCompareSel = /*[[#{snapshot.compareSelected}]]*/ 'Compare selected';
     const labelSnapshotDelete  = /*[[#{snapshot.delete}]]*/ 'Delete snapshot';
     const labelSnapshotReveal  = /*[[#{snapshot.reveal}]]*/ 'Open in file manager';
     const labelSnapshotConfirm = /*[[#{snapshot.confirm.delete}]]*/ 'Delete this snapshot?';
@@ -66,45 +73,41 @@
     const labelDiffChanged     = /*[[#{snapshot.diff.changed}]]*/ 'Changed';
     const labelDiffNoChanges   = /*[[#{snapshot.diff.noChanges}]]*/ 'No changes detected.';
     const labelDiffTitle       = /*[[#{snapshot.diff.title}]]*/ 'Diff:';
-    const labelDiffDownload    = /*[[#{snapshot.diff.download}]]*/ 'Download diff';
     const labelSnapshotServer  = /*[[#{snapshot.server}]]*/ 'Server';
     const labelSnapshotBucket  = /*[[#{snapshot.bucket}]]*/ 'Bucket';
     const labelSnapshotPrefix  = /*[[#{snapshot.prefix}]]*/ 'Prefix';
     const labelSnapshotFileName = /*[[#{snapshot.fileName}]]*/ 'File';
-    const labelSnapshotNoQuery = /*[[#{snapshot.noQuery}]]*/ 'No query executed yet.';
+    const labelSnapshotMismatch = /*[[#{snapshot.compareMismatch}]]*/ 'Snapshots must have the same server, bucket and prefix.';
 
-    let currentDiffSnapshotId = null;
-    let currentQueryParams = null;
+    let diffId1 = null;
+    let diffId2 = null;
+    let snapshotsData = [];
 
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    function isComparable(snapshot) {
-        if (!currentQueryParams) return false;
-        const sServer = snapshot.serverName || '';
-        const sBucket = snapshot.bucket || '';
-        const sPrefix = (snapshot.prefix || '').replace(/\/+$/, '');
-        const qServer = currentQueryParams.serverName || '';
-        const qBucket = currentQueryParams.bucket || '';
-        const qPrefix = (currentQueryParams.prefix || '').replace(/\/+$/, '');
-        return sServer === qServer && sBucket === qBucket && sPrefix === qPrefix;
+    function getSelectedIds() {
+        return Array.from(document.querySelectorAll('.snap-check:checked')).map(cb => cb.dataset.id);
+    }
+
+    function updateCompareBtn() {
+        const ids = getSelectedIds();
+        document.getElementById('compareBtn').disabled = ids.length !== 2;
     }
 
     async function loadSnapshots() {
         const container = document.getElementById('snapshotList');
         try {
-            const [snapRes, paramsRes] = await Promise.all([
-                fetch('/api/snapshots'),
-                fetch('/api/query/params')
-            ]);
-            const snapshots = await snapRes.json();
-            currentQueryParams = await paramsRes.json();
+            const res = await fetch('/api/snapshots');
+            const snapshots = await res.json();
+            snapshotsData = snapshots;
             if (snapshots.length === 0) {
                 container.innerHTML = '<span class="text-muted small fst-italic">' + escHtml(labelSnapshotEmpty) + '</span>';
                 return;
             }
             container.innerHTML = '<table class="table table-sm table-hover mb-1"><thead class="table-secondary"><tr>'
+                + '<th></th>'
                 + '<th>' + escHtml(labelSnapshotNameH) + '</th>'
                 + '<th>' + escHtml(labelSnapshotServer) + '</th>'
                 + '<th>' + escHtml(labelSnapshotBucket) + '</th>'
@@ -115,11 +118,8 @@
                 + '<th>' + escHtml(labelSnapshotActions) + '</th>'
                 + '</tr></thead><tbody>'
                 + snapshots.map(s => {
-                    const comparable = isComparable(s);
-                    const compareBtn = comparable
-                        ? '<button class="btn btn-sm btn-outline-primary btn-icon" title="' + escHtml(labelSnapshotCompare) + '" onclick="compareSnapshot(\'' + s.id + '\', \'' + escHtml(s.name) + '\')"><i class="bi bi-arrow-left-right"></i></button>'
-                        : '<button class="btn btn-sm btn-outline-secondary btn-icon disabled" title="' + escHtml(labelSnapshotNoQuery) + '"><i class="bi bi-arrow-left-right"></i></button>';
                     return '<tr>'
+                        + '<td><input type="checkbox" class="snap-check" data-id="' + s.id + '" onchange="updateCompareBtn()"/></td>'
                         + '<td class="small">' + escHtml(s.name) + '</td>'
                         + '<td class="small">' + escHtml(s.serverName) + '</td>'
                         + '<td class="small">' + escHtml(s.bucket) + '</td>'
@@ -128,7 +128,6 @@
                         + '<td class="small">' + new Date(s.createdAt).toLocaleString() + '</td>'
                         + '<td class="text-end small">' + s.rowCount + '</td>'
                         + '<td class="d-flex gap-1">'
-                        + compareBtn
                         + '<button class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelSnapshotReveal) + '" onclick="revealSnapshot(\'' + s.id + '\')"><i class="bi bi-folder2-open"></i></button>'
                         + '<button class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelSnapshotDelete) + '" onclick="deleteSnapshot(\'' + s.id + '\')"><i class="bi bi-trash"></i></button>'
                         + '</td></tr>';
@@ -150,11 +149,30 @@
     }
 
     function downloadDiff() {
-        if (!currentDiffSnapshotId) return;
-        window.location.href = '/api/snapshots/' + currentDiffSnapshotId + '/diff/download';
+        if (!diffId1 || !diffId2) return;
+        window.location.href = '/api/snapshots/diff/download?id1=' + encodeURIComponent(diffId1) + '&id2=' + encodeURIComponent(diffId2);
     }
 
-    async function compareSnapshot(id, name) {
+    async function compareSelected() {
+        const ids = getSelectedIds();
+        if (ids.length !== 2) return;
+
+        const s1 = snapshotsData.find(s => s.id === ids[0]);
+        const s2 = snapshotsData.find(s => s.id === ids[1]);
+        if (s1 && s2) {
+            const norm = p => (p || '').replace(/\/+$/, '');
+            if ((s1.serverName || '') !== (s2.serverName || '')
+                || (s1.bucket || '') !== (s2.bucket || '')
+                || norm(s1.prefix) !== norm(s2.prefix)) {
+                const panel = document.getElementById('diffPanel');
+                document.getElementById('diffTitle').textContent = labelSnapshotCompareSel;
+                document.getElementById('diffSummary').innerHTML = '<span class="text-danger">' + escHtml(labelSnapshotMismatch) + '</span>';
+                document.getElementById('diffContent').innerHTML = '';
+                panel.style.display = 'block';
+                return;
+            }
+        }
+
         const panel = document.getElementById('diffPanel');
         const titleEl = document.getElementById('diffTitle');
         const summaryEl = document.getElementById('diffSummary');
@@ -162,13 +180,18 @@
         const downloadBtn = document.getElementById('diffDownloadBtn');
         panel.style.display = 'block';
         downloadBtn.style.display = 'none';
-        currentDiffSnapshotId = id;
-        titleEl.textContent = labelDiffTitle + ' ' + name;
+        diffId1 = ids[0];
+        diffId2 = ids[1];
+        titleEl.textContent = labelDiffTitle + ' ' + ids[0] + ' vs ' + ids[1];
         summaryEl.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div> Comparing...';
         contentEl.innerHTML = '';
 
         try {
-            const res = await fetch('/api/snapshots/' + id + '/compare', { method: 'POST' });
+            const res = await fetch('/api/snapshots/compare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ids)
+            });
             const data = await res.json();
             if (!res.ok) {
                 summaryEl.innerHTML = '<span class="text-danger">' + escHtml(data.error) + '</span>';
@@ -178,6 +201,8 @@
             const addedCount = data.added.length;
             const removedCount = data.removed.length;
             const changedCount = data.changed.length;
+
+            titleEl.textContent = labelDiffTitle + ' ' + data.snapshot1Name + ' vs ' + data.snapshot2Name;
 
             if (addedCount === 0 && removedCount === 0 && changedCount === 0) {
                 summaryEl.innerHTML = '<span class="text-success">' + escHtml(labelDiffNoChanges) + '</span>';
