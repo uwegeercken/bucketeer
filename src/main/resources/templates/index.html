@@ -646,36 +646,50 @@
     }
 
     async function addAllToCart() {
+        const btn = document.getElementById('btnAddAll');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         let allItems = [];
         let page = 0;
         const pageSize = PAGE_SIZE;
-        while (true) {
-            const params = new URLSearchParams({ page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir });
-            const keyFilter = document.getElementById('filterKey')?.value || '';
-            const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
-            const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
-            const dateFrom = document.getElementById('filterDateFrom')?.value || '';
-            const dateTo = document.getElementById('filterDateTo')?.value || '';
-            if (keyFilter) params.append('keyFilter', keyFilter);
-            if (minSizeKb) params.append('minSizeKb', minSizeKb);
-            if (maxSizeKb) params.append('maxSizeKb', maxSizeKb);
-            if (dateFrom) params.append('dateFrom', dateFrom);
-            if (dateTo) params.append('dateTo', dateTo);
-            const res = await fetch('/api/query/results?' + params.toString());
-            const data = await res.json();
-            for (const row of data.rows) {
-                allItems.push({
-                    serverName:   currentServer,
-                    bucket:       row.bucket || currentBucket,
-                    key:          row.key,
-                    sizeBytes:    row.sizeBytes,
-                    lastModified: row.lastModified ? new Date(row.lastModified).toISOString() : null
-                });
+        const statusText = document.getElementById('queryStatusText');
+        const origStatus = statusText.textContent;
+        try {
+            while (true) {
+                statusText.textContent = 'Loading page ' + (page + 1) + '...';
+                const params = new URLSearchParams({ page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir });
+                const keyFilter = document.getElementById('filterKey')?.value || '';
+                const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
+                const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
+                const dateFrom = document.getElementById('filterDateFrom')?.value || '';
+                const dateTo = document.getElementById('filterDateTo')?.value || '';
+                if (keyFilter) params.append('keyFilter', keyFilter);
+                if (minSizeKb) params.append('minSizeKb', minSizeKb);
+                if (maxSizeKb) params.append('maxSizeKb', maxSizeKb);
+                if (dateFrom) params.append('dateFrom', dateFrom);
+                if (dateTo) params.append('dateTo', dateTo);
+                const res = await fetch('/api/query/results?' + params.toString());
+                const data = await res.json();
+                for (const row of data.rows) {
+                    allItems.push({
+                        serverName:   currentServer,
+                        bucket:       row.bucket || currentBucket,
+                        key:          row.key,
+                        sizeBytes:    row.sizeBytes,
+                        lastModified: row.lastModified ? new Date(row.lastModified).toISOString() : null
+                    });
+                }
+                if (!data.hasMore) break;
+                page++;
             }
-            if (!data.hasMore) break;
-            page++;
+            statusText.textContent = 'Adding ' + allItems.length + ' objects to selection...';
+            if (allItems.length > 0) await addToCart(allItems);
+            statusText.textContent = origStatus;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
         }
-        if (allItems.length > 0) await addToCart(allItems);
     }
 
     async function updateCartBadge(count) {
