@@ -31,6 +31,31 @@
             <div class="panel">
                 <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                <h6>0.5.4 <small class="text-muted">2026-07-28</small></h6>
+                <ul>
+                    <li>Snapshot-to-snapshot compare: select any two snapshots via checkboxes, must share the same server/bucket/prefix</li>
+                    <li>Query timer — shows elapsed time (seconds/minutes) during query execution</li>
+                    <li>Snapshots accessible from navbar icon (full list without query dependency)</li>
+                    <li>Open snapshot in OS file manager (reveal button per snapshot)</li>
+                    <li>Text Tools: multi-line input support (one value per line, all processed independently)</li>
+                    <li>Add All progress indicator in results title bar (spinner + page count, no overlay)</li>
+                    <li>Fixed prefix error layout (no longer pushes bucket/key out of alignment)</li>
+                    <li>Fixed snapshot compare disabled due to trailing slash mismatch</li>
+                    <li>Removed snapshot icon from results toolbar (moved to navbar)</li>
+                </ul>
+
+                <hr/>
+
+                <h6>0.5.3 <small class="text-muted">2026-07-26</small></h6>
+                <ul>
+                    <li>Tools modal (Base64, URL, SHA-256) with copy-to-clipboard</li>
+                    <li>Fixed addAllToCart: use row.bucket and row.sizeBytes directly from API</li>
+                    <li>Fixed keyFilter: use s3Prefix instead of key for exact key comparison</li>
+                    <li>Fixed pom.xml: stray <code>3</code> after relativePath</li>
+                </ul>
+
+                <hr/>
+
                 <h6>0.5.1 <small class="text-muted">2026-07-23</small></h6>
                 <ul>
                     <li>Prefix template: <code>{bucket}</code> reference to use the bucket name in templates</li>

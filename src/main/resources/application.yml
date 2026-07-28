@@ -10,6 +10,6 @@ server:
 
 bucketeer:
   version: "0.5.4"
-  release-date: "2026-07-27"
+  release-date: "2026-07-28"
   snapshots:
     retention-days: 30
