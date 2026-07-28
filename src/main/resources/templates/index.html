@@ -85,9 +85,10 @@
 
     <!-- Results -->
     <div class="panel" id="resultsPanel" th:if="${queryStarted}">
-        <div class="panel-title d-flex align-items-center justify-content-between">
+            <div class="panel-title d-flex align-items-center justify-content-between">
             <span th:text="#{nav.results}">Results</span>
             <div class="d-flex gap-1 align-items-center">
+                <span id="addAllStatus" class="text-muted small" style="display:none;"></span>
                 <span id="cartBadge" class="badge bg-secondary" style="display:none;cursor:pointer;"
                       onclick="window.location.href='/cart'" title="Selection"></span>
                 <button type="button" id="btnAddSelected" class="btn btn-sm btn-outline-secondary btn-icon"
@@ -648,14 +649,14 @@
         const origHtml = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        const statusEl = document.getElementById('addAllStatus');
+        statusEl.style.display = '';
         let allItems = [];
         let page = 0;
         const pageSize = PAGE_SIZE;
-        const statusText = document.getElementById('queryStatusText');
-        const origStatus = statusText.textContent;
         try {
             while (true) {
-                statusText.textContent = 'Loading page ' + (page + 1) + '...';
+                statusEl.textContent = 'Loading page ' + (page + 1) + '...';
                 const params = new URLSearchParams({ page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir });
                 const keyFilter = document.getElementById('filterKey')?.value || '';
                 const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
@@ -681,10 +682,10 @@
                 if (!data.hasMore) break;
                 page++;
             }
-            statusText.textContent = 'Adding ' + allItems.length + ' objects to selection...';
+            statusEl.textContent = 'Adding ' + allItems.length + ' objects...';
             if (allItems.length > 0) await addToCart(allItems);
-            statusText.textContent = origStatus;
         } finally {
+            statusEl.style.display = 'none';
             btn.disabled = false;
             btn.innerHTML = origHtml;
         }
