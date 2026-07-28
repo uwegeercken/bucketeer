@@ -330,10 +330,15 @@ Snapshots save the complete result set of a query (all objects under the searche
 - The snapshot is auto-named from the query parameters (e.g. `my-bucket / data/2024/*`)
 - The snapshot stores all objects under the prefix (unfiltered)
 
-**Snapshot page (`/snapshots`):**
-- Lists all saved snapshots with name, server, bucket, prefix, date and object count
-- **Compare** – shows a diff against the current query results (added, removed, changed objects)
+**Snapshot list (navbar bookmarks icon or `/snapshots`):**
+- Lists all saved snapshots with name, server, bucket, prefix, file, date and object count
+- **Compare selected** – select exactly two snapshots with checkboxes and click **Compare selected** to show a diff (added, removed, changed objects)
+- Both snapshots must have the same server, bucket and prefix to be comparable
+- **Open in file manager** – reveals the snapshot parquet file in the OS file manager
 - **Delete** – removes a snapshot
+
+**Diff export:**
+- After comparing two snapshots, the diff can be downloaded as CSV
 
 **Retention:**
 - Snapshots are automatically cleaned up after a configurable number of days
@@ -431,4 +436,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-27
+last update uwe.geercken@web.de - 2026-07-27 (snapshot-to-snapshot compare, query timer, navbar snapshots, file manager reveal)
