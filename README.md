@@ -436,4 +436,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-28 (v0.5.4 snapshot-to-snapshot compare, query timer, navbar snapshots)
+last update uwe.geercken@web.de - 2026-07-29
