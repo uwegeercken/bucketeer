@@ -111,7 +111,7 @@ public class DuckDbRepository {
     private static final java.util.Set<String> SORT_COLUMNS = java.util.Set.of("key", "size_bytes", "last_modified");
     private static final java.util.Set<String> SORT_DIRS = java.util.Set.of("asc", "desc");
 
-    public List<S3Object> query(String keyFilter, Long minSizeKb, Long maxSizeKb,
+    public List<S3Object> query(String keyFilter, Double minSizeKb, Double maxSizeKb,
                                 String dateFrom, String dateTo,
                                 int page, int pageSize,
                                 String sortBy, String sortDir) {
@@ -182,7 +182,7 @@ public class DuckDbRepository {
      * @return number of exported rows
      */
     public long exportToParquet(String exportPath,
-                                String keyFilter, Long minSizeKb, Long maxSizeKb,
+                                String keyFilter, Double minSizeKb, Double maxSizeKb,
                                 String dateFrom, String dateTo) {
         StringBuilder where = new StringBuilder("WHERE 1=1");
         List<Object> params = new ArrayList<>();
@@ -393,7 +393,7 @@ public class DuckDbRepository {
             List<Map<String, Object>> changed
     ) {}
 
-    public long queryCount(String keyFilter, Long minSizeKb, Long maxSizeKb,
+    public long queryCount(String keyFilter, Double minSizeKb, Double maxSizeKb,
                            String dateFrom, String dateTo) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM objects WHERE 1=1");
         List<Object> params = new ArrayList<>();

@@ -169,8 +169,8 @@ public class BucketeerController {
     @ResponseBody
     public Map<String, Object> queryResults(
             @RequestParam(required = false) String keyFilter,
-            @RequestParam(required = false) Long minSizeKb,
-            @RequestParam(required = false) Long maxSizeKb,
+            @RequestParam(required = false) Double minSizeKb,
+            @RequestParam(required = false) Double maxSizeKb,
             @RequestParam(required = false) String dateFrom,
             @RequestParam(required = false) String dateTo,
             @RequestParam(defaultValue = "0") int page,
@@ -205,8 +205,8 @@ public class BucketeerController {
     @GetMapping("/api/query/export")
     public void exportParquet(
             @RequestParam(required = false) String keyFilter,
-            @RequestParam(required = false) Long minSizeKb,
-            @RequestParam(required = false) Long maxSizeKb,
+            @RequestParam(required = false) Double minSizeKb,
+            @RequestParam(required = false) Double maxSizeKb,
             @RequestParam(required = false) String dateFrom,
             @RequestParam(required = false) String dateTo,
             @RequestParam(required = false) String bucket,
