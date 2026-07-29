@@ -181,6 +181,7 @@ public class BucketeerController {
         List<S3Object> results = duckDb.query(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo, page, pageSize, sortBy, sortDir);
         long total = duckDb.queryCount(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
 
+
         List<Map<String, Object>> rows = results.stream()
                 .map(obj -> Map.<String, Object>of(
                         "key",          obj.key(),
