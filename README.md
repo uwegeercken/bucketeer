@@ -12,14 +12,14 @@ The user can upload a CSV file containing keys to check if the specified keys ex
 The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and repeat. There are also date functions available.
 Functions can be nested and may have literal suffixes. This helps to dynamically construct the prefix of your files.
 
-![img_1.png](img_1.png)
+![img_2.png](img_2.png)
 ---
 
 ## Running
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.5.4.jar
+java -jar target/bucketeer-0.5.6.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -41,7 +41,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.5.4.jar
+java -jar target/bucketeer-0.5.6.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -60,12 +60,18 @@ The preference is saved in the browser and persists across sessions.
 The bucket selector is a dropdown populated from the configured S3 server.
 Select a server first, then choose a bucket from the list.
 
-### Favorites
+### Favorites & History
 
-Favorites save a named combination of **server + bucket + prefix template + key** for quick reuse.
+**Favorites** save a named combination of **server + bucket + prefix template + key** for quick reuse.
 They are stored in the browser's `localStorage` — no server-side state required.
 
-Click a favorite pill to pre-fill the form. Click `×` to delete it.
+**Search history** is maintained automatically. Every submitted search combination is saved and the most recent entries are shown in the combobox.
+
+The combobox input at the top of the page searches both favorites and history as you type:
+- Favorites are shown with a ★ icon and can be deleted via the × button in the dropdown
+- History entries are shown with a ↻ icon and appear in order of last use
+- Use the **trash icon** next to the input to clear the search history
+- Click the **bookmark icon** in the search panel header to save the current search as a favorite
 
 ### Results Panel
 
@@ -347,6 +353,11 @@ Snapshots save the complete result set of a query (all objects under the searche
 - Default: 30 days, configurable in **Settings** (`/settings`)
 - Retention is stored in `~/.bucketeer/settings.json`
 
+**Search History:**
+- The search history size can be configured in **Settings** (`/settings`)
+- Default: 50 entries, configurable up to 500
+- Set to 0 to disable history tracking
+
 ---
 
 ## Key Check
@@ -438,4 +449,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-29
+last update uwe.geercken@web.de - 2026-07-30
