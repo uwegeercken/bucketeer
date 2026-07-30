@@ -1,14 +1,16 @@
 # Bucketeer
 
-A web-based S3 object browser supporting listing, filtering, download, snapshots and favorites. Query results may
-be compared to snapshots and the differences may be exported.
+A web-based S3 object browser supporting listing, filtering, download, snapshots and favorites. 
+
+Query results can be exported to snapshots, these can be compared and the differences can be exported.
 
 Query results can be collected across multiple queries and help to do bulk downloads of
 S3 files. 
 
 The user can upload a CSV file containing keys to check if the specified keys exist on the S3 server.
 
-The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth, repeat and date. Functions can be nested and may have literal suffixes.
+The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and repeat. There are also date functions available.
+Functions can be nested and may have literal suffixes. This helps to dynamically construct the prefix of your files.
 
 ![img_1.png](img_1.png)
 ---
@@ -194,7 +196,7 @@ Key:       MTIzLzQ1Ni83ODkvMDEy
 Result:    myprefix/MILQN8OkME/MTIzLzQ1Ni83ODkvMDEy/
 ```
 `everyNth(key, 0, 2)` takes every other character (index 0, 2, 4, …) of the key.
-Used for even distribution across S3 prefixes to avoid hotspots.
+Sometimes used for even distribution across S3 prefixes to avoid hotspots.
 
 ---
 
