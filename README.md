@@ -338,8 +338,8 @@ Snapshots save the complete result set of a query (all objects under the searche
 - The snapshot is auto-named from the query parameters (e.g. `my-bucket / data/2024/*`)
 - The snapshot stores all objects under the prefix (unfiltered)
 
-**Snapshot list (navbar bookmarks icon or `/snapshots`):**
-- Lists all saved snapshots with name, server, bucket, prefix, file, date and object count
+**Snapshot list (navbar bookmarks icon → `/snapshots`):**
+- Dedicated page listing all saved snapshots with server, bucket, prefix, date and object count
 - **Compare selected** – select exactly two snapshots with checkboxes and click **Compare selected** to show a diff (added, removed, changed objects)
 - Both snapshots must have the same server, bucket and prefix to be comparable
 - **Open in file manager** – reveals the snapshot parquet file in the OS file manager
@@ -397,9 +397,11 @@ The Tools modal (wrench icon in the navbar) provides quick encoding, decoding an
 | **Base64 Decode** | Decodes Base64 to text |
 | **URL Encode** | Encodes text to URL-safe format |
 | **URL Decode** | Decodes URL-encoded text |
+| **Timestamp (ms) → Date** | Converts Unix timestamps (milliseconds) to local time, format `yyyy-MM-dd HH:mm:ss.SSS` |
+| **Date → Timestamp (ms)** | Converts `yyyy-MM-dd HH:mm:ss[.SSS]` (local time) to a Unix timestamp in milliseconds |
 | **SHA-256** | Computes the SHA-256 hex digest |
 
-**Multi-line input:** Each line is processed independently. Results are joined with newlines, so you can encode/decode/hash multiple values at once.
+**Multi-line input:** Each line is processed independently. Results are joined with newlines, so you can encode/decode/hash multiple values at once. Timestamp conversion accepts optional milliseconds (`.SSS`); values without them are treated as `000`.
 
 ---
 

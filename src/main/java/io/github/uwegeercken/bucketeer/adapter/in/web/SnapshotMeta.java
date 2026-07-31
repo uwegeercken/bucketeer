@@ -10,7 +10,8 @@ import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record SnapshotMeta(
@@ -31,23 +32,10 @@ public record SnapshotMeta(
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public static SnapshotMeta create(String name, String serverName, String bucket,
-                                       String prefix, String key,
-                                       String dateFrom, String dateTo, String whereClause,
-                                       long rowCount) {
-        return new SnapshotMeta(
-                UUID.randomUUID().toString().substring(0, 8),
-                name,
-                Instant.now(),
-                serverName,
-                bucket,
-                prefix,
-                key,
-                dateFrom,
-                dateTo,
-                whereClause,
-                rowCount
-        );
+    private static final DateTimeFormatter ID_FORMAT = DateTimeFormatter.ofPattern("yyMMddHHmmss");
+
+    public static String generateId() {
+        return LocalDateTime.now().format(ID_FORMAT);
     }
 
     public Path metaPath(Path snapshotsDir) {

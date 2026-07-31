@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -58,7 +59,7 @@ public class SnapshotController {
             return ResponseEntity.badRequest().body(Map.of("error", "No data to snapshot"));
         }
 
-        SnapshotMeta meta = SnapshotMeta.create(
+        SnapshotMeta meta = uniqueSnapshotMeta(
                 name, qp.serverName(), qp.bucket(), qp.prefix(),
                 qp.key(), qp.dateFrom(), qp.dateTo(), qp.whereClause(),
                 rowCount);
@@ -219,6 +220,19 @@ public class SnapshotController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Failed to open file manager: " + e.getMessage()));
         }
+    }
+
+    private SnapshotMeta uniqueSnapshotMeta(String name, String serverName, String bucket,
+                                                    String prefix, String key,
+                                                    String dateFrom, String dateTo, String whereClause,
+                                                    long rowCount) {
+        String baseId = SnapshotMeta.generateId();
+        String id = baseId;
+        for (int n = 2; snapshotRepo.findById(id) != null; n++) {
+            id = baseId + "_" + n;
+        }
+        return new SnapshotMeta(id, name, Instant.now(), serverName, bucket,
+                prefix, key, dateFrom, dateTo, whereClause, rowCount);
     }
 
     private static String autoName(QueryParams qp) {

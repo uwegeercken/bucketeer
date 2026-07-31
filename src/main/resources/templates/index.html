@@ -129,8 +129,15 @@
             <div class="row g-2 align-items-end">
                 <div class="col-md-4">
                     <label class="form-label small fw-semibold" th:text="#{label.filterKey}">Name contains</label>
-                    <input type="text" id="filterKey" class="form-control form-control-sm font-monospace"
-                           oninput="applyFilter()"/>
+                    <div class="fav-combobox-wrapper">
+                        <div class="d-flex gap-1">
+                            <input type="text" id="filterKey" class="form-control form-control-sm font-monospace fav-combo-input"
+                                   autocomplete="off" oninput="applyFilter()"/>
+                            <button class="btn btn-sm btn-outline-secondary btn-icon" id="clearFilterHistoryBtn"
+                                    th:title="#{btn.clearFilterHistory}" style="display:none;"><i class="bi bi-trash3"></i></button>
+                        </div>
+                        <div id="filterKeyDropdown" class="fav-dropdown" style="display:none;"></div>
+                    </div>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold" th:text="#{label.filterSizeMin}">Size min (KB)</label>
@@ -232,9 +239,12 @@
     const labelSnapshotSave = /*[[#{snapshot.save}]]*/ 'Save snapshot';
     const labelNoCombo      = /*[[#{msg.noComboEntries}]]*/ 'No entries found';
     const labelClearHistoryConfirm = /*[[#{msg.clearHistoryConfirm}]]*/ 'Clear all search history?';
+    const labelClearFilterHistoryConfirm = /*[[#{msg.clearFilterHistoryConfirm}]]*/ 'Clear all filter history?';
 
     const STORAGE_KEY  = 'bucketeer_favorites';
     const HISTORY_KEY  = 'bucketeer_history';
+    const FILTER_HISTORY_KEY = 'bucketeer_filter_history';
+    const FILTER_HISTORY_MAX = 20;
     const HISTORY_MAX  = (() => {
         try {
             const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
@@ -372,6 +382,76 @@
         updateClearHistoryBtn();
     }
 
+    function deleteHistoryEntry(server, bucket, prefix, key) {
+        saveHistory(loadHistory().filter(e =>
+            !(e.server === server && e.bucket === bucket && e.prefix === prefix && e.key === key)));
+        refreshComboDropdown();
+        updateClearHistoryBtn();
+    }
+
+    // --- Filter history (query result name filter) ---
+
+    function loadFilterHistory() {
+        try { return JSON.parse(localStorage.getItem(FILTER_HISTORY_KEY) || '[]'); } catch { return []; }
+    }
+    function saveFilterHistory(list) { localStorage.setItem(FILTER_HISTORY_KEY, JSON.stringify(list)); }
+
+    function addFilterTerm(term) {
+        term = (term || '').trim();
+        if (!term) return;
+        let list = loadFilterHistory();
+        const idx = list.indexOf(term);
+        if (idx >= 0) list.splice(idx, 1);
+        list.unshift(term);
+        if (list.length > FILTER_HISTORY_MAX) list.length = FILTER_HISTORY_MAX;
+        saveFilterHistory(list);
+        updateClearFilterHistoryBtn();
+    }
+
+    function clearFilterHistory() {
+        if (!confirm(labelClearFilterHistoryConfirm)) return;
+        saveFilterHistory([]);
+        updateClearFilterHistoryBtn();
+        closeFilterDropdown();
+    }
+
+    function updateClearFilterHistoryBtn() {
+        const btn = document.getElementById('clearFilterHistoryBtn');
+        if (!btn) return;
+        btn.style.display = loadFilterHistory().length > 0 ? '' : 'none';
+    }
+
+    function renderFilterDropdown() {
+        const dropdown = document.getElementById('filterKeyDropdown');
+        if (!dropdown) return;
+        const input = document.getElementById('filterKey');
+        const terms = loadFilterHistory();
+        const text = (input.value || '').trim().toLowerCase();
+        const filtered = text ? terms.filter(t => t.toLowerCase().includes(text)) : terms;
+        if (filtered.length === 0) {
+            dropdown.innerHTML = '<div class="fav-dropdown-empty">' + escHtml(labelNoCombo) + '</div>';
+        } else {
+            dropdown.innerHTML = filtered.map(t =>
+                '<div class="fav-dropdown-item" data-term="' + escHtml(t) + '">'
+                + '<span class="fav-icon hist">&#8635;</span>'
+                + '<span class="fav-label">' + escHtml(t) + '</span>'
+                + '</div>').join('');
+        }
+        dropdown.style.display = 'block';
+    }
+
+    function closeFilterDropdown() {
+        const dropdown = document.getElementById('filterKeyDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+    }
+
+    function selectFilterTerm(term) {
+        document.getElementById('filterKey').value = term;
+        addFilterTerm(term);
+        closeFilterDropdown();
+        applyFilter();
+    }
+
     function updateClearHistoryBtn() {
         const btn = document.getElementById('clearHistoryBtn');
         if (!btn) return;
@@ -452,8 +532,7 @@
     }
 
     function formatComboSub(item) {
-        const parts = [item.server, item.bucket, item.prefix, item.key].filter(Boolean);
-        return parts.join(' / ');
+        return item.server || '';
     }
 
     let comboHighlight = -1;
@@ -475,7 +554,9 @@
             const sub = escHtml(formatComboSub(item));
             const del = item.type === 'fav'
                 ? '<span class="fav-del" data-favdel="' + escHtml(item.name) + '">&times;</span>'
-                : '';
+                : item.type === 'hist'
+                    ? '<span class="fav-del" data-histserver="' + escHtml(item.server) + '" data-histbucket="' + escHtml(item.bucket) + '" data-histprefix="' + escHtml(item.prefix) + '" data-histkey="' + escHtml(item.key) + '">&times;</span>'
+                    : '';
             return '<div class="fav-dropdown-item" data-type="' + item.type
                 + '" data-name="' + escHtml(item.name)
                 + '" data-server="' + escHtml(item.server)
@@ -484,7 +565,7 @@
                 + '" data-key="' + escHtml(item.key)
                 + '"><span class="fav-icon' + (item.type === 'hist' ? ' hist' : '') + '">' + icon + '</span>'
                 + '<span class="fav-label">' + label + '</span>'
-                + '<span class="fav-sub d-none d-md-inline">' + sub + '</span>'
+                + (sub ? '<span class="fav-sub d-none d-md-inline">' + sub + '</span>' : '')
                 + del + '</div>';
         }).join('');
 
@@ -968,6 +1049,9 @@
             if (delEl) {
                 e.stopPropagation();
                 if (delEl.dataset.favdel) deleteFavorite(delEl.dataset.favdel);
+                else if (delEl.dataset.histserver !== undefined) deleteHistoryEntry(
+                    delEl.dataset.histserver, delEl.dataset.histbucket,
+                    delEl.dataset.histprefix, delEl.dataset.histkey);
                 return;
             }
             handleComboSelect(e.target);
@@ -976,6 +1060,33 @@
         document.getElementById('addFavBtn').addEventListener('click', addFavorite);
         document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
         updateClearHistoryBtn();
+
+        const filterKey = document.getElementById('filterKey');
+        const filterDropdown = document.getElementById('filterKeyDropdown');
+        if (filterKey && filterDropdown) {
+            filterKey.addEventListener('focus', renderFilterDropdown);
+            filterKey.addEventListener('input', renderFilterDropdown);
+            filterKey.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addFilterTerm(filterKey.value);
+                    closeFilterDropdown();
+                    applyFilter();
+                } else if (e.key === 'Escape') {
+                    closeFilterDropdown();
+                }
+            });
+            filterKey.addEventListener('blur', () => {
+                addFilterTerm(filterKey.value);
+                setTimeout(closeFilterDropdown, 150);
+            });
+            filterDropdown.addEventListener('mousedown', e => {
+                const item = e.target.closest('.fav-dropdown-item');
+                if (item) selectFilterTerm(item.dataset.term);
+            });
+            document.getElementById('clearFilterHistoryBtn').addEventListener('click', clearFilterHistory);
+            updateClearFilterHistoryBtn();
+        }
 
         document.getElementById('favModalSaveBtn').addEventListener('click', saveFavoriteFromModal);
         document.getElementById('favModalName').addEventListener('keydown', e => {

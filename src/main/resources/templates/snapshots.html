@@ -58,7 +58,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script th:inline="javascript">
-    const labelSnapshotNameH   = /*[[#{snapshot.name}]]*/ 'Name';
     const labelSnapshotDate    = /*[[#{snapshot.date}]]*/ 'Saved';
     const labelSnapshotCount   = /*[[#{snapshot.count}]]*/ 'Objects';
     const labelSnapshotActions = /*[[#{snapshot.actions}]]*/ 'Actions';
@@ -76,7 +75,6 @@
     const labelSnapshotServer  = /*[[#{snapshot.server}]]*/ 'Server';
     const labelSnapshotBucket  = /*[[#{snapshot.bucket}]]*/ 'Bucket';
     const labelSnapshotPrefix  = /*[[#{snapshot.prefix}]]*/ 'Prefix';
-    const labelSnapshotFileName = /*[[#{snapshot.fileName}]]*/ 'File';
     const labelSnapshotMismatch = /*[[#{snapshot.compareMismatch}]]*/ 'Snapshots must have the same server, bucket and prefix.';
 
     let diffId1 = null;
@@ -108,11 +106,9 @@
             }
             container.innerHTML = '<table class="table table-sm table-hover mb-1"><thead class="table-secondary"><tr>'
                 + '<th></th>'
-                + '<th>' + escHtml(labelSnapshotNameH) + '</th>'
                 + '<th>' + escHtml(labelSnapshotServer) + '</th>'
                 + '<th>' + escHtml(labelSnapshotBucket) + '</th>'
                 + '<th>' + escHtml(labelSnapshotPrefix) + '</th>'
-                + '<th>' + escHtml(labelSnapshotFileName) + '</th>'
                 + '<th>' + escHtml(labelSnapshotDate) + '</th>'
                 + '<th class="text-end">' + escHtml(labelSnapshotCount) + '</th>'
                 + '<th>' + escHtml(labelSnapshotActions) + '</th>'
@@ -120,15 +116,13 @@
                 + snapshots.map(s => {
                     return '<tr>'
                         + '<td><input type="checkbox" class="snap-check" data-id="' + s.id + '" onchange="updateCompareBtn()"/></td>'
-                        + '<td class="small">' + escHtml(s.name) + '</td>'
                         + '<td class="small">' + escHtml(s.serverName) + '</td>'
                         + '<td class="small">' + escHtml(s.bucket) + '</td>'
-                        + '<td class="small font-monospace">' + escHtml(s.prefix) + '</td>'
-                        + '<td class="small font-monospace">' + escHtml(s.fileName) + '</td>'
+                        + '<td class="small font-monospace text-break">' + escHtml(s.prefix) + '</td>'
                         + '<td class="small">' + new Date(s.createdAt).toLocaleString() + '</td>'
                         + '<td class="text-end small">' + s.rowCount + '</td>'
                         + '<td class="d-flex gap-1">'
-                        + '<button class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelSnapshotReveal) + '" onclick="revealSnapshot(\'' + s.id + '\')"><i class="bi bi-folder2-open"></i></button>'
+                        + '<button class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelSnapshotReveal) + ': ' + escHtml(s.fileName) + '" onclick="revealSnapshot(\'' + s.id + '\')"><i class="bi bi-folder2-open"></i></button>'
                         + '<button class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelSnapshotDelete) + '" onclick="deleteSnapshot(\'' + s.id + '\')"><i class="bi bi-trash"></i></button>'
                         + '</td></tr>';
                 }).join('')
