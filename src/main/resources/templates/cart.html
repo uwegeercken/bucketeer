@@ -57,6 +57,7 @@
                 <td class="small" th:text="${item.lastModified() != null ? #temporals.format(item.lastModified(), 'yyyy-MM-dd HH:mm:ss') : ''}"></td>
                 <td>
                     <button type="button" class="btn btn-sm btn-outline-danger btn-icon"
+                            th:title="#{cart.remove}" title="Remove from selection"
                             th:data-server="${item.serverName()}" th:data-bucket="${item.bucket()}"
                             th:data-key="${item.key()}" onclick="removeItem(this)">
                         <i class="bi bi-x"></i>

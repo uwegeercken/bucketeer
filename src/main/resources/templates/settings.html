@@ -29,6 +29,21 @@
             </div>
         </div>
 
+        <div class="mb-4">
+            <label class="form-label fw-semibold small" th:text="#{settings.maxObjects.label}">
+                Max objects per query
+            </label>
+            <div class="d-flex align-items-center gap-3">
+                <input type="number" id="maxObjectsInput"
+                       class="form-control form-control-sm"
+                       style="width: 130px;"
+                       min="0" max="10000000" step="1000"/>
+                <span class="text-muted small" th:text="#{settings.maxObjects.hint}">
+                    Stop fetching after this many objects. 0 = unlimited.
+                </span>
+            </div>
+        </div>
+
         <div class="panel-title mt-4" th:text="#{settings.section.history}">History</div>
 
         <div class="mb-4">
@@ -96,6 +111,7 @@
 <script>
     const SETTINGS_KEY  = 'bucketeer_settings';
     const DEFAULT_PAGE_SIZE = 100;
+    const DEFAULT_MAX_OBJECTS = 0;
     const DEFAULT_RETENTION_DAYS = 30;
     const DEFAULT_HISTORY_MAX = 50;
     const DEFAULT_FILTER_HISTORY_MAX = 20;
@@ -107,6 +123,7 @@
 
     async function saveSettings() {
         const pageSize = parseInt(document.getElementById('pageSizeInput').value, 10);
+        const maxObjects = parseInt(document.getElementById('maxObjectsInput').value, 10);
         const retentionDays = parseInt(document.getElementById('retentionDaysInput').value, 10);
         const historyMax = parseInt(document.getElementById('historyMaxInput').value, 10);
         const filterHistoryMax = parseInt(document.getElementById('filterHistoryMaxInput').value, 10);
@@ -117,6 +134,13 @@
             valid = false;
         } else {
             document.getElementById('pageSizeInput').classList.remove('is-invalid');
+        }
+
+        if (isNaN(maxObjects) || maxObjects < 0 || maxObjects > 10000000) {
+            document.getElementById('maxObjectsInput').classList.add('is-invalid');
+            valid = false;
+        } else {
+            document.getElementById('maxObjectsInput').classList.remove('is-invalid');
         }
 
         if (isNaN(retentionDays) || retentionDays < 0 || retentionDays > 365) {
@@ -145,6 +169,7 @@
         // Save client-side settings to localStorage
         const settings = loadSettings();
         settings.pageSize = pageSize;
+        settings.maxObjects = maxObjects;
         settings.historyMax = historyMax;
         settings.filterHistoryMax = filterHistoryMax;
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -164,10 +189,12 @@
     function resetSettings() {
         localStorage.removeItem(SETTINGS_KEY);
         document.getElementById('pageSizeInput').value = DEFAULT_PAGE_SIZE;
+        document.getElementById('maxObjectsInput').value = DEFAULT_MAX_OBJECTS;
         document.getElementById('retentionDaysInput').value = DEFAULT_RETENTION_DAYS;
         document.getElementById('historyMaxInput').value = DEFAULT_HISTORY_MAX;
         document.getElementById('filterHistoryMaxInput').value = DEFAULT_FILTER_HISTORY_MAX;
         document.getElementById('pageSizeInput').classList.remove('is-invalid');
+        document.getElementById('maxObjectsInput').classList.remove('is-invalid');
         document.getElementById('retentionDaysInput').classList.remove('is-invalid');
         document.getElementById('historyMaxInput').classList.remove('is-invalid');
         document.getElementById('filterHistoryMaxInput').classList.remove('is-invalid');
@@ -182,6 +209,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         const settings = loadSettings();
         document.getElementById('pageSizeInput').value = settings.pageSize || DEFAULT_PAGE_SIZE;
+        document.getElementById('maxObjectsInput').value = settings.maxObjects ?? DEFAULT_MAX_OBJECTS;
         document.getElementById('historyMaxInput').value = settings.historyMax ?? DEFAULT_HISTORY_MAX;
         document.getElementById('filterHistoryMaxInput').value = settings.filterHistoryMax ?? DEFAULT_FILTER_HISTORY_MAX;
 

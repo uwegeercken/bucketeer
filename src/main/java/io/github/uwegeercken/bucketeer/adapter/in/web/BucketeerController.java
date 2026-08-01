@@ -51,6 +51,7 @@ public class BucketeerController {
             @RequestParam(required = false) String prefix,
             @RequestParam(required = false) String key,
             @RequestParam(required = false) Boolean search,
+            @RequestParam(required = false, defaultValue = "0") long maxObjects,
             HttpSession session,
             Model model) {
 
@@ -103,15 +104,23 @@ public class BucketeerController {
 
             executor.execute(() -> {
                 try {
-                    bucketeerUseCase.fetchAllObjects(finalServer, finalBucket, finalS3Prefix, page -> {
-                        List<S3Object> filtered = page.objects().stream()
-                                .filter(obj -> !obj.key().endsWith("/"))
-                                .filter(obj -> finalKeyFilter == null ||
-                                        obj.key().equals(finalKeyFilter))
-                                .toList();
-                        duckDb.insertBatch(filtered);
-                        qc.incrementFound(filtered.size());
-                    });
+                    boolean limitReached = bucketeerUseCase.fetchAllObjects(
+                            finalServer, finalBucket, finalS3Prefix,
+                            Math.max(0, maxObjects),
+                            page -> {
+                                List<S3Object> filtered = page.objects().stream()
+                                        .filter(obj -> !obj.key().endsWith("/"))
+                                        .filter(obj -> finalKeyFilter == null ||
+                                                obj.key().equals(finalKeyFilter))
+                                        .toList();
+                                duckDb.insertBatch(filtered);
+                                qc.incrementFound(filtered.size());
+                            });
+                    if (limitReached) {
+                        qc.limitReached();
+                        log.info("Query limit of {} objects reached for {}/{}",
+                                maxObjects, finalServer, finalBucket);
+                    }
                     qc.done();
                 } catch (Exception e) {
                     log.error("Query failed for server {}/{}: {}", finalServer, finalBucket, e.getMessage());
@@ -157,11 +166,12 @@ public class BucketeerController {
     public Map<String, Object> queryStatus(HttpSession session) {
         QueryContext qc = (QueryContext) session.getAttribute(QueryContext.SESSION_KEY);
         if (qc == null) {
-            return Map.of("status", "IDLE", "objectsFound", 0L, "error", "");
+            return Map.of("status", "IDLE", "objectsFound", 0L, "error", "", "limitReached", false);
         }
         return Map.of(
                 "status",       qc.getStatus().name(),
                 "objectsFound", qc.getObjectsFound(),
+                "limitReached", qc.isLimitReached(),
                 "error",        qc.getErrorMessage() != null ? qc.getErrorMessage() : ""
         );
     }

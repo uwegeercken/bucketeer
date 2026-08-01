@@ -15,11 +15,13 @@ public class QueryContext implements Serializable {
 
     private volatile Status status = Status.IDLE;
     private final AtomicLong objectsFound = new AtomicLong(0);
+    private volatile boolean limitReached = false;
     private volatile String errorMessage;
 
     public void start() {
         status = Status.RUNNING;
         objectsFound.set(0);
+        limitReached = false;
         errorMessage = null;
     }
 
@@ -27,7 +29,10 @@ public class QueryContext implements Serializable {
     public void done()                     { status = Status.DONE; }
     public void error(String message)      { status = Status.ERROR; errorMessage = message; }
 
+    public void limitReached()             { limitReached = true; }
+
     public Status getStatus()       { return status; }
     public long getObjectsFound()   { return objectsFound.get(); }
+    public boolean isLimitReached() { return limitReached; }
     public String getErrorMessage() { return errorMessage; }
 }

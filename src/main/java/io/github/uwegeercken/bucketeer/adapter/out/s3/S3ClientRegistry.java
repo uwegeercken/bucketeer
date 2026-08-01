@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -17,6 +19,7 @@ import java.net.URI;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +81,16 @@ public class S3ClientRegistry {
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(server.accessKey(), server.secretKey())))
                 .forcePathStyle(true);
+
+        ClientOverrideConfiguration.Builder overrideBuilder =
+                ClientOverrideConfiguration.builder()
+                        .retryPolicy(RetryPolicy.builder()
+                                .numRetries(Math.max(0, server.retries()))
+                                .build());
+        if (server.timeoutSeconds() > 0) {
+            overrideBuilder.apiCallTimeout(Duration.ofSeconds(server.timeoutSeconds()));
+        }
+        builder.overrideConfiguration(overrideBuilder.build());
 
         if (!server.verifyCertificate()) {
             builder.httpClientBuilder(UrlConnectionHttpClient.builder()

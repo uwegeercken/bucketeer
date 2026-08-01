@@ -26,8 +26,10 @@ public interface BucketeerUseCase {
      * @param serverName     the S3 server
      * @param bucket         the bucket
      * @param resolvedPrefix the resolved prefix
+     * @param maxObjects     stop after this many objects (0 = no limit)
      * @param pageCallback   called after each page with the objects from that page
+     * @return true if the maxObjects limit was reached before all pages were fetched
      */
-    void fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
-                         Consumer<ObjectListing> pageCallback);
+    boolean fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
+                            long maxObjects, Consumer<ObjectListing> pageCallback);
 }

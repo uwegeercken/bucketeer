@@ -31,6 +31,19 @@
             <div class="panel">
                 <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                <h6>0.5.8 <small class="text-muted">2026-08-01</small></h6>
+                <ul>
+                    <li>S3 server config: request timeout and retries per server</li>
+                    <li>Max objects per query (settings) — fetching stops exactly at the limit, amber "limit reached" status</li>
+                    <li>Text Tools: JSON pretty / minify</li>
+                    <li>Settings: separate size for the name-filter history</li>
+                    <li>UI: icon buttons on Key Check and server configuration, table grids with centered checkboxes</li>
+                    <li>i18n: unused keys removed, German terminology fixes</li>
+                    <li>Logging: exceptions now logged as error messages</li>
+                </ul>
+
+                <hr/>
+
                 <h6>0.5.7 <small class="text-muted">2026-07-31</small></h6>
                 <ul>
                     <li>Snapshots on dedicated page (/snapshots) — file names now use timestamp (yyMMddHHmmss) instead of random id</li>

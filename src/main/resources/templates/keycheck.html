@@ -43,8 +43,12 @@
                     <input type="file" class="form-control form-control-sm" id="fileInput" accept=".csv,.txt,.tsv" required>
                 </div>
                 <div class="col-md-1">
-                    <button type="submit" class="btn btn-sm btn-primary w-100" id="checkBtn"
-                            th:text="#{keycheck.check}">Check</button>
+                    <label class="form-label small fw-semibold" aria-hidden="true">&nbsp;</label>
+                    <button type="submit" class="btn btn-sm btn-primary btn-icon" id="checkBtn"
+                            th:title="#{keycheck.check}" title="Check"
+                            th:aria-label="#{keycheck.check}" aria-label="Check">
+                        <i class="bi bi-check2-circle"></i>
+                    </button>
                 </div>
             </div>
         </form>

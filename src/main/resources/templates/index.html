@@ -40,8 +40,9 @@
             <button class="btn btn-sm btn-outline-secondary btn-icon" id="addFavBtn"
                     th:title="#{btn.addFavorite}"><i class="bi bi-bookmark-plus"></i></button>
         </div>
-        <form method="get" action="/" id="searchForm" class="pb-2" onsubmit="saveFormState();addToHistory();sessionStorage.removeItem('bkt_sort_by');sessionStorage.removeItem('bkt_sort_dir');sortBy='key';sortDir='asc';">
+        <form method="get" action="/" id="searchForm" class="pb-2" onsubmit="saveFormState();addToHistory();setMaxObjectsInput();sessionStorage.removeItem('bkt_sort_by');sessionStorage.removeItem('bkt_sort_dir');sortBy='key';sortDir='asc';">
             <input type="hidden" name="search" value="true"/>
+            <input type="hidden" name="maxObjects" id="maxObjectsInput"/>
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold" th:text="#{label.bucket}">Bucket</label>
@@ -95,7 +96,7 @@
             <div class="d-flex gap-1 align-items-center">
                 <span id="addAllStatus" class="text-muted small" style="display:none;"></span>
                 <span id="cartBadge" class="badge bg-secondary" style="display:none;cursor:pointer;"
-                      onclick="window.location.href='/cart'" title="Selection"></span>
+                      onclick="window.location.href='/cart'" th:title="#{cart.title}" title="Selection"></span>
                 <button type="button" id="btnAddSelected" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="addSelectedToCart()" th:title="#{cart.addSelected}" disabled>
                     <i class="bi bi-plus-square"></i>
@@ -175,7 +176,7 @@
                class="table table-sm table-hover table-bordered mb-2 results-table">
             <thead class="table-secondary">
             <tr>
-                <th style="width:40px;">
+                <th class="text-center" style="width:40px;">
                     <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"/>
                 </th>
                 <th style="cursor:pointer;" onclick="toggleSort('key')" id="th-key">
@@ -203,7 +204,8 @@
             <div class="modal-content">
                 <div class="modal-header py-2">
                     <h6 class="modal-title fw-semibold" id="favModalLabel" th:text="#{modal.fav.title}">Save favorite</h6>
-                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
                 </div>
                 <div class="modal-body">
                     <label class="form-label small fw-semibold" for="favModalName" th:text="#{modal.fav.name}">Favorite name</label>
@@ -240,21 +242,31 @@
     const labelNoCombo      = /*[[#{msg.noComboEntries}]]*/ 'No entries found';
     const labelClearHistoryConfirm = /*[[#{msg.clearHistoryConfirm}]]*/ 'Clear all search history?';
     const labelClearFilterHistoryConfirm = /*[[#{msg.clearFilterHistoryConfirm}]]*/ 'Clear all filter history?';
+    const labelLimitReached = /*[[#{msg.queryLimitReached}]]*/ 'limit reached';
+    const labelDeleteFav    = /*[[#{btn.deleteFavorite}]]*/ 'Delete favorite';
+    const labelDeleteHist   = /*[[#{btn.deleteHistoryEntry}]]*/ 'Delete history entry';
 
     const STORAGE_KEY  = 'bucketeer_favorites';
     const HISTORY_KEY  = 'bucketeer_history';
     const FILTER_HISTORY_KEY = 'bucketeer_filter_history';
     const SETTINGS_KEY = 'bucketeer_settings';
 
-    function settingsValue(key, fallback) {
+    function settingsValue(key, fallback, max) {
         try {
             const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-            return s[key] !== undefined && s[key] >= 0 && s[key] <= 500 ? s[key] : fallback;
+            const v = s[key];
+            return v !== undefined && v >= 0 && v <= (max || 500) ? v : fallback;
         } catch { return fallback; }
     }
 
-    const FILTER_HISTORY_MAX = settingsValue('filterHistoryMax', 20);
-    const HISTORY_MAX  = settingsValue('historyMax', 50);
+    const FILTER_HISTORY_MAX = settingsValue('filterHistoryMax', 20, 500);
+    const HISTORY_MAX  = settingsValue('historyMax', 50, 500);
+    const MAX_OBJECTS  = settingsValue('maxObjects', 0, 10000000);
+
+    function setMaxObjectsInput() {
+        const el = document.getElementById('maxObjectsInput');
+        if (el) el.value = MAX_OBJECTS;
+    }
 
     // --- Bucket dropdown ---
 
@@ -557,9 +569,9 @@
             const label = item.type === 'fav' ? escHtml(item.name) : escHtml(formatComboDisplay(item));
             const sub = escHtml(formatComboSub(item));
             const del = item.type === 'fav'
-                ? '<span class="fav-del" data-favdel="' + escHtml(item.name) + '">&times;</span>'
+                ? '<span class="fav-del" data-favdel="' + escHtml(item.name) + '" title="' + labelDeleteFav + '">&times;</span>'
                 : item.type === 'hist'
-                    ? '<span class="fav-del" data-histserver="' + escHtml(item.server) + '" data-histbucket="' + escHtml(item.bucket) + '" data-histprefix="' + escHtml(item.prefix) + '" data-histkey="' + escHtml(item.key) + '">&times;</span>'
+                    ? '<span class="fav-del" data-histserver="' + escHtml(item.server) + '" data-histbucket="' + escHtml(item.bucket) + '" data-histprefix="' + escHtml(item.prefix) + '" data-histkey="' + escHtml(item.key) + '" title="' + labelDeleteHist + '">&times;</span>'
                     : '';
             return '<div class="fav-dropdown-item" data-type="' + item.type
                 + '" data-name="' + escHtml(item.name)
@@ -697,15 +709,21 @@
     function handleQueryResult(data) {
         const statusText = document.getElementById('queryStatusText');
         if (data.status === 'RUNNING') {
+            statusText.classList.remove('text-warning');
             statusText.textContent = data.objectsFound + ' ' + labelObjFound;
         } else if (data.status === 'DONE') {
             clearInterval(pollInterval);
             stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
+            statusText.classList.remove('text-warning');
             if (data.objectsFound === 0) {
                 statusText.textContent = labelNoObj;
             } else {
                 statusText.textContent = data.objectsFound + ' ' + labelObjTotal;
+                if (data.limitReached) {
+                    statusText.classList.add('text-warning');
+                    statusText.textContent = data.objectsFound + ' ' + labelObjTotal + ' \u2013 ' + labelLimitReached;
+                }
                 document.getElementById('filterForm').style.display = 'block';
                 loadResults();
             }
@@ -760,7 +778,7 @@
         const tbody = document.getElementById('resultsBody');
         tbody.innerHTML = rows.map(row =>
             '<tr>'
-            + '<td><input type="checkbox" class="row-check" data-key="' + escHtml(row.key) + '"'
+            + '<td class="text-center"><input type="checkbox" class="row-check" data-key="' + escHtml(row.key) + '"'
             + ' data-bucket="' + escHtml(row.bucket) + '"'
             + ' data-sizebytes="' + row.sizeBytes + '"'
             + ' data-lastmodified="' + escHtml(row.lastModified) + '"'

@@ -55,6 +55,25 @@
                 </div>
             </div>
 
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold" th:text="#{config.col.timeoutSeconds}">Timeout (seconds)</label>
+                    <input type="number" name="timeoutSeconds" class="form-control form-control-sm"
+                           th:value="${server.timeoutSeconds()}" min="0" max="3600" step="1"/>
+                    <div class="form-text" th:text="#{config.form.timeoutHint}">
+                        0 = SDK default (no explicit API-call timeout).
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold" th:text="#{config.col.retries}">Retries</label>
+                    <input type="number" name="retries" class="form-control form-control-sm"
+                           th:value="${server.retries()}" min="0" max="10" step="1"/>
+                    <div class="form-text" th:text="#{config.form.retriesHint}">
+                        Number of retries for transient S3 errors. 0 = no retries.
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex gap-2 mt-4">
                 <button type="submit" name="test" value="false"
                         class="btn btn-sm btn-primary" th:text="#{config.action.save}">Save</button>

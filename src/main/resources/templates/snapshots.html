@@ -17,12 +17,13 @@
         <div class="panel-title d-flex align-items-center justify-content-between">
             <span th:text="#{snapshot.list}">Snapshots</span>
             <div class="d-flex gap-1">
-                <button type="button" class="btn btn-sm btn-outline-primary" id="compareBtn" disabled
-                        onclick="compareSelected()" th:title="#{snapshot.compare}">
-                    <i class="bi bi-arrow-left-right me-1"></i><span th:text="#{snapshot.compareSelected}">Compare selected</span>
+                <button type="button" class="btn btn-sm btn-outline-primary btn-icon" id="compareBtn" disabled
+                        onclick="compareSelected()" th:title="#{snapshot.compareSelected}" title="Compare selected"
+                        th:aria-label="#{snapshot.compareSelected}" aria-label="Compare selected">
+                    <i class="bi bi-arrow-left-right"></i>
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
-                        onclick="loadSnapshots()" th:title="#{snapshot.list}">
+                        onclick="loadSnapshots()" th:title="#{snapshot.reload}" title="Reload snapshots">
                     <i class="bi bi-arrow-clockwise"></i>
                 </button>
             </div>
@@ -43,6 +44,7 @@
                     <i class="bi bi-download"></i>
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
+                        th:title="#{btn.close}" title="Close"
                         onclick="document.getElementById('diffPanel').style.display='none'">
                     <i class="bi bi-x-lg"></i>
                 </button>
@@ -61,7 +63,6 @@
     const labelSnapshotDate    = /*[[#{snapshot.date}]]*/ 'Saved';
     const labelSnapshotCount   = /*[[#{snapshot.count}]]*/ 'Objects';
     const labelSnapshotActions = /*[[#{snapshot.actions}]]*/ 'Actions';
-    const labelSnapshotCompare = /*[[#{snapshot.compare}]]*/ 'Compare with snapshot';
     const labelSnapshotCompareSel = /*[[#{snapshot.compareSelected}]]*/ 'Compare selected';
     const labelSnapshotDelete  = /*[[#{snapshot.delete}]]*/ 'Delete snapshot';
     const labelSnapshotReveal  = /*[[#{snapshot.reveal}]]*/ 'Open in file manager';
@@ -104,8 +105,8 @@
                 container.innerHTML = '<span class="text-muted small fst-italic">' + escHtml(labelSnapshotEmpty) + '</span>';
                 return;
             }
-            container.innerHTML = '<table class="table table-sm table-hover mb-1"><thead class="table-secondary"><tr>'
-                + '<th></th>'
+            container.innerHTML = '<table class="table table-sm table-hover table-bordered mb-1"><thead class="table-secondary"><tr>'
+                + '<th class="text-center"></th>'
                 + '<th>' + escHtml(labelSnapshotServer) + '</th>'
                 + '<th>' + escHtml(labelSnapshotBucket) + '</th>'
                 + '<th>' + escHtml(labelSnapshotPrefix) + '</th>'
@@ -115,7 +116,7 @@
                 + '</tr></thead><tbody>'
                 + snapshots.map(s => {
                     return '<tr>'
-                        + '<td><input type="checkbox" class="snap-check" data-id="' + s.id + '" onchange="updateCompareBtn()"/></td>'
+                        + '<td class="text-center"><input type="checkbox" class="snap-check" data-id="' + s.id + '" onchange="updateCompareBtn()"/></td>'
                         + '<td class="small">' + escHtml(s.serverName) + '</td>'
                         + '<td class="small">' + escHtml(s.bucket) + '</td>'
                         + '<td class="small font-monospace text-break">' + escHtml(s.prefix) + '</td>'

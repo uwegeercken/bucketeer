@@ -36,7 +36,11 @@
     <div class="panel">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="panel-title mb-0" th:text="#{config.servers}">S3 Servers</div>
-            <a href="/config/server/new" class="btn btn-sm btn-primary" th:text="#{config.addServer}">+ Add Server</a>
+            <a href="/config/server/new" class="btn btn-sm btn-primary btn-icon"
+               th:title="#{config.addServer}" title="Add Server"
+               th:aria-label="#{config.addServer}" aria-label="Add Server">
+                <i class="bi bi-plus-lg"></i>
+            </a>
         </div>
 
         <div th:if="${servers.isEmpty()}" class="text-muted small" th:text="#{config.noServers}"></div>
@@ -63,12 +67,19 @@
                 <td>
                     <div class="d-flex gap-1">
                         <a th:href="@{/config/server/{name}/edit(name=${server.name()})}"
-                           class="btn btn-sm btn-outline-secondary" th:text="#{config.action.edit}">Edit</a>
+                           class="btn btn-sm btn-outline-secondary btn-icon"
+                           th:title="#{config.action.edit}" title="Edit"
+                           th:aria-label="#{config.action.edit}" aria-label="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
                         <form th:action="@{/config/server/{name}/delete(name=${server.name()})}"
                               method="post" class="d-inline"
                               onsubmit="return confirm(labelConfirmDelete)">
-                            <button type="submit" class="btn btn-sm btn-outline-danger"
-                                    th:text="#{config.action.delete}">Delete</button>
+                            <button type="submit" class="btn btn-sm btn-outline-danger btn-icon"
+                                    th:title="#{config.action.delete}" title="Delete"
+                                    th:aria-label="#{config.action.delete}" aria-label="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </form>
                     </div>
                 </td>

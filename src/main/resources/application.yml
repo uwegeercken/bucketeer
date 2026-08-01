@@ -9,7 +9,5 @@ server:
   port: 8080
 
 bucketeer:
-  version: "0.5.7"
-  release-date: "2026-07-31"
-  snapshots:
-    retention-days: 30
+  version: "0.5.8"
+  release-date: "2026-08-01"

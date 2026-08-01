@@ -1,16 +1,18 @@
 # Bucketeer
 
-A web-based S3 object browser supporting listing, filtering, download, snapshots and favorites. 
+A web-based **S3 object browser** for any S3-compatible server — list, filter, sort, download and compare objects in your browser.
 
-Query results can be exported to snapshots, these can be compared and the differences can be exported.
+## Features
 
-Query results can be collected across multiple queries and help to do bulk downloads of
-S3 files. 
-
-The user can upload a CSV file containing keys to check if the specified keys exist on the S3 server.
-
-The S3 prefix can be typed in literally or generated dynamically using functions such as left, right, upper, lower, everyNth and repeat. There are also date functions available.
-Functions can be nested and may have literal suffixes. This helps to dynamically construct the prefix of your files.
+- **Browse &amp; search** — paginated results, client-side filtering by name (regular expressions), size and last-modified date, sortable columns
+- **Prefix templates** — build S3 prefixes dynamically with functions (`left`, `right`, `upper`, `lower`, `everyNth`, `substring`, `repeat`) and date placeholders; functions can be nested and combined with literal suffixes
+- **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
+- **Selection &amp; bulk download** — collect objects across queries and download them all as a ZIP
+- **Snapshots** — save query results as Parquet, compare snapshots over time and export the diff (added / removed / changed objects)
+- **Key Check** — upload a CSV with keys and verify which ones exist on the server
+- **Text Tools** — Base64 / URL encode &amp; decode, timestamp ↔ date conversion, JSON pretty / minify, SHA-256
+- **Dark mode** and German / English / Spanish UI
+- **Zero-config security** — S3 credentials are encrypted at rest in `~/.bucketeer/servers.json`
 
 ![img_2.png](img_2.png)
 ---
@@ -19,7 +21,7 @@ Functions can be nested and may have literal suffixes. This helps to dynamically
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.5.7.jar
+java -jar target/bucketeer-0.5.8.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -41,7 +43,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.5.7.jar
+java -jar target/bucketeer-0.5.8.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -359,6 +361,10 @@ Snapshots save the complete result set of a query (all objects under the searche
 - Set to 0 to disable history tracking
 - The **Name contains** result filter keeps its own history (last 20 terms by default); its size is configured separately in **Settings** (`/settings`)
 
+**Query Settings:**
+- **Max objects per query** stops fetching after the given number of objects (`0` = unlimited)
+- If the limit is reached, the status line shows an amber **"limit reached"** hint – not all objects were loaded
+
 ---
 
 ## Key Check
@@ -422,6 +428,8 @@ Each server entry supports:
 | **Access Key** | S3 access key |
 | **Secret Key** | S3 secret key |
 | **Verify Certificate** | Uncheck for HTTPS servers without a valid certificate (e.g. StorageGRID without cert) |
+| **Timeout (seconds)** | Explicit API-call timeout for S3 requests. `0` = SDK default (no explicit timeout) |
+| **Retries** | Number of retries for transient S3 errors. `0` = no retries (default 3) |
 
 After saving, a **Save & Test** option verifies the connection by listing buckets before confirming.
 
@@ -454,4 +462,4 @@ public class Md5Function implements TemplateFunction {
 Usage in template: `data/{md5(key)}/{key}/`
 
 ## Last update
-last update uwe.geercken@web.de - 2026-07-31
+last update uwe.geercken@web.de - 2026-08-01

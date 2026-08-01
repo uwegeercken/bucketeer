@@ -36,7 +36,7 @@ public class S3Adapter implements S3StoragePort {
     }
 
     @Override
-    public ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken) {
+    public ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken, long maxKeys) {
         S3Client client = registry.clientFor(serverName);
 
         ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder()
@@ -44,6 +44,9 @@ public class S3Adapter implements S3StoragePort {
                 .prefix(prefix != null ? prefix : "");
         if (continuationToken != null && !continuationToken.isBlank()) {
             builder.continuationToken(continuationToken);
+        }
+        if (maxKeys > 0) {
+            builder.maxKeys((int) Math.min(maxKeys, 1000));
         }
 
         ListObjectsV2Response response = client.listObjectsV2(builder.build());

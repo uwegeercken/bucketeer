@@ -11,7 +11,7 @@ public interface S3StoragePort {
 
     List<String> listBuckets(String serverName);
 
-    ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken);
+    ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken, long maxKeys);
 
     InputStream downloadObject(String serverName, String bucket, String key);
 

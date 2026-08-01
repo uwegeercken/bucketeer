@@ -52,11 +52,13 @@ public class ConfigController {
             @RequestParam String accessKey,
             @RequestParam String secretKey,
             @RequestParam(defaultValue = "false") boolean verifyCertificate,
+            @RequestParam(defaultValue = "0") int timeoutSeconds,
+            @RequestParam(defaultValue = "3") int retries,
             @RequestParam(defaultValue = "false") boolean test,
             RedirectAttributes redirect) {
 
         ServerConfig server = new ServerConfig(name, endpoint, region,
-                accessKey, secretKey, verifyCertificate);
+                accessKey, secretKey, verifyCertificate, timeoutSeconds, retries);
 
         if (test) {
             String error = configService.saveAndTest(server);

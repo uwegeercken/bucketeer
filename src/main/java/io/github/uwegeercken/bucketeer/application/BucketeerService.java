@@ -47,17 +47,25 @@ public class BucketeerService implements BucketeerUseCase {
 
     @Override
     public ObjectListing listObjects(String serverName, String bucket, String resolvedPrefix, String continuationToken) {
-        return s3StoragePort.listObjects(serverName, bucket, resolvedPrefix, continuationToken);
+        return s3StoragePort.listObjects(serverName, bucket, resolvedPrefix, continuationToken, 0);
     }
 
     @Override
-    public void fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
-                                Consumer<ObjectListing> pageCallback) {
+    public boolean fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
+                                  long maxObjects, Consumer<ObjectListing> pageCallback) {
         String token = null;
+        long count = 0;
         do {
-            ObjectListing page = s3StoragePort.listObjects(serverName, bucket, resolvedPrefix, token);
+            long remaining = maxObjects > 0 ? Math.max(0, maxObjects - count) : 0;
+            ObjectListing page = s3StoragePort.listObjects(serverName, bucket, resolvedPrefix, token,
+                    maxObjects > 0 ? Math.min(remaining, 1000) : 0);
             pageCallback.accept(page);
+            count += page.objects().size();
             token = page.truncated() ? page.nextContinuationToken() : null;
+            if (maxObjects > 0 && count >= maxObjects) {
+                return true;
+            }
         } while (token != null);
+        return false;
     }
 }

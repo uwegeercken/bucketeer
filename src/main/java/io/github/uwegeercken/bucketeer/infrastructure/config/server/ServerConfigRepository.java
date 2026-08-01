@@ -43,7 +43,9 @@ public class ServerConfigRepository {
                             e.name(), e.endpoint(), e.region(),
                             encryptor.decrypt(e.accessKey()),
                             encryptor.decrypt(e.secretKey()),
-                            e.verifyCertificate()))
+                            e.verifyCertificate(),
+                            e.timeoutSeconds() != null ? e.timeoutSeconds() : 0,
+                            e.retries() != null ? e.retries() : 3))
                     .toList();
         } catch (CredentialEncryptor.EncryptionException e) {
             log.error("Failed to decrypt server credentials - encryption key may have changed. " +
@@ -63,7 +65,9 @@ public class ServerConfigRepository {
                             s.name(), s.endpoint(), s.region(),
                             encryptor.encrypt(s.accessKey()),
                             encryptor.encrypt(s.secretKey()),
-                            s.verifyCertificate()))
+                            s.verifyCertificate(),
+                            s.timeoutSeconds(),
+                            s.retries()))
                     .toList();
             mapper.writeValue(configPath.toFile(), entries);
             log.info("Saved {} server(s) to {}", servers.size(), configPath);
@@ -95,6 +99,8 @@ public class ServerConfigRepository {
             String region,
             String accessKey,
             String secretKey,
-            boolean verifyCertificate
+            boolean verifyCertificate,
+            Integer timeoutSeconds,
+            Integer retries
     ) {}
 }
