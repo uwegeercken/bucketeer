@@ -67,6 +67,19 @@ public class DuckDbRepository {
         }
     }
 
+    /** Removes a single object from the cache (e.g. after delete/move). Returns the number of removed rows. */
+    public long deleteByKey(String bucket, String key) {
+        String sql = "DELETE FROM objects WHERE bucket = ? AND key = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, bucket);
+            ps.setString(2, key);
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            log.error("Failed to delete object from cache {}: {}", key, e.getMessage());
+            return 0;
+        }
+    }
+
     /** Inserts a batch of S3 objects into the cache. */
     public void insertBatch(List<S3Object> objects) {
         String sql = "INSERT INTO objects (key, bucket, size_bytes, last_modified, etag) VALUES (?, ?, ?, ?, ?)";

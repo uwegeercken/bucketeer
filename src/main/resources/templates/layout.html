@@ -42,13 +42,13 @@
 
 <!-- Header fragment -->
 <nav th:fragment="header" class="navbar navbar-dark bg-dark mb-3 border-bottom border-secondary">
-    <div class="container-fluid">
+    <div class="container-fluid position-relative d-flex justify-content-between align-items-center">
         <!-- Left: app name -->
         <a class="navbar-brand fw-bold" href="/" th:text="#{app.title}">Bucketeer</a>
 
         <!-- Center: server selector -->
         <form method="post" action="/session/server"
-              class="d-flex align-items-center gap-2 mx-auto">
+              class="d-flex align-items-center gap-2 position-absolute start-50 translate-middle-x">
             <label class="text-secondary small" th:text="#{label.server}">Server</label>
             <select name="serverName" class="form-select form-select-sm w-auto"
                     onchange="sessionStorage.removeItem('bkt_bucket');sessionStorage.removeItem('bkt_prefix');sessionStorage.removeItem('bkt_key');this.form.submit()"
@@ -65,33 +65,49 @@
         </form>
 
         <!-- Right: nav links -->
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
             <a th:if="${backUrl != null}" th:href="${backUrl}"
                class="btn btn-sm btn-outline-light" th:title="#{nav.back}"><i class="bi bi-arrow-left"></i></a>
-            <button class="btn btn-sm btn-outline-light" id="themeToggle"
-                    th:title="#{label.themeToggle}" onclick="toggleTheme()">
-                <i class="bi bi-moon-stars" id="themeIcon"></i>
-            </button>
-            <a class="btn btn-sm btn-outline-light" href="/cart"
-               th:title="#{nav.cart}"><i class="bi bi-list-check"></i></a>
-            <a class="btn btn-sm btn-outline-light" href="/keycheck"
-               th:title="#{nav.keycheck}"><i class="bi bi-clipboard-check"></i></a>
-            <button class="btn btn-sm btn-outline-light" id="toolsBtn"
-                    th:title="#{nav.tools}" onclick="var m=new bootstrap.Modal(document.getElementById('toolsModal'));m.show();">
-                <i class="bi bi-wrench"></i>
-            </button>
-            <a class="btn btn-sm btn-outline-light" href="/snapshots"
-               onclick="if(typeof saveFormState==='function') saveFormState()"
-               th:title="#{nav.snapshots}"><i class="bi bi-bookmarks"></i></a>
-            <a class="btn btn-sm btn-outline-light" href="/config"
-               onclick="if(typeof saveFormState==='function') saveFormState()"
-               th:title="#{nav.servers}"><i class="bi bi-server"></i></a>
-            <a class="btn btn-sm btn-outline-light" href="/settings"
-               onclick="if(typeof saveFormState==='function') saveFormState()"
-               th:title="#{nav.config}"><i class="bi bi-gear"></i></a>
-            <a class="btn btn-sm btn-outline-light" href="/help"
-               onclick="if(typeof saveFormState==='function') saveFormState()"
-               th:title="#{nav.help}"><i class="bi bi-question-circle"></i></a>
+
+            <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-light" href="/cart"
+                   th:title="#{nav.cart}"><i class="bi bi-list-check"></i></a>
+                <a class="btn btn-sm btn-outline-light" href="/keycheck"
+                   th:title="#{nav.keycheck}"><i class="bi bi-clipboard-check"></i></a>
+                <a class="btn btn-sm btn-outline-light" href="/snapshots"
+                   onclick="if(typeof saveFormState==='function') saveFormState()"
+                   th:title="#{nav.snapshots}"><i class="bi bi-bookmarks"></i></a>
+                <a class="btn btn-sm btn-outline-light" href="/history"
+                   onclick="if(typeof saveFormState==='function') saveFormState()"
+                   th:title="#{nav.history}"><i class="bi bi-clock-history"></i></a>
+            </div>
+
+            <div class="vr mx-2"></div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-light" id="toolsBtn"
+                        th:title="#{nav.tools}" onclick="var m=new bootstrap.Modal(document.getElementById('toolsModal'));m.show();">
+                    <i class="bi bi-wrench"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-light" id="themeToggle"
+                        th:title="#{label.themeToggle}" onclick="toggleTheme()">
+                    <i class="bi bi-moon-stars" id="themeIcon"></i>
+                </button>
+            </div>
+
+            <div class="vr mx-2"></div>
+
+            <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-light" href="/settings"
+                   onclick="if(typeof saveFormState==='function') saveFormState()"
+                   th:title="#{nav.config}"><i class="bi bi-gear"></i></a>
+                <a class="btn btn-sm btn-outline-light" href="/config"
+                   onclick="if(typeof saveFormState==='function') saveFormState()"
+                   th:title="#{nav.servers}"><i class="bi bi-server"></i></a>
+                <a class="btn btn-sm btn-outline-light" href="/help"
+                   onclick="if(typeof saveFormState==='function') saveFormState()"
+                   th:title="#{nav.help}"><i class="bi bi-question-circle"></i></a>
+            </div>
         </div>
     </div>
 </nav>
@@ -254,3 +270,176 @@
     </script>
 
 </footer>
+
+<!-- Move modal fragment (shared by selection and query results pages) -->
+<th:block th:fragment="moveModal">
+    <div class="modal fade" id="moveModal" tabindex="-1" aria-labelledby="moveModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="moveModalLabel" th:text="#{modal.move.title}">Move object</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="moveModalInfo" class="font-monospace small fw-semibold mb-1"></div>
+                    <div id="moveModalCount" class="text-muted small mb-2"></div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold" for="moveModalToPrefix" th:text="#{cart.batch.toPrefix}">To prefix</label>
+                        <input type="text" id="moveModalToPrefix" class="form-control form-control-sm font-monospace"/>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small" for="moveModalPrefixSelect" th:text="#{cart.batch.choosePrefix}">Or choose a common prefix</label>
+                        <select id="moveModalPrefixSelect" class="form-select form-select-sm font-monospace"
+                                onchange="if(this.value) document.getElementById('moveModalToPrefix').value = this.value;">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    <div class="alert alert-warning py-2 px-2 mb-2" style="font-size:0.82rem;" th:text="#{cart.batch.skipWarning}">Objects whose target key already exists are skipped and recorded in the action history.</div>
+                    <div class="text-muted small" th:text="#{modal.move.prefixHint}">Enter only the target folder; the file name is kept.</div>
+                    <div id="moveModalError" class="alert alert-danger py-1 px-2 mt-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                    <div id="moveModalResult" class="alert alert-success py-1 px-2 mt-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-primary" id="moveModalConfirmBtn" th:text="#{btn.move}">Move</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const moveModalLabels = {
+            mixed:   /*[[#{cart.batch.mixed}]]*/ 'Selection must contain objects of a single server and bucket.',
+            count:   /*[[#{cart.batch.count}]]*/ '{0} objects',
+            result:  /*[[#{cart.batch.moveResult}]]*/ 'Moved: {0}, skipped: {1}, failed: {2}.',
+            invalid: /*[[#{modal.move.invalidPrefix}]]*/ 'Target prefix must not be empty or equal the source folder.',
+            skipped: /*[[#{msg.move.skipped}]]*/ 'Target already exists, object skipped.',
+            opError: /*[[#{msg.opError}]]*/ 'Operation failed:'
+        };
+
+        window.MoveModal = (function() {
+            let config = null;
+
+            function collectPrefixes(keys) {
+                const prefixes = new Set();
+                for (const key of keys) {
+                    const i = key.lastIndexOf('/');
+                    if (i > 0) {
+                        const parent = key.substring(0, i + 1);
+                        let s = 0;
+                        while ((s = parent.indexOf('/', s)) >= 0 && s < parent.length) {
+                            prefixes.add(parent.substring(0, s + 1));
+                            s++;
+                        }
+                    }
+                }
+                if (keys.length > 1) {
+                    let lcp = keys[0];
+                    for (let i = 1; i < keys.length; i++) {
+                        let j = 0;
+                        while (j < lcp.length && j < keys[i].length && lcp[j] === keys[i][j]) j++;
+                        lcp = lcp.substring(0, j);
+                    }
+                    const lastSlash = lcp.lastIndexOf('/');
+                    if (lastSlash >= 0) {
+                        let s = 0;
+                        while ((s = lcp.indexOf('/', s)) >= 0 && s <= lastSlash) {
+                            prefixes.add(lcp.substring(0, s + 1));
+                            s++;
+                        }
+                    }
+                }
+                return Array.from(prefixes).sort();
+            }
+
+            function open(cfg) {
+                config = cfg;
+                document.getElementById('moveModalToPrefix').value = '';
+                const prefixSelect = document.getElementById('moveModalPrefixSelect');
+                prefixSelect.innerHTML = '<option value=""></option>';
+                collectPrefixes(cfg.items.map(i => i.key)).forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    opt.textContent = p;
+                    prefixSelect.appendChild(opt);
+                });
+                const server = cfg.items[0].serverName;
+                const bucket = cfg.items[0].bucket;
+                const sameGroup = cfg.items.every(i => i.serverName === server && i.bucket === bucket);
+                cfg.sameGroup = sameGroup;
+                document.getElementById('moveModalInfo').textContent = server + ' / ' + bucket;
+                document.getElementById('moveModalCount').textContent =
+                    moveModalLabels.count.replace('{0}', cfg.items.length);
+                if (cfg.title) {
+                    document.getElementById('moveModalLabel').textContent = cfg.title;
+                }
+                const btn = document.getElementById('moveModalConfirmBtn');
+                btn.disabled = !sameGroup;
+                const errEl = document.getElementById('moveModalError');
+                errEl.style.display = 'none';
+                errEl.classList.remove('alert-success');
+                const resultEl = document.getElementById('moveModalResult');
+                resultEl.style.display = 'none';
+                resultEl.classList.remove('alert-danger');
+                if (!sameGroup) {
+                    errEl.textContent = moveModalLabels.mixed;
+                    errEl.style.display = 'block';
+                }
+                new bootstrap.Modal(document.getElementById('moveModal')).show();
+            }
+
+            async function confirm() {
+                if (!config) return;
+                const btn = document.getElementById('moveModalConfirmBtn');
+                btn.disabled = true;
+                const errEl = document.getElementById('moveModalError');
+                const resultEl = document.getElementById('moveModalResult');
+                const toPrefix = document.getElementById('moveModalToPrefix').value.trim();
+                errEl.style.display = 'none';
+                errEl.classList.remove('alert-success');
+                resultEl.style.display = 'none';
+                resultEl.classList.remove('alert-danger');
+                if (!toPrefix) {
+                    errEl.textContent = moveModalLabels.invalid;
+                    errEl.style.display = 'block';
+                    btn.disabled = false;
+                    return;
+                }
+                try {
+                    const res = await fetch(config.endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(config.makePayload(toPrefix))
+                    });
+                    const data = await res.json();
+                    await config.handleResponse(data, errEl, resultEl, btn);
+                } catch (e) {
+                    errEl.textContent = moveModalLabels.opError + ' ' + e.message;
+                    errEl.style.display = 'block';
+                    btn.disabled = false;
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const btn = document.getElementById('moveModalConfirmBtn');
+                if (btn) btn.addEventListener('click', confirm);
+                const input = document.getElementById('moveModalToPrefix');
+                if (input) {
+                    input.addEventListener('keydown', e => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            confirm();
+                        }
+                    });
+                }
+                const modalEl = document.getElementById('moveModal');
+                if (modalEl) {
+                    modalEl.addEventListener('hidden.bs.modal', () => { config = null; });
+                }
+            });
+
+            return { open };
+        })();
+    </script>
+</th:block>

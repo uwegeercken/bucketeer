@@ -1,6 +1,9 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
+import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
+import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
@@ -12,6 +15,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -22,10 +28,17 @@ public class CartController {
     private static final Logger log = LoggerFactory.getLogger(CartController.class);
     public static final String SESSION_KEY = "bucketeer_cart";
 
-    private final S3StoragePort s3StoragePort;
+    private static final DateTimeFormatter BATCH_ID_FORMAT =
+            DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
-    public CartController(S3StoragePort s3StoragePort) {
-        this.s3StoragePort = s3StoragePort;
+    private final S3StoragePort s3StoragePort;
+    private final BucketeerUseCase bucketeerUseCase;
+    private final ActionHistory actionHistory;
+
+    public CartController(S3StoragePort s3StoragePort, BucketeerUseCase bucketeerUseCase, ActionHistory actionHistory) {
+        this.s3StoragePort    = s3StoragePort;
+        this.bucketeerUseCase = bucketeerUseCase;
+        this.actionHistory    = actionHistory;
     }
 
     @SuppressWarnings("unchecked")
@@ -37,6 +50,22 @@ public class CartController {
         List<CartItem> cart = new ArrayList<>();
         session.setAttribute(SESSION_KEY, cart);
         return cart;
+    }
+
+    /** Removes all cart items matching the given server/bucket/key. Returns true if anything was removed. */
+    public static boolean removeItem(HttpSession session, String serverName, String bucket, String key) {
+        Object raw = session.getAttribute(SESSION_KEY);
+        if (!(raw instanceof List<?>)) {
+            return false;
+        }
+        List<CartItem> cart = (List<CartItem>) raw;
+        boolean removed = cart.removeIf(ci -> ci.serverName().equals(serverName)
+                && ci.bucket().equals(bucket)
+                && ci.key().equals(key));
+        if (removed) {
+            session.setAttribute(SESSION_KEY, cart);
+        }
+        return removed;
     }
 
     @GetMapping(value = "/api/cart/count", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -83,11 +112,120 @@ public class CartController {
     @PostMapping(value = "/api/cart/remove", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public Map<String, Object> removeFromCart(@RequestBody CartItemRequest item, HttpSession session) {
-        List<CartItem> cart = getCart(session);
-        cart.removeIf(ci -> ci.serverName().equals(item.serverName())
-                && ci.bucket().equals(item.bucket())
-                && ci.key().equals(item.key()));
-        return Map.of("count", cart.size());
+        removeItem(session, item.serverName(), item.bucket(), item.key());
+        return Map.of("count", getCart(session).size());
+    }
+
+    @PostMapping(value = "/api/cart/delete-selected", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> deleteSelected(@RequestBody List<CartItemRequest> items, HttpSession session) {
+        String batchId = nextBatchId();
+        int processed = 0;
+        int deleted = 0;
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (CartItemRequest item : items) {
+            processed++;
+            try {
+                bucketeerUseCase.deleteObject(item.serverName(), item.bucket(), item.key());
+                removeItem(session, item.serverName(), item.bucket(), item.key());
+                deleted++;
+                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.SELECTION,
+                        batchId, item.serverName(), item.bucket(), item.key(), null,
+                        ActionEntry.Status.DELETED, null));
+                results.add(Map.of("key", item.key(), "status", "DELETED"));
+            } catch (Exception e) {
+                log.error("Delete failed for {}/{}: {}", item.bucket(), item.key(), e.getMessage());
+                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.SELECTION,
+                        batchId, item.serverName(), item.bucket(), item.key(), null,
+                        ActionEntry.Status.FAILED, e.getMessage()));
+                results.add(Map.of("key", item.key(), "status", "FAILED", "error", e.getMessage()));
+            }
+        }
+        return Map.of(
+                "processed", processed,
+                "deleted",   deleted,
+                "failed",    processed - deleted,
+                "items",     results
+        );
+    }
+
+    @PostMapping(value = "/api/cart/move-selected", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> moveSelected(@RequestBody CartMoveRequest req, HttpSession session) {
+        String batchId = nextBatchId();
+        int moved = 0;
+        int skipped = 0;
+        int failed = 0;
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        List<CartItem> snapshot = new ArrayList<>(getCart(session));
+        for (CartItem item : snapshot) {
+            if (!item.serverName().equals(req.serverName()) || !item.bucket().equals(req.bucket())
+                    || !req.keys().contains(item.key())) {
+                continue;
+            }
+            String targetKey = targetKey(item.key(), req.toPrefix());
+            if (targetKey.equals(item.key())) {
+                skipped++;
+                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
+                        batchId, item.serverName(), item.bucket(), item.key(), targetKey,
+                        ActionEntry.Status.SKIPPED, "Target equals source"));
+                results.add(Map.of("key", item.key(), "targetKey", targetKey, "status", "SKIPPED"));
+                continue;
+            }
+            try {
+                boolean movedFlag = bucketeerUseCase.moveObject(item.serverName(), item.bucket(), item.key(), targetKey);
+                removeItem(session, item.serverName(), item.bucket(), item.key());
+                if (movedFlag) {
+                    moved++;
+                } else {
+                    skipped++;
+                }
+                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
+                        batchId, item.serverName(), item.bucket(), item.key(), targetKey,
+                        movedFlag ? ActionEntry.Status.MOVED : ActionEntry.Status.SKIPPED, null));
+                results.add(Map.of("key", item.key(), "targetKey", targetKey,
+                        "status", movedFlag ? "MOVED" : "SKIPPED"));
+            } catch (Exception e) {
+                failed++;
+                log.error("Move failed for {}/{}: {}", item.bucket(), item.key(), e.getMessage());
+                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
+                        batchId, item.serverName(), item.bucket(), item.key(), targetKey,
+                        ActionEntry.Status.FAILED, e.getMessage()));
+                results.add(Map.of("key", item.key(), "targetKey", targetKey, "status", "FAILED", "error", e.getMessage()));
+            }
+        }
+        return Map.of(
+                "moved",   moved,
+                "skipped", skipped,
+                "failed",  failed,
+                "items",   results
+        );
+    }
+
+    /**
+     * Builds the target key by replacing the object's own folder (the path up to the last '/')
+     * with the target prefix. Examples (toPrefix "archive/"):
+     *   "a/b/c.txt"            -&gt; "archive/c.txt"
+     *   "a/b/sub/c.txt"        -&gt; "archive/c.txt"
+     *   "top.txt"              -&gt; "archive/top.txt"
+     * An empty target prefix moves the object to the bucket root.
+     */
+    static String targetKey(String key, String toPrefix) {
+        String rel = key;
+        int idx = key.lastIndexOf('/');
+        if (idx >= 0) {
+            rel = key.substring(idx + 1);
+        }
+        String target = toPrefix == null ? "" : toPrefix;
+        if (!target.isEmpty() && !target.endsWith("/") && !rel.isEmpty()) {
+            target = target + "/";
+        }
+        return target + rel;
+    }
+
+    private String nextBatchId() {
+        return LocalDateTime.now().format(BATCH_ID_FORMAT);
     }
 
     @PostMapping(value = "/api/cart/clear", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -157,5 +295,12 @@ public class CartController {
             String key,
             long sizeBytes,
             java.time.Instant lastModified
+    ) {}
+
+    public record CartMoveRequest(
+            String serverName,
+            String bucket,
+            String toPrefix,
+            List<String> keys
     ) {}
 }

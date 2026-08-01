@@ -68,4 +68,32 @@ public class BucketeerService implements BucketeerUseCase {
         } while (token != null);
         return false;
     }
+
+    @Override
+    public boolean moveObject(String serverName, String bucket, String sourceKey, String targetKey) {
+        if (targetKey == null || targetKey.isBlank()) {
+            throw new IllegalArgumentException("Target key must not be empty");
+        }
+        if (targetKey.equals(sourceKey)) {
+            throw new IllegalArgumentException("Target key must differ from source key");
+        }
+        boolean copied = s3StoragePort.copyObject(serverName, bucket, sourceKey, bucket, targetKey, false);
+        if (!copied) {
+            return false;
+        }
+        try {
+            s3StoragePort.deleteObject(serverName, bucket, sourceKey);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException(
+                    "Copy created at " + targetKey + " but deletion of " + sourceKey + " failed ("
+                            + e.getMessage() + "). A duplicate may exist - remove it manually once permitted.",
+                    e);
+        }
+        return true;
+    }
+
+    @Override
+    public void deleteObject(String serverName, String bucket, String key) {
+        s3StoragePort.deleteObject(serverName, bucket, key);
+    }
 }

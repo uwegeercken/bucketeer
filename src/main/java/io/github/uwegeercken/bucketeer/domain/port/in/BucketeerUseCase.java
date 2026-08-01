@@ -32,4 +32,14 @@ public interface BucketeerUseCase {
      */
     boolean fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
                             long maxObjects, Consumer<ObjectListing> pageCallback);
+
+    /**
+     * Moves an object within the same bucket (copy then delete).
+     * The source is only deleted after a successful copy.
+     *
+     * @return true if the object was moved, false if the target already existed (object skipped)
+     */
+    boolean moveObject(String serverName, String bucket, String sourceKey, String targetKey);
+
+    void deleteObject(String serverName, String bucket, String key);
 }

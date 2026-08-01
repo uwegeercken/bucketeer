@@ -28,10 +28,31 @@
         <!-- Tab 1: Release Info -->
         <div class="tab-pane fade show active" id="tabReleases" role="tabpanel">
 
-            <div class="panel">
-                <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
+                <div class="panel">
+                    <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
-                <h6>0.5.8 <small class="text-muted">2026-08-01</small></h6>
+                    <h6>0.6.0 <small class="text-muted">2026-08-01</small></h6>
+                    <ul>
+                        <li>Fixed move always reported as "skipped": the existence check was evaluated against the source object; the target key is now checked before copying — targets are never overwritten and skips are detected correctly</li>
+                        <li>Unified move semantics — single move and batch move both take a target prefix (the object's folder is replaced, only the file name is kept); the dialog offers a dropdown of the shared prefixes from the current results</li>
+                        <li>If a move copy succeeds but deleting the source fails (e.g. missing permission), a clear warning states that a duplicate may exist and must be cleaned up manually</li>
+                        <li>Action history: origin/error columns removed from the table and from the API/download export</li>
+                    </ul>
+
+                    <hr/>
+
+                    <h6>0.5.9 <small class="text-muted">2026-08-01</small></h6>
+                    <ul>
+                        <li>Move and delete S3 objects — per row in the results and as batch operations (delete / prefix-based move) in the selection</li>
+                        <li>Batch move replaces the object's own folder with the target prefix: <code>data/shard-00/test1/file.odt</code> with target <code>archive/</code> becomes <code>archive/file.odt</code> — objects keep only their file name, files from subfolders are moved flat into the target prefix</li>
+                        <li>Move is copy + delete: the source is only removed after a successful copy; existing targets are skipped (never overwritten) and recorded in the action history — when moving many objects at once, make sure target keys are unique, otherwise objects are skipped</li>
+                        <li>Action history (/history) — every move/delete is recorded as an audit log in ~/.bucketeer/actions/actions.jsonl, reviewable and downloadable as JSON</li>
+                        <li>After move/delete the row is removed from the cached results; collected items are cleaned from the selection</li>
+                    </ul>
+
+                    <hr/>
+
+                    <h6>0.5.8 <small class="text-muted">2026-08-01</small></h6>
                 <ul>
                     <li>S3 server config: request timeout and retries per server</li>
                     <li>Max objects per query (settings) — fetching stops exactly at the limit, amber "limit reached" status</li>

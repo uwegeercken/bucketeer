@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="#{history.title}">Bucketeer – Action History</title>
+    <th:block th:replace="~{layout :: styles}"></th:block>
+</head>
+<body>
+
+<nav th:replace="~{layout :: header}"></nav>
+
+<main class="container-fluid px-4">
+
+    <div class="panel">
+        <div class="panel-title d-flex align-items-center justify-content-between">
+            <span th:text="#{history.title}">Action History</span>
+            <div class="d-flex gap-1">
+                <a href="/api/history/download" class="btn btn-sm btn-outline-secondary btn-icon"
+                   th:title="#{history.download}"><i class="bi bi-download"></i></a>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon"
+                        th:title="#{history.refresh}" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-icon"
+                        th:title="#{history.clear}" th:disabled="${historyRows.isEmpty()}"
+                        onclick="openClearHistoryModal()">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+
+        <div th:if="${historyRows.isEmpty()}" class="text-muted small fst-italic" th:text="#{history.empty}">No actions recorded yet.</div>
+
+        <div th:unless="${historyRows.isEmpty()}" class="table-responsive">
+            <table class="table table-sm table-hover table-bordered mb-0">
+                <thead class="table-secondary">
+                <tr>
+                    <th th:text="#{history.time}">Time</th>
+                    <th th:text="#{history.status}">Status</th>
+                    <th th:text="#{history.server}">Server</th>
+                    <th th:text="#{history.bucket}">Bucket</th>
+                    <th th:text="#{history.source}">Source</th>
+                    <th th:text="#{history.target}">Target</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${historyRows}">
+                    <td class="small" th:text="${row.time}"></td>
+                    <td class="small"
+                        th:classappend="${row.status == 'failed' ? 'text-danger' : (row.status == 'skipped' ? 'text-warning' : '')}"
+                        th:text="#{|history.status.${row.status}|}"></td>
+                    <td class="small" th:text="${row.server}"></td>
+                    <td class="small" th:text="${row.bucket}"></td>
+                    <td class="small font-monospace text-break" th:text="${row.sourceKey}"></td>
+                    <td class="small font-monospace text-break" th:text="${row.targetKey}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Clear History Modal -->
+    <div class="modal fade" id="clearHistoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" th:text="#{history.clear}">Clear history</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body" th:text="#{history.confirm.clear}">Delete all action history entries?</div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="clearHistoryConfirmBtn" th:text="#{history.clear}">Clear history</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function openClearHistoryModal() {
+        new bootstrap.Modal(document.getElementById('clearHistoryModal')).show();
+    }
+
+    document.getElementById('clearHistoryConfirmBtn').addEventListener('click', async () => {
+        await fetch('/api/history/clear', { method: 'POST' });
+        location.reload();
+    });
+</script>
+</body>
+</html>

@@ -103,11 +103,11 @@
                 </button>
                 <button type="button" id="btnAddAll" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="addAllToCart()" th:title="#{cart.addAll}">
-                    <i class="bi bi-check2-square"></i>
+                    <i class="bi bi-collection"></i>
                 </button>
                 <button type="button" id="btnSaveSnapshot" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="saveSnapshot()" th:title="#{snapshot.save}" disabled>
-                    <i class="bi bi-bookmark-plus"></i>
+                    <i class="bi bi-camera"></i>
                 </button>
                 <button type="button" id="toggleMaximize" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="toggleMaximize()" th:title="#{btn.toggleMaximize}">
@@ -219,6 +219,29 @@
         </div>
     </div>
 
+    <!-- Delete Object Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="deleteModalLabel" th:text="#{modal.delete.title}">Delete object</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="deleteModalMessage" class="text-break font-monospace small mb-2"></div>
+                    <div id="deleteModalError" class="alert alert-danger py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="deleteModalConfirmBtn" th:text="#{btn.delete}">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <th:block th:replace="~{layout :: moveModal}"></th:block>
+
 </main>
 
 <footer th:replace="~{layout :: footer}"></footer>
@@ -245,6 +268,10 @@
     const labelLimitReached = /*[[#{msg.queryLimitReached}]]*/ 'limit reached';
     const labelDeleteFav    = /*[[#{btn.deleteFavorite}]]*/ 'Delete favorite';
     const labelDeleteHist   = /*[[#{btn.deleteHistoryEntry}]]*/ 'Delete history entry';
+    const labelMove         = /*[[#{btn.move}]]*/ 'Move object';
+    const labelDelete       = /*[[#{btn.delete}]]*/ 'Delete object';
+    const labelDeleteConfirm = /*[[#{modal.delete.message}]]*/ 'Delete this object permanently?\n\n{0}';
+    const labelOpError       = /*[[#{msg.opError}]]*/ 'Operation failed:';
 
     const STORAGE_KEY  = 'bucketeer_favorites';
     const HISTORY_KEY  = 'bucketeer_history';
@@ -788,6 +815,8 @@
             + '<td class="small">' + escHtml(row.lastModified) + '</td>'
             + '<td class="d-flex gap-1">'
             + '<a href="/download?bucket=' + encodeURIComponent(row.bucket || currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a>'
+            + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelMove) + '" aria-label="' + escHtml(labelMove) + '" onclick="openMoveModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-arrows-move" aria-hidden="true"></i></button>'
+            + '<button type="button" class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelDelete) + '" aria-label="' + escHtml(labelDelete) + '" onclick="openDeleteModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-trash" aria-hidden="true"></i></button>'
             + '</td>'
             + '</tr>'
         ).join('');
@@ -1018,6 +1047,81 @@
         }
     }
 
+    // --- Object Actions (move / delete) ---
+
+    let pendingDelete = null;
+
+    function openDeleteModal(bucket, key) {
+        pendingDelete = { bucket: decodeURIComponent(bucket), key: decodeURIComponent(key) };
+        document.getElementById('deleteModalMessage').textContent =
+            labelDeleteConfirm.replace('{0}', pendingDelete.key);
+        const errEl = document.getElementById('deleteModalError');
+        errEl.style.display = 'none';
+        new bootstrap.Modal(document.getElementById('deleteModal')).show();
+    }
+
+    async function confirmDelete() {
+        if (!pendingDelete) return;
+        const btn = document.getElementById('deleteModalConfirmBtn');
+        btn.disabled = true;
+        const errEl = document.getElementById('deleteModalError');
+        try {
+            const res = await fetch('/api/object/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bucket: pendingDelete.bucket, key: pendingDelete.key })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                pendingDelete = null;
+                await loadResults();
+                updateCartBadge();
+            } else {
+                errEl.textContent = labelOpError + ' ' + (data.error || '');
+                errEl.style.display = 'block';
+            }
+        } catch (e) {
+            errEl.textContent = labelOpError + ' ' + e.message;
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function openMoveModal(bucket, key) {
+        const sourceKey = decodeURIComponent(key);
+        MoveModal.open({
+            title: /*[[#{modal.move.title}]]*/ 'Move object',
+            items: [{ serverName: currentServer, bucket: decodeURIComponent(bucket), key: sourceKey }],
+            endpoint: '/api/object/move',
+            makePayload: (toPrefix) => ({
+                bucket: decodeURIComponent(bucket),
+                sourceKey: sourceKey,
+                toPrefix: toPrefix
+            }),
+            handleResponse: async (data, errEl, resultEl, btn) => {
+                if (data.sameKey) {
+                    errEl.textContent = moveModalLabels.invalid;
+                    errEl.style.display = 'block';
+                    btn.disabled = false;
+                } else if (data.skipped) {
+                    resultEl.classList.add('alert-success');
+                    resultEl.textContent = moveModalLabels.skipped;
+                    resultEl.style.display = 'block';
+                } else if (data.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
+                    await loadResults();
+                    updateCartBadge();
+                } else {
+                    errEl.textContent = moveModalLabels.opError + ' ' + (data.error || '');
+                    errEl.style.display = 'block';
+                    btn.disabled = false;
+                }
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
             new bootstrap.Popover(el);
@@ -1115,6 +1219,11 @@
                 e.preventDefault();
                 saveFavoriteFromModal();
             }
+        });
+
+        document.getElementById('deleteModalConfirmBtn').addEventListener('click', confirmDelete);
+        document.getElementById('deleteModal').addEventListener('hidden.bs.modal', () => {
+            pendingDelete = null;
         });
     });
 </script>

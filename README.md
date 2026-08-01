@@ -1,6 +1,6 @@
 # Bucketeer
 
-A web-based **S3 object browser** for any S3-compatible server — list, filter, sort, download and compare objects in your browser.
+A web-based **S3 object browser** for any S3-compatible server — list, filter, sort, download, move, delete and compare objects in your browser.
 
 ## Features
 
@@ -8,6 +8,8 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Prefix templates** — build S3 prefixes dynamically with functions (`left`, `right`, `upper`, `lower`, `everyNth`, `substring`, `repeat`) and date placeholders; functions can be nested and combined with literal suffixes
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
 - **Selection &amp; bulk download** — collect objects across queries and download them all as a ZIP
+- **Move &amp; delete objects** — move (same bucket, copy + delete) or delete individual objects from the results, or apply batch operations (delete / prefix-based move) to the selection; existing targets are skipped and reported
+- **Action history** — every move/delete is recorded in `~/.bucketeer/actions/actions.jsonl` and can be reviewed on the **Action History** page (`/history`)
 - **Snapshots** — save query results as Parquet, compare snapshots over time and export the diff (added / removed / changed objects)
 - **Key Check** — upload a CSV with keys and verify which ones exist on the server
 - **Text Tools** — Base64 / URL encode &amp; decode, timestamp ↔ date conversion, JSON pretty / minify, SHA-256
@@ -21,7 +23,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.5.8.jar
+java -jar target/bucketeer-0.6.0.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -43,7 +45,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.5.8.jar
+java -jar target/bucketeer-0.6.0.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -100,10 +102,28 @@ The selection lets you collect objects across multiple searches and download the
 **Selection page (`/cart`):**
 - Lists all collected items with name, server, bucket, size and date
 - **Download all as ZIP** – streams all items into a single zip archive
+- **Move selected** – batch move: each object is moved into the target prefix keeping only its file name; the object's folder is replaced by the target prefix
+- **Delete selected** – deletes all selected objects from the storage
 - **Clear selection** – removes all items
 
 The selection persists across searches and page navigations within the same session.
 Duplicate items (same server + bucket + key) are not added twice.
+
+### Move & Delete Objects
+
+Every object row in the results panel offers two actions next to the download button:
+- **Move** (arrows icon) – opens a dialog to enter the target key in the same bucket. Move is implemented as S3 **copy + delete**: the source is only deleted after a successful copy. If an object already exists at the target, the move is **skipped and reported** instead of overwritten.
+- **Delete** (trash icon) – permanently deletes the object after a confirmation dialog.
+
+Both actions also work as **batch operations** on the selection page (`/cart`). Batch moves replace the **object's own folder** (everything up to the last `/`) with the target prefix: `data/shard-00/test1/file.odt` moved to `archive/` becomes `archive/file.odt`. Objects keep only their file name — files collected from subfolders are moved **flat** into the target prefix. You only enter the target prefix; the source folder is taken from each object's key.
+
+> **Skip semantics:** Objects whose target key already exists are **not overwritten** — they are skipped and recorded as `SKIPPED` in the **Action History**. When you move many objects at once (e.g. hundreds), it is **your responsibility** to ensure target keys are unique; otherwise objects are skipped. Check the Action History (`/history`) to see exactly what was moved, skipped or failed.
+
+Every action (successful, skipped or failed) is recorded in the **Action History**.
+
+### Action History (`/history`)
+
+Every move and delete is logged as an audit entry in `~/.bucketeer/actions/actions.jsonl` with timestamp, action (move/delete), origin (results/selection), server, bucket, source and target key, and status (moved/skipped/deleted/failed). Failed operations keep their error message. On the Action History page you can review the log, clear it, or download it as JSON.
 
 ---
 

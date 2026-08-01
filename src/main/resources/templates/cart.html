@@ -16,6 +16,14 @@
         <div class="panel-title d-flex align-items-center justify-content-between">
             <span th:text="#{cart.title}">Selection</span>
             <div class="d-flex gap-1">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" id="btnMoveSelected"
+                        disabled th:title="#{btn.moveSelected}" onclick="openCartMoveModal()">
+                    <i class="bi bi-arrows-move"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-icon" id="btnDeleteSelected"
+                        disabled th:title="#{btn.deleteSelected}" onclick="openCartDeleteModal()">
+                    <i class="bi bi-trash"></i>
+                </button>
                 <a href="/cart/download-all" class="btn btn-sm btn-outline-secondary btn-icon"
                    th:classappend="${cartItems.isEmpty()} ? 'disabled' : ''"
                    th:title="#{cart.downloadAll}" id="btnDownloadAll">
@@ -24,7 +32,7 @@
                 <button type="button" class="btn btn-sm btn-outline-danger btn-icon"
                         onclick="clearCart()" th:title="#{cart.clear}"
                         th:disabled="${cartItems.isEmpty()}" id="btnClearCart">
-                    <i class="bi bi-trash"></i>
+                    <i class="bi bi-x-circle"></i>
                 </button>
             </div>
         </div>
@@ -40,6 +48,8 @@
         <table th:if="${!cartItems.isEmpty()}" class="table table-sm table-hover table-bordered mb-0 results-table">
             <thead class="table-secondary">
             <tr>
+                <th style="width:32px"><input type="checkbox" id="cartSelectAll"
+                                              th:title="#{cart.selectAll}" onchange="toggleCartSelectAll(this.checked)"/></th>
                 <th th:text="#{label.objectName}">Name</th>
                 <th th:text="#{cart.server}">Server</th>
                 <th th:text="#{cart.bucket}">Bucket</th>
@@ -50,6 +60,9 @@
             </thead>
             <tbody>
             <tr th:each="item, iter : ${cartItems}">
+                <td><input type="checkbox" class="cart-check"
+                           th:data-server="${item.serverName()}" th:data-bucket="${item.bucket()}"
+                           th:data-key="${item.key()}" onchange="updateCartActionButtons()"/></td>
                 <td class="text-break font-monospace small" th:text="${item.key()}"></td>
                 <td class="small" th:text="${item.serverName()}"></td>
                 <td class="small" th:text="${item.bucket()}"></td>
@@ -68,6 +81,30 @@
         </table>
     </div>
 
+    <!-- Batch Delete Modal -->
+    <div class="modal fade" id="cartDeleteModal" tabindex="-1" aria-labelledby="cartDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="cartDeleteModalLabel" th:text="#{cart.modal.delete.title}">Delete selected objects</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="cartDeleteCount" class="small mb-2"></div>
+                    <div id="cartDeleteError" class="alert alert-danger py-1 px-2 mb-2" style="display:none; font-size:0.82rem;"></div>
+                    <div id="cartDeleteResult" class="alert alert-success py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="cartDeleteConfirmBtn" th:text="#{btn.delete}">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <th:block th:replace="~{layout :: moveModal}"></th:block>
+
 </main>
 
 <footer th:replace="~{layout :: footer}"></footer>
@@ -75,6 +112,11 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script th:inline="javascript">
     const labelConfirmClear = /*[[#{cart.confirm.clear}]]*/ 'Clear all items from cart?';
+    const labelBatchCount      = /*[[#{cart.batch.count}]]*/ '{0} objects';
+    const labelBatchDeleteResult = /*[[#{cart.batch.deleteResult}]]*/ 'Deleted: {0}, failed: {1}.';
+    const labelOpError         = /*[[#{msg.opError}]]*/ 'Operation failed:';
+
+    let pendingCartDelete = null;
 
     function removeItem(btn) {
         const item = {
@@ -94,6 +136,101 @@
         fetch('/api/cart/clear', { method: 'POST' })
             .then(() => location.reload());
     }
+
+    function getSelectedCartItems() {
+        return Array.from(document.querySelectorAll('.cart-check:checked')).map(cb => ({
+            serverName: cb.dataset.server,
+            bucket:     cb.dataset.bucket,
+            key:        cb.dataset.key
+        }));
+    }
+
+    function updateCartActionButtons() {
+        const anyChecked = document.querySelectorAll('.cart-check:checked').length > 0;
+        document.getElementById('btnMoveSelected').disabled = !anyChecked;
+        document.getElementById('btnDeleteSelected').disabled = !anyChecked;
+    }
+
+    function toggleCartSelectAll(checked) {
+        document.querySelectorAll('.cart-check').forEach(cb => cb.checked = checked);
+        updateCartActionButtons();
+    }
+
+    function openCartDeleteModal() {
+        const items = getSelectedCartItems();
+        if (items.length === 0) return;
+        pendingCartDelete = items;
+        document.getElementById('cartDeleteCount').textContent =
+            labelBatchCount.replace('{0}', items.length);
+        const errEl = document.getElementById('cartDeleteError');
+        const resultEl = document.getElementById('cartDeleteResult');
+        errEl.style.display = 'none';
+        resultEl.style.display = 'none';
+        new bootstrap.Modal(document.getElementById('cartDeleteModal')).show();
+    }
+
+    async function confirmCartDelete() {
+        if (!pendingCartDelete) return;
+        const btn = document.getElementById('cartDeleteConfirmBtn');
+        btn.disabled = true;
+        const errEl = document.getElementById('cartDeleteError');
+        const resultEl = document.getElementById('cartDeleteResult');
+        try {
+            const res = await fetch('/api/cart/delete-selected', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pendingCartDelete)
+            });
+            const data = await res.json();
+            if (data.failed > 0) {
+                const failedItem = data.items.find(i => i.error);
+                errEl.textContent = labelOpError + ' ' + (failedItem ? failedItem.error : '');
+                errEl.style.display = 'block';
+            }
+            resultEl.textContent = labelBatchDeleteResult
+                .replace('{0}', data.deleted).replace('{1}', data.failed);
+            resultEl.style.display = 'block';
+            setTimeout(() => location.reload(), 1500);
+        } catch (e) {
+            errEl.textContent = labelOpError + ' ' + e.message;
+            errEl.style.display = 'block';
+            btn.disabled = false;
+        }
+    }
+
+    function openCartMoveModal() {
+        const items = getSelectedCartItems();
+        if (items.length === 0) return;
+        MoveModal.open({
+            title: /*[[#{cart.modal.move.title}]]*/ 'Move selected objects',
+            items: items,
+            endpoint: '/api/cart/move-selected',
+            makePayload: (toPrefix) => ({
+                serverName: items[0].serverName,
+                bucket: items[0].bucket,
+                toPrefix: toPrefix,
+                keys: items.map(i => i.key)
+            }),
+            handleResponse: (data, errEl, resultEl, btn) => {
+                if (data.failed > 0) {
+                    const failedItem = data.items.find(i => i.status === 'FAILED');
+                    resultEl.classList.add('alert-danger');
+                    resultEl.textContent = moveModalLabels.opError + ' ' + (failedItem ? failedItem.error : '');
+                } else {
+                    resultEl.textContent = moveModalLabels.result
+                        .replace('{0}', data.moved).replace('{1}', data.skipped)
+                        .replace('{2}', data.failed);
+                }
+                resultEl.style.display = 'block';
+                setTimeout(() => location.reload(), 1500);
+            }
+        });
+    }
+
+    document.getElementById('cartDeleteConfirmBtn').addEventListener('click', confirmCartDelete);
+    document.getElementById('cartDeleteModal').addEventListener('hidden.bs.modal', () => {
+        pendingCartDelete = null;
+    });
 </script>
 </body>
 </html>

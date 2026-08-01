@@ -84,4 +84,34 @@ public class S3Adapter implements S3StoragePort {
             return HeadObjectResult.notFound();
         }
     }
+
+    @Override
+    public boolean copyObject(String serverName, String sourceBucket, String sourceKey,
+                              String destinationBucket, String destinationKey, boolean overwrite) {
+        if (!overwrite && headObject(serverName, destinationBucket, destinationKey).exists()) {
+            return false;
+        }
+
+        S3Client client = registry.clientFor(serverName);
+
+        CopyObjectRequest request = CopyObjectRequest.builder()
+                .sourceBucket(sourceBucket)
+                .sourceKey(sourceKey)
+                .destinationBucket(destinationBucket)
+                .destinationKey(destinationKey)
+                .build();
+
+        try {
+            client.copyObject(request);
+            return true;
+        } catch (S3Exception e) {
+            throw e;
+        }
+    }
+
+    @Override
+    public void deleteObject(String serverName, String bucket, String key) {
+        S3Client client = registry.clientFor(serverName);
+        client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+    }
 }

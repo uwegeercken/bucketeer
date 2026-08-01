@@ -1,10 +1,12 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
+import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
+import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,17 +35,20 @@ public class BucketeerController {
     private final SessionContext sessionContext;
     private final DuckDbRepository duckDb;
     private final ThreadPoolTaskExecutor executor;
+    private final ActionHistory actionHistory;
 
     public BucketeerController(BucketeerUseCase bucketeerUseCase,
                                S3StoragePort s3StoragePort,
                                SessionContext sessionContext,
                                DuckDbRepository duckDb,
-                               ThreadPoolTaskExecutor executor) {
+                               ThreadPoolTaskExecutor executor,
+                               ActionHistory actionHistory) {
         this.bucketeerUseCase = bucketeerUseCase;
         this.s3StoragePort    = s3StoragePort;
         this.sessionContext   = sessionContext;
         this.duckDb           = duckDb;
         this.executor         = executor;
+        this.actionHistory    = actionHistory;
     }
 
     @GetMapping("/")
@@ -301,4 +307,69 @@ public class BucketeerController {
             in.transferTo(response.getOutputStream());
         }
     }
+
+    @PostMapping(value = "/api/object/delete", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> deleteObject(@RequestBody ObjectDeleteRequest req, HttpSession session) {
+        if (req == null || !StringUtils.hasText(req.bucket()) || !StringUtils.hasText(req.key())) {
+            return Map.of("ok", false, "error", "Bucket and key are required");
+        }
+        String server = resolveServer(req.serverName());
+        try {
+            bucketeerUseCase.deleteObject(server, req.bucket(), req.key());
+            duckDb.deleteByKey(req.bucket(), req.key());
+            CartController.removeItem(session, server, req.bucket(), req.key());
+            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.RESULTS,
+                    null, server, req.bucket(), req.key(), null, ActionEntry.Status.DELETED, null));
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            log.error("Delete failed for {}/{}: {}", req.bucket(), req.key(), e.getMessage());
+            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.RESULTS,
+                    null, server, req.bucket(), req.key(), null, ActionEntry.Status.FAILED, e.getMessage()));
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping(value = "/api/object/move", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> moveObject(@RequestBody ObjectMoveRequest req, HttpSession session) {
+        if (req == null || !StringUtils.hasText(req.bucket())
+                || !StringUtils.hasText(req.sourceKey()) || !StringUtils.hasText(req.toPrefix())) {
+            return Map.of("ok", false, "error", "Bucket, source key and target prefix are required");
+        }
+        String server = resolveServer(req.serverName());
+        String targetKey = CartController.targetKey(req.sourceKey(), req.toPrefix());
+        if (targetKey.equals(req.sourceKey())) {
+            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.RESULTS,
+                    null, server, req.bucket(), req.sourceKey(), targetKey,
+                    ActionEntry.Status.SKIPPED, "Target equals source"));
+            return Map.of("ok", true, "skipped", true, "sameKey", true);
+        }
+        try {
+            boolean moved = bucketeerUseCase.moveObject(server, req.bucket(), req.sourceKey(), targetKey);
+            duckDb.deleteByKey(req.bucket(), req.sourceKey());
+            CartController.removeItem(session, server, req.bucket(), req.sourceKey());
+            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.RESULTS,
+                    null, server, req.bucket(), req.sourceKey(), targetKey,
+                    moved ? ActionEntry.Status.MOVED : ActionEntry.Status.SKIPPED, null));
+            return Map.of("ok", true, "skipped", !moved);
+        } catch (Exception e) {
+            log.error("Move failed for {}/{}: {}", req.bucket(), req.sourceKey(), e.getMessage());
+            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.RESULTS,
+                    null, server, req.bucket(), req.sourceKey(), targetKey,
+                    ActionEntry.Status.FAILED, e.getMessage()));
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    private String resolveServer(String serverName) {
+        if (StringUtils.hasText(serverName)) {
+            return serverName;
+        }
+        return sessionContext.getSelectedServer();
+    }
+
+    public record ObjectDeleteRequest(String serverName, String bucket, String key) {}
+
+    public record ObjectMoveRequest(String serverName, String bucket, String sourceKey, String toPrefix) {}
 }
