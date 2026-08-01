@@ -139,6 +139,10 @@
                                 th:text="#{tools.ts.toDate}">Timestamp (ms) → Date</button>
                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('date2ts')"
                                 th:text="#{tools.date.toTs}">Date → Timestamp (ms)</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('jsonpretty')"
+                                th:text="#{tools.json.pretty}">JSON Pretty</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('jsonmin')"
+                                th:text="#{tools.json.minify}">JSON Minify</button>
                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('sha256')"
                                 th:text="#{tools.hash.sha256}">SHA-256</button>
                     </div>
@@ -187,6 +191,12 @@
                 if (!input) { errEl.textContent = msg.errorEmpty; errEl.style.display = 'block'; return; }
 
                 try {
+                    if (action === 'jsonpretty' || action === 'jsonmin') {
+                        var parsed = JSON.parse(input);
+                        document.getElementById('toolsOutput').value =
+                            action === 'jsonpretty' ? JSON.stringify(parsed, null, 2) : JSON.stringify(parsed);
+                        return;
+                    }
                     var lines = input.split('\n');
                     if (action === 'sha256') {
                         var promises = lines.map(function(line) {

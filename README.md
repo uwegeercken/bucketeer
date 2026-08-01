@@ -357,6 +357,7 @@ Snapshots save the complete result set of a query (all objects under the searche
 - The search history size can be configured in **Settings** (`/settings`)
 - Default: 50 entries, configurable up to 500
 - Set to 0 to disable history tracking
+- The **Name contains** result filter keeps its own history (last 20 terms by default); its size is configured separately in **Settings** (`/settings`)
 
 ---
 
@@ -399,9 +400,11 @@ The Tools modal (wrench icon in the navbar) provides quick encoding, decoding an
 | **URL Decode** | Decodes URL-encoded text |
 | **Timestamp (ms) → Date** | Converts Unix timestamps (milliseconds) to local time, format `yyyy-MM-dd HH:mm:ss.SSS` |
 | **Date → Timestamp (ms)** | Converts `yyyy-MM-dd HH:mm:ss[.SSS]` (local time) to a Unix timestamp in milliseconds |
+| **JSON Pretty** | Formats/indents JSON input |
+| **JSON Minify** | Compacts JSON into a single line |
 | **SHA-256** | Computes the SHA-256 hex digest |
 
-**Multi-line input:** Each line is processed independently. Results are joined with newlines, so you can encode/decode/hash multiple values at once. Timestamp conversion accepts optional milliseconds (`.SSS`); values without them are treated as `000`.
+**Multi-line input:** Each line is processed independently. Results are joined with newlines, so you can encode/decode/hash multiple values at once. Timestamp conversion accepts optional milliseconds (`.SSS`); values without them are treated as `000`. JSON operations process the whole input (e.g. a pretty-printed multi-line JSON).
 
 ---
 

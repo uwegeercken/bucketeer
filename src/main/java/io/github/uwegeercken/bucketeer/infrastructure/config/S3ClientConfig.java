@@ -28,7 +28,7 @@ public class S3ClientConfig {
                 log.info("Loading S3 servers from ~/.bucketeer/servers.json");
                 registry.reload(repository.loadAll());
             } catch (Exception e) {
-                log.error("Failed to load server config: {}", e.getMessage(), e);
+                log.error("Failed to load server config: {}", e.getMessage());
                 log.warn("Starting with empty server list. Use /config to add servers.");
             }
         } else {

@@ -48,11 +48,11 @@ public class SnapshotRepository {
                 try {
                     metas.add(SnapshotMeta.readMeta(file));
                 } catch (IOException e) {
-                    log.warn("Skipping corrupt snapshot meta: {}", file.getFileName(), e);
+                    log.error("Skipping corrupt snapshot meta: {}: {}", file.getFileName(), e.getMessage());
                 }
             }
         } catch (IOException e) {
-            log.warn("Failed to list snapshots: {}", e.getMessage());
+            log.error("Failed to list snapshots: {}", e.getMessage());
         }
         metas.sort((a, b) -> b.createdAt().compareTo(a.createdAt()));
         return metas;

@@ -244,13 +244,17 @@
     const STORAGE_KEY  = 'bucketeer_favorites';
     const HISTORY_KEY  = 'bucketeer_history';
     const FILTER_HISTORY_KEY = 'bucketeer_filter_history';
-    const FILTER_HISTORY_MAX = 20;
-    const HISTORY_MAX  = (() => {
+    const SETTINGS_KEY = 'bucketeer_settings';
+
+    function settingsValue(key, fallback) {
         try {
             const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-            return s.historyMax !== undefined && s.historyMax >= 0 && s.historyMax <= 500 ? s.historyMax : 50;
-        } catch { return 50; }
-    })();
+            return s[key] !== undefined && s[key] >= 0 && s[key] <= 500 ? s[key] : fallback;
+        } catch { return fallback; }
+    }
+
+    const FILTER_HISTORY_MAX = settingsValue('filterHistoryMax', 20);
+    const HISTORY_MAX  = settingsValue('historyMax', 50);
 
     // --- Bucket dropdown ---
 
@@ -637,7 +641,6 @@
     let currentPage  = 0;
     let sortBy       = 'key';
     let sortDir      = 'asc';
-    const SETTINGS_KEY = 'bucketeer_settings';
     const PAGE_SIZE  = (() => {
         try {
             const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');

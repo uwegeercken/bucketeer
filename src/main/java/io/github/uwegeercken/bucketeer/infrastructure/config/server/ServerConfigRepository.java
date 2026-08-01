@@ -50,7 +50,7 @@ public class ServerConfigRepository {
                     "Please re-enter credentials via /config: {}", e.getMessage());
             return List.of();
         } catch (IOException e) {
-            log.error("Failed to load server config from {}: {}", configPath, e.getMessage(), e);
+            log.error("Failed to load server config from {}: {}", configPath, e.getMessage());
             return List.of();
         }
     }

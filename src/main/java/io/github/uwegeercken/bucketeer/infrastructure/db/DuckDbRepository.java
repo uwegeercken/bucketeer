@@ -63,7 +63,7 @@ public class DuckDbRepository {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("DELETE FROM objects");
         } catch (SQLException e) {
-            log.error("Failed to clear objects table: {}", e.getMessage(), e);
+            log.error("Failed to clear objects table: {}", e.getMessage());
         }
     }
 
@@ -82,7 +82,7 @@ public class DuckDbRepository {
             }
             ps.executeBatch();
         } catch (SQLException e) {
-            log.error("Failed to insert objects batch: {}", e.getMessage(), e);
+            log.error("Failed to insert objects batch: {}", e.getMessage());
         }
     }
 
@@ -92,7 +92,7 @@ public class DuckDbRepository {
              ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM objects")) {
             return rs.next() ? rs.getLong(1) : 0;
         } catch (SQLException e) {
-            log.error("Failed to count objects: {}", e.getMessage(), e);
+            log.error("Failed to count objects: {}", e.getMessage());
             return 0;
         }
     }
@@ -165,7 +165,7 @@ public class DuckDbRepository {
                 }
             }
         } catch (SQLException e) {
-            log.error("Failed to query objects: {}", e.getMessage(), e);
+            log.error("Failed to query objects: {}", e.getMessage());
         }
         return results;
     }
@@ -219,8 +219,8 @@ public class DuckDbRepository {
             ps.execute();
             return queryCount(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
         } catch (SQLException e) {
-            log.error("Failed to export to Parquet: {}", e.getMessage(), e);
-            throw new RuntimeException("Parquet export failed: " + e.getMessage(), e);
+            log.error("Failed to export to Parquet: {}", e.getMessage());
+            throw new RuntimeException("Parquet export failed: " + e.getMessage());
         }
     }
     /** Exports all current objects to a Parquet file (for snapshot creation). */
@@ -231,8 +231,8 @@ public class DuckDbRepository {
             stmt.execute(sql);
             return count();
         } catch (SQLException e) {
-            log.error("Failed to export all to Parquet: {}", e.getMessage(), e);
-            throw new RuntimeException("Parquet export failed: " + e.getMessage(), e);
+            log.error("Failed to export all to Parquet: {}", e.getMessage());
+            throw new RuntimeException("Parquet export failed: " + e.getMessage());
         }
     }
 
@@ -271,8 +271,8 @@ public class DuckDbRepository {
 
             return new DiffResult(added, removed, changed);
         } catch (SQLException e) {
-            log.error("Failed to compare with snapshot: {}", e.getMessage(), e);
-            throw new RuntimeException("Snapshot comparison failed: " + e.getMessage(), e);
+            log.error("Failed to compare with snapshot: {}", e.getMessage());
+            throw new RuntimeException("Snapshot comparison failed: " + e.getMessage());
         }
     }
 
@@ -316,8 +316,8 @@ public class DuckDbRepository {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
         } catch (SQLException e) {
-            log.error("Failed to export diff to CSV: {}", e.getMessage(), e);
-            throw new RuntimeException("Diff export failed: " + e.getMessage(), e);
+            log.error("Failed to export diff to CSV: {}", e.getMessage());
+            throw new RuntimeException("Diff export failed: " + e.getMessage());
         }
     }
 
@@ -355,8 +355,8 @@ public class DuckDbRepository {
 
             return new DiffResult(added, removed, changed);
         } catch (SQLException e) {
-            log.error("Failed to compare snapshots: {}", e.getMessage(), e);
-            throw new RuntimeException("Snapshot comparison failed: " + e.getMessage(), e);
+            log.error("Failed to compare snapshots: {}", e.getMessage());
+            throw new RuntimeException("Snapshot comparison failed: " + e.getMessage());
         }
     }
 
@@ -382,8 +382,8 @@ public class DuckDbRepository {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
         } catch (SQLException e) {
-            log.error("Failed to export diff to CSV: {}", e.getMessage(), e);
-            throw new RuntimeException("Diff export failed: " + e.getMessage(), e);
+            log.error("Failed to export diff to CSV: {}", e.getMessage());
+            throw new RuntimeException("Diff export failed: " + e.getMessage());
         }
     }
 
@@ -427,7 +427,7 @@ public class DuckDbRepository {
                 return rs.next() ? rs.getLong(1) : 0;
             }
         } catch (SQLException e) {
-            log.error("Failed to count filtered objects: {}", e.getMessage(), e);
+            log.error("Failed to count filtered objects: {}", e.getMessage());
             return 0;
         }
     }

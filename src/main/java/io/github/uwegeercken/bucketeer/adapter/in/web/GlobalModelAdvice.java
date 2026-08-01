@@ -2,6 +2,8 @@ package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -9,6 +11,8 @@ import java.util.List;
 
 @ControllerAdvice
 public class GlobalModelAdvice {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalModelAdvice.class);
 
     private final BucketeerUseCase bucketeerUseCase;
     private final SessionContext sessionContext;
@@ -27,6 +31,7 @@ public class GlobalModelAdvice {
         try {
             return bucketeerUseCase.serverNames();
         } catch (Exception e) {
+            log.error("Failed to load server names: {}", e.getMessage());
             return List.of();
         }
     }
@@ -38,7 +43,9 @@ public class GlobalModelAdvice {
             if (sessionContext.getSelectedServer() == null && !names.isEmpty()) {
                 sessionContext.setSelectedServer(names.getFirst());
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            log.error("Failed to determine selected server: {}", e.getMessage());
+        }
         return sessionContext.getSelectedServer();
     }
 

@@ -69,7 +69,7 @@ public class SnapshotController {
             duckDb.exportAllToParquet(parquetPath.toString());
             snapshotRepo.save(meta);
         } catch (IOException e) {
-            log.error("Failed to save snapshot: {}", e.getMessage(), e);
+            log.error("Failed to save snapshot: {}", e.getMessage());
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Failed to save snapshot: " + e.getMessage()));
         }
@@ -139,7 +139,7 @@ public class SnapshotController {
                     "removed",       diff.removed(),
                     "changed",       diff.changed()));
         } catch (Exception e) {
-            log.error("Failed to compare snapshots {} and {}: {}", ids.get(0), ids.get(1), e.getMessage(), e);
+            log.error("Failed to compare snapshots {} and {}: {}", ids.get(0), ids.get(1), e.getMessage());
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Comparison failed: " + e.getMessage()));
         }
@@ -175,7 +175,7 @@ public class SnapshotController {
                     .contentType(MediaType.parseMediaType("text/csv"))
                     .body(resource);
         } catch (Exception e) {
-            log.error("Failed to export diff: {}", e.getMessage(), e);
+            log.error("Failed to export diff: {}", e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -216,7 +216,7 @@ public class SnapshotController {
             Runtime.getRuntime().exec(cmd);
             return ResponseEntity.ok(Map.of("ok", true));
         } catch (Exception e) {
-            log.error("Failed to reveal file: {}", e.getMessage(), e);
+            log.error("Failed to reveal file: {}", e.getMessage());
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Failed to open file manager: " + e.getMessage()));
         }

@@ -36,7 +36,7 @@ public class S3ClientRegistry {
         try {
             clients.values().forEach(c -> {
                 try { c.close(); } catch (Exception e) {
-                    log.warn("Error closing S3 client: {}", e.getMessage());
+                    log.error("Error closing S3 client: {}", e.getMessage());
                 }
             });
             Map<String, S3Client> newClients = new LinkedHashMap<>();

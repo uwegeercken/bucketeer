@@ -57,9 +57,11 @@ public class ServerConfigService {
             log.info("Connection test for '{}' succeeded: {} bucket(s)", server.name(), buckets.size());
             return null;
         } catch (S3Exception e) {
+            log.error("Connection test for '{}' failed: {}", server.name(), e.awsErrorDetails().errorMessage());
             return "S3 error: " + e.awsErrorDetails().errorMessage()
                     + " (Code: " + e.awsErrorDetails().errorCode() + ")";
         } catch (Exception e) {
+            log.error("Connection test for '{}' failed: {}", server.name(), e.getMessage());
             return "Connection failed: " + e.getMessage();
         }
     }

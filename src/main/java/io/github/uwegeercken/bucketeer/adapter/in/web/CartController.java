@@ -147,7 +147,7 @@ public class CartController {
                 zos.closeEntry();
             }
         } catch (Exception e) {
-            log.error("Failed to create zip download: {}", e.getMessage(), e);
+            log.error("Failed to create zip download: {}", e.getMessage());
         }
     }
 

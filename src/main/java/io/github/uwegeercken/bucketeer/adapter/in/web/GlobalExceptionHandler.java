@@ -41,20 +41,20 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(S3Exception.class)
     public ModelAndView handleS3Exception(S3Exception ex, HttpServletRequest request) {
-        log.error("S3 error: {}", ex.awsErrorDetails().errorMessage(), ex);
+        log.error("S3 error: {}", ex.awsErrorDetails().errorMessage());
         return errorView("S3 Fehler: " + ex.awsErrorDetails().errorMessage()
                 + " (Code: " + ex.awsErrorDetails().errorCode() + ")", request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ModelAndView handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
-        log.error("Invalid argument: {}", ex.getMessage(), ex);
+        log.error("Invalid argument: {}", ex.getMessage());
         return errorView(ex.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)
     public ModelAndView handleGeneral(Exception ex, HttpServletRequest request) {
-        log.error("Unexpected error: {}", ex.getMessage(), ex);
+        log.error("Unexpected error: {}", ex.getMessage());
         return errorView("Unerwarteter Fehler: " + ex.getMessage(), request);
     }
 

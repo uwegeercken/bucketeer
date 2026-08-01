@@ -114,6 +114,7 @@ public class BucketeerController {
                     });
                     qc.done();
                 } catch (Exception e) {
+                    log.error("Query failed for server {}/{}: {}", finalServer, finalBucket, e.getMessage());
                     qc.error(e.getMessage());
                 }
             });
@@ -146,7 +147,7 @@ public class BucketeerController {
         try {
             return bucketeerUseCase.listBuckets(server);
         } catch (Exception e) {
-            log.warn("Failed to list buckets for server {}: {}", server, e.getMessage());
+            log.error("Failed to list buckets for server {}: {}", server, e.getMessage());
             return List.of();
         }
     }
@@ -244,7 +245,7 @@ public class BucketeerController {
         } finally {
             // delete temp file after streaming
             try { java.nio.file.Files.deleteIfExists(exportPath); }
-            catch (IOException e) { log.warn("Could not delete export file: {}", exportPath); }
+            catch (IOException e) { log.error("Could not delete export file: {}: {}", exportPath, e.getMessage()); }
         }
     }
 
@@ -258,6 +259,7 @@ public class BucketeerController {
         try {
             return bucketeerUseCase.resolveTemplate(prefix, key, bucket);
         } catch (Exception e) {
+            log.error("Failed to resolve prefix '{}': {}", prefix, e.getMessage());
             return "";
         }
     }

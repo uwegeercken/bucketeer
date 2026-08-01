@@ -46,7 +46,7 @@ public class AppSettings {
             Object val = data.get("snapshotRetentionDays");
             if (val instanceof Number n) snapshotRetentionDays = n.intValue();
         } catch (IOException e) {
-            log.warn("Failed to load settings from {}: {}", SETTINGS_PATH, e.getMessage());
+            log.error("Failed to load settings from {}: {}", SETTINGS_PATH, e.getMessage());
         }
     }
 

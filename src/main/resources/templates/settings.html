@@ -46,6 +46,21 @@
             </div>
         </div>
 
+        <div class="mb-4">
+            <label class="form-label fw-semibold small" th:text="#{settings.filterHistoryMax.label}">
+                Filter history size (entries)
+            </label>
+            <div class="d-flex align-items-center gap-3">
+                <input type="number" id="filterHistoryMaxInput"
+                       class="form-control form-control-sm"
+                       style="width: 100px;"
+                       min="0" max="500" step="10"/>
+                <span class="text-muted small" th:text="#{settings.filterHistoryMax.hint}">
+                    Max entries in filter history. 0 = disabled.
+                </span>
+            </div>
+        </div>
+
         <div class="panel-title mt-4" th:text="#{settings.section.snapshots}">Snapshots</div>
 
         <div class="mb-4">
@@ -83,6 +98,7 @@
     const DEFAULT_PAGE_SIZE = 100;
     const DEFAULT_RETENTION_DAYS = 30;
     const DEFAULT_HISTORY_MAX = 50;
+    const DEFAULT_FILTER_HISTORY_MAX = 20;
 
     function loadSettings() {
         try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); }
@@ -93,6 +109,7 @@
         const pageSize = parseInt(document.getElementById('pageSizeInput').value, 10);
         const retentionDays = parseInt(document.getElementById('retentionDaysInput').value, 10);
         const historyMax = parseInt(document.getElementById('historyMaxInput').value, 10);
+        const filterHistoryMax = parseInt(document.getElementById('filterHistoryMaxInput').value, 10);
 
         let valid = true;
         if (isNaN(pageSize) || pageSize < 10 || pageSize > 1000) {
@@ -116,12 +133,20 @@
             document.getElementById('historyMaxInput').classList.remove('is-invalid');
         }
 
+        if (isNaN(filterHistoryMax) || filterHistoryMax < 0 || filterHistoryMax > 500) {
+            document.getElementById('filterHistoryMaxInput').classList.add('is-invalid');
+            valid = false;
+        } else {
+            document.getElementById('filterHistoryMaxInput').classList.remove('is-invalid');
+        }
+
         if (!valid) return;
 
         // Save client-side settings to localStorage
         const settings = loadSettings();
         settings.pageSize = pageSize;
         settings.historyMax = historyMax;
+        settings.filterHistoryMax = filterHistoryMax;
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 
         // Save retention days to server
@@ -141,9 +166,11 @@
         document.getElementById('pageSizeInput').value = DEFAULT_PAGE_SIZE;
         document.getElementById('retentionDaysInput').value = DEFAULT_RETENTION_DAYS;
         document.getElementById('historyMaxInput').value = DEFAULT_HISTORY_MAX;
+        document.getElementById('filterHistoryMaxInput').value = DEFAULT_FILTER_HISTORY_MAX;
         document.getElementById('pageSizeInput').classList.remove('is-invalid');
         document.getElementById('retentionDaysInput').classList.remove('is-invalid');
         document.getElementById('historyMaxInput').classList.remove('is-invalid');
+        document.getElementById('filterHistoryMaxInput').classList.remove('is-invalid');
 
         fetch('/api/settings', {
             method: 'POST',
@@ -156,6 +183,7 @@
         const settings = loadSettings();
         document.getElementById('pageSizeInput').value = settings.pageSize || DEFAULT_PAGE_SIZE;
         document.getElementById('historyMaxInput').value = settings.historyMax ?? DEFAULT_HISTORY_MAX;
+        document.getElementById('filterHistoryMaxInput').value = settings.filterHistoryMax ?? DEFAULT_FILTER_HISTORY_MAX;
 
         fetch('/api/settings')
             .then(r => r.json())
