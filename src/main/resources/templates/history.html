@@ -37,6 +37,7 @@
                 <thead class="table-secondary">
                 <tr>
                     <th th:text="#{history.time}">Time</th>
+                    <th th:text="#{history.batch}">Batch</th>
                     <th th:text="#{history.status}">Status</th>
                     <th th:text="#{history.server}">Server</th>
                     <th th:text="#{history.bucket}">Bucket</th>
@@ -47,6 +48,7 @@
                 <tbody>
                 <tr th:each="row : ${historyRows}">
                     <td class="small" th:text="${row.time}"></td>
+                    <td class="small" th:text="${row.batchId}"></td>
                     <td class="small"
                         th:classappend="${row.status == 'failed' ? 'text-danger' : (row.status == 'skipped' ? 'text-warning' : '')}"
                         th:text="#{|history.status.${row.status}|}"></td>

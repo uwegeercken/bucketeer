@@ -481,5 +481,13 @@ public class Md5Function implements TemplateFunction {
 
 Usage in template: `data/{md5(key)}/{key}/`
 
+## Miscellaneous
+
+Some keys are Easter eggs.
+
+Manche Schlüssel sind Ostereier.
+
+Algunas claves son huevos de pascua.
+
 ## Last update
-last update uwe.geercken@web.de - 2026-08-01
+last update uwe.geercken@web.de - 2026-08-02

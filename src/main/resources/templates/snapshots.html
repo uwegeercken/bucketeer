@@ -82,6 +82,14 @@
     let diffId2 = null;
     let snapshotsData = [];
 
+    function formatDateTime(value) {
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return '';
+        const p = (n) => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+            + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    }
+
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
@@ -120,7 +128,7 @@
                         + '<td class="small">' + escHtml(s.serverName) + '</td>'
                         + '<td class="small">' + escHtml(s.bucket) + '</td>'
                         + '<td class="small font-monospace text-break">' + escHtml(s.prefix) + '</td>'
-                        + '<td class="small">' + new Date(s.createdAt).toLocaleString() + '</td>'
+                        + '<td class="small">' + formatDateTime(s.createdAt) + '</td>'
                         + '<td class="text-end small">' + s.rowCount + '</td>'
                         + '<td class="d-flex gap-1">'
                         + '<button class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelSnapshotReveal) + ': ' + escHtml(s.fileName) + '" onclick="revealSnapshot(\'' + s.id + '\')"><i class="bi bi-folder2-open"></i></button>'

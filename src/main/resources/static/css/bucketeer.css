@@ -188,3 +188,72 @@ footer {
     background: var(--bs-tertiary-bg);
     border-color: var(--bs-border-color);
 }
+
+/* ============================================================
+   Easter Egg (secret key → confetti + eggs)
+   ============================================================ */
+#easterEggOverlay {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 2000;
+}
+#easterEggOverlay.dismissable { pointer-events: auto; }
+
+.confetti-particle {
+    position: absolute;
+    top: -5vh;
+    border-radius: 2px;
+    opacity: 0.95;
+}
+.egg-particle {
+    position: absolute;
+    top: -8vh;
+    width: 22px;
+    height: 30px;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    box-shadow: inset -3px -4px 6px rgba(0, 0, 0, 0.18), inset 2px 3px 4px rgba(255, 255, 255, 0.35);
+}
+.egg-message {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 1rem;
+    opacity: 0;
+    font-size: clamp(1.5rem, 4.5vw, 3.2rem);
+    font-weight: 800;
+    color: #2aa876;
+    white-space: pre-line;
+    text-shadow: 0 2px 0 #fff, 0 4px 12px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    animation: eggMessageShow 4s ease 5s forwards;
+}
+[data-bs-theme="dark"] .egg-message {
+    color: #8ff0c9;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes eggFall {
+    0%   { transform: translateY(0) rotate(0deg); }
+    10%  { transform: translateY(8vh) rotate(12deg) translateX(6px); }
+    45%  { transform: translateY(45vh) rotate(-18deg) translateX(-10px); }
+    80%  { transform: translateY(85vh) rotate(14deg) translateX(8px); }
+    100% { transform: translateY(112vh) rotate(-8deg) translateX(0); }
+}
+@keyframes confettiFall {
+    0%   { transform: translateY(0) rotate(0deg) translateX(0); }
+    25%  { transform: translateY(25vh) rotate(90deg) translateX(14px); }
+    50%  { transform: translateY(55vh) rotate(180deg) translateX(-12px); }
+    75%  { transform: translateY(80vh) rotate(270deg) translateX(10px); }
+    100% { transform: translateY(115vh) rotate(360deg) translateX(0); }
+}
+@keyframes eggMessageShow {
+    0%   { opacity: 0; transform: scale(0.85); }
+    12%  { opacity: 1; transform: scale(1); }
+    78%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.95); }
+}

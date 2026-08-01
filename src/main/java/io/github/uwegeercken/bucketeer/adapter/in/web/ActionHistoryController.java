@@ -79,6 +79,7 @@ public class ActionHistoryController {
         return Map.of(
                 "time",      e.timestamp().atZone(java.time.ZoneId.systemDefault())
                         .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                "batchId",   e.batchId() != null ? e.batchId() : "",
                 "status",    statusKey(e.status()),
                 "server",    e.server(),
                 "bucket",    e.bucket(),

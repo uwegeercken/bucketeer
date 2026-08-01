@@ -413,7 +413,11 @@
                         body: JSON.stringify(config.makePayload(toPrefix))
                     });
                     const data = await res.json();
-                    await config.handleResponse(data, errEl, resultEl, btn);
+                    const success = await config.handleResponse(data, errEl, resultEl, btn);
+                    if (success && typeof window.addMoveToHistory === 'function') {
+                        const first = config.items[0];
+                        if (first) window.addMoveToHistory(first.serverName, first.bucket, toPrefix);
+                    }
                 } catch (e) {
                     errEl.textContent = moveModalLabels.opError + ' ' + e.message;
                     errEl.style.display = 'block';
@@ -441,5 +445,25 @@
 
             return { open };
         })();
+
+        window.addMoveToHistory = function(server, bucket, prefix) {
+            if (!server || !bucket || !prefix) return;
+            let settings = {};
+            try { settings = JSON.parse(localStorage.getItem('bucketeer_settings') || '{}'); } catch (e) {}
+            let max = settings.historyMax !== undefined ? settings.historyMax : 50;
+            max = Math.max(0, Math.min(max, 500));
+            if (max <= 0) return;
+            let list;
+            try { list = JSON.parse(localStorage.getItem('bucketeer_history') || '[]'); } catch (e) { list = []; }
+            const combo = { server: server, bucket: bucket, prefix: prefix, key: '' };
+            const idx = list.findIndex(e =>
+                e.server === combo.server && e.bucket === combo.bucket &&
+                e.prefix === combo.prefix && e.key === combo.key);
+            if (idx >= 0) list.splice(idx, 1);
+            list.unshift(combo);
+            if (list.length > max) list.length = max;
+            localStorage.setItem('bucketeer_history', JSON.stringify(list));
+            if (typeof window.refreshComboDropdown === 'function') window.refreshComboDropdown();
+        };
     </script>
 </th:block>

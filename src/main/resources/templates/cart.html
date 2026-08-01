@@ -42,7 +42,7 @@
         <div th:if="${!cartItems.isEmpty()}" class="mb-2">
             <span class="text-muted small" th:text="#{cart.itemCount(${cartItems.size()})}"></span>
             &mdash;
-            <span class="text-muted small" th:text="#{cart.totalSize(${totalSizeKb})}"></span>
+            <span class="text-muted small" th:text="#{cart.totalSize(${totalSize})}"></span>
         </div>
 
         <table th:if="${!cartItems.isEmpty()}" class="table table-sm table-hover table-bordered mb-0 results-table">
@@ -223,6 +223,7 @@
                 }
                 resultEl.style.display = 'block';
                 setTimeout(() => location.reload(), 1500);
+                return data.failed === 0;
             }
         });
     }

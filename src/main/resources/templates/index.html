@@ -40,7 +40,7 @@
             <button class="btn btn-sm btn-outline-secondary btn-icon" id="addFavBtn"
                     th:title="#{btn.addFavorite}"><i class="bi bi-bookmark-plus"></i></button>
         </div>
-        <form method="get" action="/" id="searchForm" class="pb-2" onsubmit="saveFormState();addToHistory();setMaxObjectsInput();sessionStorage.removeItem('bkt_sort_by');sessionStorage.removeItem('bkt_sort_dir');sortBy='key';sortDir='asc';">
+        <form method="get" action="/" id="searchForm" class="pb-2" onsubmit="return handleFormSubmit();">
             <input type="hidden" name="search" value="true"/>
             <input type="hidden" name="maxObjects" id="maxObjectsInput"/>
             <div class="row g-2 align-items-end">
@@ -1113,6 +1113,7 @@
                     bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
                     await loadResults();
                     updateCartBadge();
+                    return true;
                 } else {
                     errEl.textContent = moveModalLabels.opError + ' ' + (data.error || '');
                     errEl.style.display = 'block';
@@ -1120,6 +1121,88 @@
                 }
             }
         });
+    }
+
+    // --- Easter Egg ---
+    const SECRET_KEYS = ['osterei', 'easteregg', 'huevo de pascua'];
+    const EGG_COLORS = [
+        'radial-gradient(circle at 35% 30%, #f8bbd0, #f06292)',
+        'radial-gradient(circle at 35% 30%, #bbdefb, #42a5f5)',
+        'radial-gradient(circle at 35% 30%, #c8e6c9, #66bb6a)',
+        'radial-gradient(circle at 35% 30%, #fff9c4, #ffee58)',
+        'radial-gradient(circle at 35% 30%, #e1bee7, #ab47bc)'
+    ];
+    const CONFETTI_COLORS = ['#f44336', '#ff9800', '#ffeb3b', '#4caf50', '#2196f3', '#9c27b0', '#00bcd4', '#e91e63'];
+
+    function handleFormSubmit() {
+        const key = document.getElementById('keyInput').value.trim().toLowerCase();
+        if (SECRET_KEYS.includes(key)) {
+            launchEasterEgg();
+            return false;
+        }
+        saveFormState();
+        addToHistory();
+        setMaxObjectsInput();
+        sessionStorage.removeItem('bkt_sort_by');
+        sessionStorage.removeItem('bkt_sort_dir');
+        sortBy = 'key';
+        sortDir = 'asc';
+        return true;
+    }
+
+    function checkEasterEgg() {
+        const key = document.getElementById('keyInput').value.trim().toLowerCase();
+        if (SECRET_KEYS.includes(key)) {
+            launchEasterEgg();
+        }
+    }
+
+    function launchEasterEgg() {
+        removeEasterEggOverlay();
+        const overlay = document.createElement('div');
+        overlay.id = 'easterEggOverlay';
+        document.body.appendChild(overlay);
+
+        for (let i = 0; i < 120; i++) {
+            const p = document.createElement('div');
+            p.className = 'confetti-particle';
+            const w = 5 + Math.random() * 6;
+            const h = 8 + Math.random() * 8;
+            p.style.width = w + 'px';
+            p.style.height = h + 'px';
+            p.style.left = (Math.random() * 100) + 'vw';
+            p.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+            p.style.animation = 'confettiFall ' + (4.6 + Math.random() * 2.4) + 's linear ' +
+                (Math.random() * 2.5) + 's forwards';
+            overlay.appendChild(p);
+        }
+
+        for (let i = 0; i < 20; i++) {
+            const p = document.createElement('div');
+            p.className = 'egg-particle';
+            const scale = 0.7 + Math.random() * 0.9;
+            p.style.width  = (22 * scale) + 'px';
+            p.style.height = (30 * scale) + 'px';
+            p.style.left = (Math.random() * 98) + 'vw';
+            p.style.background = EGG_COLORS[i % EGG_COLORS.length];
+            p.style.animation = 'eggFall ' + (5.4 + Math.random() * 2.2) + 's ease-in ' +
+                (Math.random() * 2.0) + 's forwards';
+            overlay.appendChild(p);
+        }
+
+        const msg = document.createElement('div');
+        msg.className = 'egg-message';
+        msg.textContent = 'Bucketeer hoppelt\ndurch Deine Buckets';
+        overlay.appendChild(msg);
+
+        setTimeout(() => overlay.classList.add('dismissable'), 6000);
+        overlay.addEventListener('click', removeEasterEggOverlay, { once: true });
+        setTimeout(removeEasterEggOverlay, 9500);
+    }
+
+    function removeEasterEggOverlay() {
+        const overlay = document.getElementById('easterEggOverlay');
+        if (overlay) overlay.remove();
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1131,6 +1214,7 @@
         loadBuckets(currentBucket).then(() => {
             restoreFormState();
             updateResolvedPrefix();
+            checkEasterEgg();
             startPolling();
             updateCartBadge();
         });

@@ -17,7 +17,7 @@
     <packaging>jar</packaging>
 
     <name>bucketeer</name>
-    <description>A web-based S3 object browser supporting listing, filtering, download, snapshots and favorites</description>
+    <description>A web-based S3 object browser supporting listing, filtering, moving, deleting, collecting, download, snapshots and favorites</description>
     <url>https://github.com/uwegeercken/bucketeer</url>
 
     <licenses>

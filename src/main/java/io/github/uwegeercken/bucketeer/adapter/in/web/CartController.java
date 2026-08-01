@@ -240,9 +240,16 @@ public class CartController {
         List<CartItem> cart = getCart(session);
         model.addAttribute("cartItems", cart);
         long totalBytes = cart.stream().mapToLong(CartItem::sizeBytes).sum();
-        model.addAttribute("totalSizeKb", String.format("%.2f", totalBytes / 1024.0));
+        model.addAttribute("totalSize", formatSize(totalBytes));
         model.addAttribute("backUrl", "/");
         return "cart";
+    }
+
+    private static String formatSize(long bytes) {
+        if (bytes >= 1024L * 1024) {
+            return String.format("%.2f MB", bytes / (1024.0 * 1024.0));
+        }
+        return String.format("%.2f KB", bytes / 1024.0);
     }
 
     @GetMapping("/cart/download-all")
