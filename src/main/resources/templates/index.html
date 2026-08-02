@@ -297,6 +297,9 @@
 
     // --- Bucket dropdown ---
 
+    let lastBucketsLoad = 0;
+    let refreshInFlight = false;
+
     async function loadBuckets(selectPreselected) {
         const select = document.getElementById('bucketInput');
         try {
@@ -309,6 +312,21 @@
                     + escHtml(b) + '</option>').join('');
         } catch {
             select.innerHTML = '<option value="">--</option>';
+        } finally {
+            lastBucketsLoad = Date.now();
+        }
+    }
+
+    async function refreshBucketList() {
+        if (refreshInFlight) return;
+        const select = document.getElementById('bucketInput');
+        if (Date.now() - lastBucketsLoad < 5000) return;
+        const current = select.value;
+        refreshInFlight = true;
+        try {
+            await loadBuckets(current);
+        } finally {
+            refreshInFlight = false;
         }
     }
 
@@ -1218,6 +1236,10 @@
             startPolling();
             updateCartBadge();
         });
+
+        const bucketInput = document.getElementById('bucketInput');
+        bucketInput.addEventListener('mousedown', refreshBucketList);
+        bucketInput.addEventListener('focus', refreshBucketList);
 
         // Combobox logic
         const comboInput = document.getElementById('favComboInput');

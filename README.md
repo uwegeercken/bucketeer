@@ -7,7 +7,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Browse &amp; search** — paginated results, client-side filtering by name (regular expressions), size and last-modified date, sortable columns
 - **Prefix templates** — build S3 prefixes dynamically with functions (`left`, `right`, `upper`, `lower`, `everyNth`, `substring`, `repeat`) and date placeholders; functions can be nested and combined with literal suffixes
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
-- **Selection &amp; bulk download** — collect objects across queries and download them all as a ZIP
+- **Selection &amp; bulk download** — collect objects across queries and download them all as a ZIP. **Note:** rendering the selection page inserts one row per selected object into the DOM. Very large selections (e.g. 100,000+ objects) take a while to render; the batch **Move Selected / Delete Selected** actions become active only once the list has finished loading. For very large datasets, keep the selection small (e.g. avoid "add all" for tens of thousands of objects).
 - **Move &amp; delete objects** — move (same bucket, copy + delete) or delete individual objects from the results, or apply batch operations (delete / prefix-based move) to the selection; existing targets are skipped and reported
 - **Action history** — every move/delete is recorded in `~/.bucketeer/actions/actions.jsonl` and can be reviewed on the **Action History** page (`/history`)
 - **Snapshots** — save query results as Parquet, compare snapshots over time and export the diff (added / removed / changed objects)
@@ -23,7 +23,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.6.0.jar
+java -jar target/bucketeer-0.6.1.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -45,10 +45,79 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.6.0.jar
+java -jar target/bucketeer-0.6.1.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
+
+---
+
+## Testdaten erzeugen
+
+Für Performance- und Batch-Tests (Löschen / Verschieben großer Auswahlmengen) kann Bucketeer einen S3-kompatiblen Server deterministisch mit Testdaten befüllen — ohne Spring-Kontext und ohne Web-Server:
+
+```bash
+java -jar target/bucketeer-0.6.1.jar --seed
+```
+
+Standardstruktur (3000 Objekte, 1–10 KB, verteilt über 20 Shard-Präfixe):
+
+```
+testdata/events/shard-00/event-000000.json
+testdata/events/shard-01/event-000001.json
+...
+testdata/events/shard-19/event-002999.json
+```
+
+Die Verteilung über mehrere Präfixe verbessert die Listing- und Batch-Performance von S3-kompatiblen Servern.
+
+**Optionen** (alle mit Defaults):
+
+| Option | Default | Bedeutung |
+|--------|---------|-----------|
+| `--endpoint` | `http://localhost:9000` | S3-Endpoint (MinIO-Container oder NetApp) |
+| `--access-key` / `--secret-key` | `admin` / `admin123` | Zugangsdaten |
+| `--region` | `us-east-1` | AWS-Region |
+| `--no-verify-ssl` | – | alle Zertifikate akzeptieren (z. B. StorageGRID ohne gültiges Zertifikat) |
+| `--bucket` | `testdata` | Ziel-Bucket |
+| `--count` | `3000` | Anzahl Objekte |
+| `--prefixes` | `20` | Fan-out / Anzahl Shard-Präfixe |
+| `--size-min` / `--size-max` | `1024` / `10240` | Objektgrößen in Bytes |
+| `--parallel` | `10` | parallele Upload-Threads |
+| `--empty` | – | Bucket vorher vollständig leeren |
+| `--dry-run` | – | nur den Plan ausgeben, nichts schreiben |
+
+**Beispiele:**
+
+MinIO-Container (docker-compose):
+
+```bash
+java -jar target/bucketeer-0.6.1.jar --seed --endpoint=http://localhost:9000 \
+  --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
+```
+
+NetApp StorageGRID (ohne gültiges Zertifikat):
+
+```bash
+java -jar target/bucketeer-0.6.1.jar --seed --endpoint=https://storagegrid:9000 \
+  --access-key=AKIA... --secret-key=... --no-verify-ssl --bucket=testdata
+```
+
+Die Erzeugung ist **deterministisch**: gleiche Keys und Größen bei jedem Lauf. Nach Lösch-/Verschiebe-Tests stellst du den Ausgangszustand manuell wieder her, indem du den Seed-Befehl erneut ausführst (optional vorher mit `--empty` den Bucket leeren).
+
+**Wiederherstellung nach einem Test** (leert das Bucket und befüllt es neu):
+
+```bash
+java -jar target/bucketeer-0.6.1.jar --seed --empty --count=3000 --prefixes=20
+```
+
+**Plan anzeigen, ohne etwas zu schreiben**:
+
+```bash
+java -jar target/bucketeer-0.6.1.jar --seed --dry-run
+```
+
+Der `--seed`-Modus startet weder Spring noch den Web-Server; er erkennt das Flag an beliebiger Argument-Position und beendet sich mit Exit-Code `0` (Erfolg) oder `1` (Fehler).
 
 ---
 

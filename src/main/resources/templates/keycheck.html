@@ -104,6 +104,9 @@
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    let lastBucketsLoad = 0;
+    let refreshInFlight = false;
+
     async function loadBuckets() {
         try {
             const res = await fetch('/api/buckets');
@@ -111,7 +114,23 @@
             const select = document.getElementById('bucketInput');
             select.innerHTML = '<option value="">--</option>'
                 + buckets.map(b => '<option value="' + escHtml(b) + '">' + escHtml(b) + '</option>').join('');
-        } catch {}
+        } catch {} finally {
+            lastBucketsLoad = Date.now();
+        }
+    }
+
+    async function refreshBucketList() {
+        if (refreshInFlight) return;
+        const select = document.getElementById('bucketInput');
+        if (Date.now() - lastBucketsLoad < 5000) return;
+        const current = select.value;
+        refreshInFlight = true;
+        try {
+            await loadBuckets();
+            select.value = current;
+        } finally {
+            refreshInFlight = false;
+        }
     }
 
     async function startCheck(e) {
@@ -217,6 +236,9 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         loadBuckets();
+        const bucketInput = document.getElementById('bucketInput');
+        bucketInput.addEventListener('mousedown', refreshBucketList);
+        bucketInput.addEventListener('focus', refreshBucketList);
     });
 </script>
 </body>

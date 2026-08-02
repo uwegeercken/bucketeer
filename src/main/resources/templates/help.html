@@ -31,6 +31,17 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.6.1 <small class="text-muted">2026-08-02</small></h6>
+                    <ul>
+                        <li>Selection page renders large collections progressively in chunks with a load counter in the title bar — the page stays responsive instead of blocking while thousands of rows are inserted</li>
+                        <li>Batch delete / prefix-based move run as background jobs with live progress in the dialog (polled every 400 ms); the batch buttons stay disabled until the list has finished rendering</li>
+                        <li>Bucket dropdown refreshes automatically when opened — newly created buckets appear without reloading the page</li>
+                        <li>New CLI mode <code>--seed</code>: deterministically fills an S3-compatible server with test data (options for object count, shard prefixes, size range, parallel uploads, <code>--empty</code>, <code>--dry-run</code>, <code>--no-verify-ssl</code>) — see the README</li>
+                        <li>Easter egg: searching for <code>osterei</code> / <code>easteregg</code> / <code>huevo de pascua</code> triggers a small surprise</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.6.0 <small class="text-muted">2026-08-01</small></h6>
                     <ul>
                         <li>Fixed move always reported as "skipped": the existence check was evaluated against the source object; the target key is now checked before copying — targets are never overwritten and skips are detected correctly</li>
