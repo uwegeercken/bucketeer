@@ -52,15 +52,15 @@ java -jar target/bucketeer-0.6.1.jar
 
 ---
 
-## Testdaten erzeugen
+## Generating test data
 
-Für Performance- und Batch-Tests (Löschen / Verschieben großer Auswahlmengen) kann Bucketeer einen S3-kompatiblen Server deterministisch mit Testdaten befüllen — ohne Spring-Kontext und ohne Web-Server:
+For performance and batch tests (deleting / moving large selections), Bucketeer can fill an S3-compatible server with deterministic test data — without the Spring context and without a web server:
 
 ```bash
 java -jar target/bucketeer-0.6.1.jar --seed
 ```
 
-Standardstruktur (3000 Objekte, 1–10 KB, verteilt über 20 Shard-Präfixe):
+Default structure (3000 objects, 1–10 KB, spread over 20 shard prefixes):
 
 ```
 testdata/events/shard-00/event-000000.json
@@ -69,55 +69,55 @@ testdata/events/shard-01/event-000001.json
 testdata/events/shard-19/event-002999.json
 ```
 
-Die Verteilung über mehrere Präfixe verbessert die Listing- und Batch-Performance von S3-kompatiblen Servern.
+Spreading the objects across multiple prefixes improves the listing and batch performance of S3-compatible servers.
 
-**Optionen** (alle mit Defaults):
+**Options** (all with defaults):
 
-| Option | Default | Bedeutung |
-|--------|---------|-----------|
-| `--endpoint` | `http://localhost:9000` | S3-Endpoint (MinIO-Container oder NetApp) |
-| `--access-key` / `--secret-key` | `admin` / `admin123` | Zugangsdaten |
-| `--region` | `us-east-1` | AWS-Region |
-| `--no-verify-ssl` | – | alle Zertifikate akzeptieren (z. B. StorageGRID ohne gültiges Zertifikat) |
-| `--bucket` | `testdata` | Ziel-Bucket |
-| `--count` | `3000` | Anzahl Objekte |
-| `--prefixes` | `20` | Fan-out / Anzahl Shard-Präfixe |
-| `--size-min` / `--size-max` | `1024` / `10240` | Objektgrößen in Bytes |
-| `--parallel` | `10` | parallele Upload-Threads |
-| `--empty` | – | Bucket vorher vollständig leeren |
-| `--dry-run` | – | nur den Plan ausgeben, nichts schreiben |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--endpoint` | `http://localhost:9000` | S3 endpoint (MinIO container or NetApp) |
+| `--access-key` / `--secret-key` | `admin` / `admin123` | Credentials |
+| `--region` | `us-east-1` | AWS region |
+| `--no-verify-ssl` | – | accept any certificate (e.g. StorageGRID without a valid certificate) |
+| `--bucket` | `testdata` | Target bucket |
+| `--count` | `3000` | Number of objects |
+| `--prefixes` | `20` | Fan-out / number of shard prefixes |
+| `--size-min` / `--size-max` | `1024` / `10240` | Object sizes in bytes |
+| `--parallel` | `10` | Parallel upload threads |
+| `--empty` | – | Fully empty the bucket beforehand |
+| `--dry-run` | – | Only print the plan, write nothing |
 
-**Beispiele:**
+**Examples:**
 
-MinIO-Container (docker-compose):
+MinIO container (docker-compose):
 
 ```bash
 java -jar target/bucketeer-0.6.1.jar --seed --endpoint=http://localhost:9000 \
   --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
 ```
 
-NetApp StorageGRID (ohne gültiges Zertifikat):
+NetApp StorageGRID (without a valid certificate):
 
 ```bash
 java -jar target/bucketeer-0.6.1.jar --seed --endpoint=https://storagegrid:9000 \
   --access-key=AKIA... --secret-key=... --no-verify-ssl --bucket=testdata
 ```
 
-Die Erzeugung ist **deterministisch**: gleiche Keys und Größen bei jedem Lauf. Nach Lösch-/Verschiebe-Tests stellst du den Ausgangszustand manuell wieder her, indem du den Seed-Befehl erneut ausführst (optional vorher mit `--empty` den Bucket leeren).
+Generation is **deterministic**: the same keys and sizes on every run. After delete/move tests, restore the original state manually by running the seed command again (optionally emptying the bucket first with `--empty`).
 
-**Wiederherstellung nach einem Test** (leert das Bucket und befüllt es neu):
+**Restore after a test** (empties the bucket and refills it):
 
 ```bash
 java -jar target/bucketeer-0.6.1.jar --seed --empty --count=3000 --prefixes=20
 ```
 
-**Plan anzeigen, ohne etwas zu schreiben**:
+**Show the plan without writing anything**:
 
 ```bash
 java -jar target/bucketeer-0.6.1.jar --seed --dry-run
 ```
 
-Der `--seed`-Modus startet weder Spring noch den Web-Server; er erkennt das Flag an beliebiger Argument-Position und beendet sich mit Exit-Code `0` (Erfolg) oder `1` (Fehler).
+The `--seed` mode starts neither Spring nor the web server; it detects the flag at any argument position and exits with code `0` (success) or `1` (error).
 
 ---
 
