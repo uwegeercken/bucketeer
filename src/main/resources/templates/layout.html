@@ -313,6 +313,7 @@
             mixed:   /*[[#{cart.batch.mixed}]]*/ 'Selection must contain objects of a single server and bucket.',
             count:   /*[[#{cart.batch.count}]]*/ '{0} objects',
             result:  /*[[#{cart.batch.moveResult}]]*/ 'Moved: {0}, skipped: {1}, failed: {2}.',
+            progress: /*[[#{cart.batch.progress}]]*/ 'Processed {0} of {1} objects...',
             invalid: /*[[#{modal.move.invalidPrefix}]]*/ 'Target prefix must not be empty or equal the source folder.',
             skipped: /*[[#{msg.move.skipped}]]*/ 'Target already exists, object skipped.',
             opError: /*[[#{msg.opError}]]*/ 'Operation failed:'
@@ -413,6 +414,13 @@
                         body: JSON.stringify(config.makePayload(toPrefix))
                     });
                     const data = await res.json();
+                    if (config.poll) {
+                        if (!res.ok || !data.jobId) throw new Error(data.error || ('HTTP ' + res.status));
+                        const countEl = document.getElementById('moveModalCount');
+                        countEl.textContent = moveModalLabels.progress.replace('{0}', 0).replace('{1}', data.total);
+                        pollJob(data.jobId, countEl, errEl, resultEl, btn, toPrefix);
+                        return;
+                    }
                     const success = await config.handleResponse(data, errEl, resultEl, btn);
                     if (success && typeof window.addMoveToHistory === 'function') {
                         const first = config.items[0];
@@ -423,6 +431,39 @@
                     errEl.style.display = 'block';
                     btn.disabled = false;
                 }
+            }
+
+            function pollJob(jobId, countEl, errEl, resultEl, btn, toPrefix) {
+                const timer = setInterval(async () => {
+                    try {
+                        const res = await fetch('/api/cart/batch/' + encodeURIComponent(jobId));
+                        const p = await res.json();
+                        if (p.found === false) {
+                            clearInterval(timer);
+                            throw new Error('Job not found');
+                        }
+                        countEl.textContent = moveModalLabels.progress.replace('{0}', p.processed).replace('{1}', p.total);
+                        if (p.done) {
+                            clearInterval(timer);
+                            if (p.error) {
+                                errEl.textContent = moveModalLabels.opError + ' ' + p.error;
+                                errEl.style.display = 'block';
+                                btn.disabled = false;
+                                return;
+                            }
+                            const success = await config.handleResponse(p.result, errEl, resultEl, btn);
+                            if (success && typeof window.addMoveToHistory === 'function') {
+                                const first = config.items[0];
+                                if (first) window.addMoveToHistory(first.serverName, first.bucket, toPrefix);
+                            }
+                        }
+                    } catch (e) {
+                        clearInterval(timer);
+                        errEl.textContent = moveModalLabels.opError + ' ' + e.message;
+                        errEl.style.display = 'block';
+                        btn.disabled = false;
+                    }
+                }, 400);
             }
 
             document.addEventListener('DOMContentLoaded', () => {

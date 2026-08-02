@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -34,11 +36,25 @@ public class CartController {
     private final S3StoragePort s3StoragePort;
     private final BucketeerUseCase bucketeerUseCase;
     private final ActionHistory actionHistory;
+    private final Map<String, BatchJob> batchJobs = new ConcurrentHashMap<>();
 
     public CartController(S3StoragePort s3StoragePort, BucketeerUseCase bucketeerUseCase, ActionHistory actionHistory) {
         this.s3StoragePort    = s3StoragePort;
         this.bucketeerUseCase = bucketeerUseCase;
         this.actionHistory    = actionHistory;
+    }
+
+    /** In-memory progress state of a background batch job (delete-selected / move-selected). */
+    private static final class BatchJob {
+        final AtomicInteger processed = new AtomicInteger();
+        volatile int total;
+        volatile boolean done;
+        volatile Map<String, Object> result;
+        volatile String error;
+
+        BatchJob(int total) {
+            this.total = total;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -119,12 +135,20 @@ public class CartController {
     @PostMapping(value = "/api/cart/delete-selected", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public Map<String, Object> deleteSelected(@RequestBody List<CartItemRequest> items, HttpSession session) {
+        String jobId = UUID.randomUUID().toString();
+        BatchJob job = new BatchJob(items.size());
+        batchJobs.put(jobId, job);
+        cleanupBatchJobs();
+        new Thread(() -> runDeleteSelected(job, items, session), "bucketeer-delete").start();
+        return Map.of("jobId", jobId, "total", items.size());
+    }
+
+    private void runDeleteSelected(BatchJob job, List<CartItemRequest> items, HttpSession session) {
         String batchId = nextBatchId();
-        int processed = 0;
         int deleted = 0;
         List<Map<String, Object>> results = new ArrayList<>();
         for (CartItemRequest item : items) {
-            processed++;
+            job.processed.incrementAndGet();
             try {
                 bucketeerUseCase.deleteObject(item.serverName(), item.bucket(), item.key());
                 removeItem(session, item.serverName(), item.bucket(), item.key());
@@ -141,29 +165,41 @@ public class CartController {
                 results.add(Map.of("key", item.key(), "status", "FAILED", "error", e.getMessage()));
             }
         }
-        return Map.of(
-                "processed", processed,
+        job.result = Map.of(
+                "processed", items.size(),
                 "deleted",   deleted,
-                "failed",    processed - deleted,
+                "failed",    items.size() - deleted,
                 "items",     results
         );
+        job.done = true;
     }
 
     @PostMapping(value = "/api/cart/move-selected", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public Map<String, Object> moveSelected(@RequestBody CartMoveRequest req, HttpSession session) {
+        String jobId = UUID.randomUUID().toString();
+        BatchJob job = new BatchJob(req.keys().size());
+        batchJobs.put(jobId, job);
+        cleanupBatchJobs();
+        new Thread(() -> runMoveSelected(job, req, session), "bucketeer-move").start();
+        return Map.of("jobId", jobId, "total", req.keys().size());
+    }
+
+    private void runMoveSelected(BatchJob job, CartMoveRequest req, HttpSession session) {
         String batchId = nextBatchId();
+        List<CartItem> snapshot = new ArrayList<>(getCart(session));
+        List<CartItem> toMove = snapshot.stream()
+                .filter(item -> item.serverName().equals(req.serverName())
+                        && item.bucket().equals(req.bucket())
+                        && req.keys().contains(item.key()))
+                .toList();
+        job.total = toMove.size();
         int moved = 0;
         int skipped = 0;
         int failed = 0;
         List<Map<String, Object>> results = new ArrayList<>();
-
-        List<CartItem> snapshot = new ArrayList<>(getCart(session));
-        for (CartItem item : snapshot) {
-            if (!item.serverName().equals(req.serverName()) || !item.bucket().equals(req.bucket())
-                    || !req.keys().contains(item.key())) {
-                continue;
-            }
+        for (CartItem item : toMove) {
+            job.processed.incrementAndGet();
             String targetKey = targetKey(item.key(), req.toPrefix());
             if (targetKey.equals(item.key())) {
                 skipped++;
@@ -195,12 +231,41 @@ public class CartController {
                 results.add(Map.of("key", item.key(), "targetKey", targetKey, "status", "FAILED", "error", e.getMessage()));
             }
         }
-        return Map.of(
+        job.result = Map.of(
                 "moved",   moved,
                 "skipped", skipped,
                 "failed",  failed,
                 "items",   results
         );
+        job.done = true;
+    }
+
+    @GetMapping(value = "/api/cart/batch/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> batchProgress(@PathVariable String jobId) {
+        BatchJob job = batchJobs.get(jobId);
+        if (job == null) {
+            return Map.of("jobId", jobId, "found", false);
+        }
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("jobId", jobId);
+        resp.put("found", true);
+        resp.put("total", job.total);
+        resp.put("processed", job.processed.get());
+        resp.put("done", job.done);
+        if (job.error != null) {
+            resp.put("error", job.error);
+        }
+        if (job.result != null) {
+            resp.put("result", job.result);
+        }
+        return resp;
+    }
+
+    private void cleanupBatchJobs() {
+        if (batchJobs.size() > 20) {
+            batchJobs.entrySet().removeIf(e -> e.getValue().done);
+        }
     }
 
     /**

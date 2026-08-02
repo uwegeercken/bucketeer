@@ -15,7 +15,8 @@
     <div class="panel">
         <div class="panel-title d-flex align-items-center justify-content-between">
             <span th:text="#{cart.title}">Selection</span>
-            <div class="d-flex gap-1">
+            <div class="d-flex gap-1 align-items-center">
+                <span id="renderStatus" class="text-muted small" style="display:none;"></span>
                 <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" id="btnMoveSelected"
                         disabled th:title="#{btn.moveSelected}" onclick="openCartMoveModal()">
                     <i class="bi bi-arrows-move"></i>
@@ -58,25 +59,7 @@
                 <th style="width:52px"></th>
             </tr>
             </thead>
-            <tbody>
-            <tr th:each="item, iter : ${cartItems}">
-                <td><input type="checkbox" class="cart-check"
-                           th:data-server="${item.serverName()}" th:data-bucket="${item.bucket()}"
-                           th:data-key="${item.key()}" onchange="updateCartActionButtons()"/></td>
-                <td class="text-break font-monospace small" th:text="${item.key()}"></td>
-                <td class="small" th:text="${item.serverName()}"></td>
-                <td class="small" th:text="${item.bucket()}"></td>
-                <td class="text-end small" th:text="${#numbers.formatDecimal(item.sizeBytes() / 1024.0, 1, 2)}"></td>
-                <td class="small" th:text="${item.lastModified() != null ? #temporals.format(item.lastModified(), 'yyyy-MM-dd HH:mm:ss') : ''}"></td>
-                <td>
-                    <button type="button" class="btn btn-sm btn-outline-danger btn-icon"
-                            th:title="#{cart.remove}" title="Remove from selection"
-                            th:data-server="${item.serverName()}" th:data-bucket="${item.bucket()}"
-                            th:data-key="${item.key()}" onclick="removeItem(this)">
-                        <i class="bi bi-x"></i>
-                    </button>
-                </td>
-            </tr>
+            <tbody id="cartTbody">
             </tbody>
         </table>
     </div>
@@ -111,12 +94,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script th:inline="javascript">
-    const labelConfirmClear = /*[[#{cart.confirm.clear}]]*/ 'Clear all items from cart?';
+    const labelConfirmClear = /*[[#{cart.confirm.clear}]]*/ 'Clear all items from selection?';
+    const labelRemove         = /*[[#{cart.remove}]]*/ 'Remove from selection';
+    const labelRenderProgress = /*[[#{cart.renderProgress}]]*/ 'Rendering {0} of {1} objects...';
     const labelBatchCount      = /*[[#{cart.batch.count}]]*/ '{0} objects';
+    const labelBatchProgress   = /*[[#{cart.batch.progress}]]*/ 'Processed {0} of {1} objects...';
     const labelBatchDeleteResult = /*[[#{cart.batch.deleteResult}]]*/ 'Deleted: {0}, failed: {1}.';
     const labelOpError         = /*[[#{msg.opError}]]*/ 'Operation failed:';
 
     let pendingCartDelete = null;
+    let selectAllChecked  = false;
+    let cartLoaded        = false;
 
     function removeItem(btn) {
         const item = {
@@ -137,6 +125,69 @@
             .then(() => location.reload());
     }
 
+    function escHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    function formatTimestamp(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        const p = n => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+            + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    }
+
+    function cartRowHtml(item) {
+        const checked = selectAllChecked ? ' checked' : '';
+        const attrs = ' data-server="' + escHtml(item.serverName) + '"'
+            + ' data-bucket="' + escHtml(item.bucket) + '"'
+            + ' data-key="' + escHtml(item.key) + '"';
+        return '<tr>'
+            + '<td><input type="checkbox" class="cart-check"' + checked + attrs
+            + ' onchange="updateCartActionButtons()"/></td>'
+            + '<td class="text-break font-monospace small">' + escHtml(item.key) + '</td>'
+            + '<td class="small">' + escHtml(item.serverName) + '</td>'
+            + '<td class="small">' + escHtml(item.bucket) + '</td>'
+            + '<td class="text-end small">' + escHtml(item.sizeKb) + '</td>'
+            + '<td class="small">' + escHtml(formatTimestamp(item.lastModified)) + '</td>'
+            + '<td><button type="button" class="btn btn-sm btn-outline-danger btn-icon"'
+            + ' title="' + escHtml(labelRemove) + '"' + attrs
+            + ' onclick="removeItem(this)"><i class="bi bi-x"></i></button></td>'
+            + '</tr>';
+    }
+
+    async function renderCartRows() {
+        const tbody = document.getElementById('cartTbody');
+        if (!tbody) return;
+        const statusEl = document.getElementById('renderStatus');
+        statusEl.style.display = '';
+        let items;
+        try {
+            const res = await fetch('/api/cart');
+            items = await res.json();
+        } catch (e) {
+            statusEl.textContent = labelOpError + ' ' + e.message;
+            return;
+        }
+        const total = items.length;
+        const CHUNK = 300;
+        for (let i = 0; i < total; i += CHUNK) {
+            const html = items.slice(i, i + CHUNK).map(cartRowHtml).join('');
+            tbody.insertAdjacentHTML('beforeend', html);
+            const done = Math.min(i + CHUNK, total);
+            statusEl.textContent = labelRenderProgress.replace('{0}', done).replace('{1}', total);
+            await new Promise(r => requestAnimationFrame(r));
+        }
+        statusEl.style.display = 'none';
+        cartLoaded = true;
+        updateCartActionButtons();
+    }
+
+    renderCartRows();
+
     function getSelectedCartItems() {
         return Array.from(document.querySelectorAll('.cart-check:checked')).map(cb => ({
             serverName: cb.dataset.server,
@@ -147,11 +198,12 @@
 
     function updateCartActionButtons() {
         const anyChecked = document.querySelectorAll('.cart-check:checked').length > 0;
-        document.getElementById('btnMoveSelected').disabled = !anyChecked;
-        document.getElementById('btnDeleteSelected').disabled = !anyChecked;
+        document.getElementById('btnMoveSelected').disabled = !(cartLoaded && anyChecked);
+        document.getElementById('btnDeleteSelected').disabled = !(cartLoaded && anyChecked);
     }
 
     function toggleCartSelectAll(checked) {
+        selectAllChecked = checked;
         document.querySelectorAll('.cart-check').forEach(cb => cb.checked = checked);
         updateCartActionButtons();
     }
@@ -169,12 +221,35 @@
         new bootstrap.Modal(document.getElementById('cartDeleteModal')).show();
     }
 
+    function pollBatch(jobId, onProgress, onDone, onError) {
+        const timer = setInterval(async () => {
+            try {
+                const res = await fetch('/api/cart/batch/' + encodeURIComponent(jobId));
+                const p = await res.json();
+                if (p.found === false) {
+                    clearInterval(timer);
+                    onError('Job not found');
+                    return;
+                }
+                onProgress(p.processed, p.total);
+                if (p.done) {
+                    clearInterval(timer);
+                    onDone(p);
+                }
+            } catch (e) {
+                clearInterval(timer);
+                onError(e.message);
+            }
+        }, 400);
+    }
+
     async function confirmCartDelete() {
         if (!pendingCartDelete) return;
         const btn = document.getElementById('cartDeleteConfirmBtn');
         btn.disabled = true;
         const errEl = document.getElementById('cartDeleteError');
         const resultEl = document.getElementById('cartDeleteResult');
+        const countEl = document.getElementById('cartDeleteCount');
         try {
             const res = await fetch('/api/cart/delete-selected', {
                 method: 'POST',
@@ -182,15 +257,35 @@
                 body: JSON.stringify(pendingCartDelete)
             });
             const data = await res.json();
-            if (data.failed > 0) {
-                const failedItem = data.items.find(i => i.error);
-                errEl.textContent = labelOpError + ' ' + (failedItem ? failedItem.error : '');
-                errEl.style.display = 'block';
-            }
-            resultEl.textContent = labelBatchDeleteResult
-                .replace('{0}', data.deleted).replace('{1}', data.failed);
-            resultEl.style.display = 'block';
-            setTimeout(() => location.reload(), 1500);
+            if (!res.ok || !data.jobId) throw new Error(data.error || ('HTTP ' + res.status));
+            countEl.textContent = labelBatchProgress.replace('{0}', 0).replace('{1}', data.total);
+            pollBatch(data.jobId,
+                (processed, total) => {
+                    countEl.textContent = labelBatchProgress.replace('{0}', processed).replace('{1}', total);
+                },
+                (p) => {
+                    if (p.error) {
+                        errEl.textContent = labelOpError + ' ' + p.error;
+                        errEl.style.display = 'block';
+                        btn.disabled = false;
+                        return;
+                    }
+                    const result = p.result;
+                    if (result.failed > 0) {
+                        const failedItem = result.items.find(i => i.error);
+                        errEl.textContent = labelOpError + ' ' + (failedItem ? failedItem.error : '');
+                        errEl.style.display = 'block';
+                    }
+                    resultEl.textContent = labelBatchDeleteResult
+                        .replace('{0}', result.deleted).replace('{1}', result.failed);
+                    resultEl.style.display = 'block';
+                    setTimeout(() => location.reload(), 1500);
+                },
+                (msg) => {
+                    errEl.textContent = labelOpError + ' ' + msg;
+                    errEl.style.display = 'block';
+                    btn.disabled = false;
+                });
         } catch (e) {
             errEl.textContent = labelOpError + ' ' + e.message;
             errEl.style.display = 'block';
@@ -205,6 +300,7 @@
             title: /*[[#{cart.modal.move.title}]]*/ 'Move selected objects',
             items: items,
             endpoint: '/api/cart/move-selected',
+            poll: true,
             makePayload: (toPrefix) => ({
                 serverName: items[0].serverName,
                 bucket: items[0].bucket,
