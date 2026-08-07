@@ -50,7 +50,7 @@
         <form method="post" action="/session/server"
               class="d-flex align-items-center gap-2 position-absolute start-50 translate-middle-x">
             <label class="text-secondary small" th:text="#{label.server}">Server</label>
-            <select name="serverName" class="form-select form-select-sm w-auto"
+            <select name="serverName" id="headerServerSelect" class="form-select form-select-sm w-auto"
                     onchange="sessionStorage.removeItem('bkt_bucket');sessionStorage.removeItem('bkt_prefix');sessionStorage.removeItem('bkt_key');this.form.submit()"
                     th:if="${serverNames != null and !serverNames.isEmpty()}">
                 <option th:each="s : ${serverNames}"
@@ -319,6 +319,16 @@
             opError: /*[[#{msg.opError}]]*/ 'Operation failed:'
         };
 
+        function normPrefix(p) {
+            p = (p || '').trim();
+            if (p && !p.endsWith('/')) p = p + '/';
+            return p;
+        }
+
+        function loadSharedHistory() {
+            try { return JSON.parse(localStorage.getItem('bucketeer_history') || '[]'); } catch (e) { return []; }
+        }
+
         window.MoveModal = (function() {
             let config = null;
 
@@ -357,16 +367,24 @@
             function open(cfg) {
                 config = cfg;
                 document.getElementById('moveModalToPrefix').value = '';
+                const server = cfg.items[0].serverName;
+                const bucket = cfg.items[0].bucket;
                 const prefixSelect = document.getElementById('moveModalPrefixSelect');
                 prefixSelect.innerHTML = '<option value=""></option>';
-                collectPrefixes(cfg.items.map(i => i.key)).forEach(p => {
+                const prefixes = new Set();
+                const objectKeys = cfg.items.filter(i => i.key).map(i => i.key);
+                collectPrefixes(objectKeys).forEach(p => prefixes.add(p));
+                loadSharedHistory().forEach(h => {
+                    if (h.server === server && h.bucket === bucket && h.prefix) {
+                        prefixes.add(normPrefix(h.prefix));
+                    }
+                });
+                Array.from(prefixes).sort().forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p;
                     opt.textContent = p;
                     prefixSelect.appendChild(opt);
                 });
-                const server = cfg.items[0].serverName;
-                const bucket = cfg.items[0].bucket;
                 const sameGroup = cfg.items.every(i => i.serverName === server && i.bucket === bucket);
                 cfg.sameGroup = sameGroup;
                 document.getElementById('moveModalInfo').textContent = server + ' / ' + bucket;
@@ -489,6 +507,7 @@
 
         window.addMoveToHistory = function(server, bucket, prefix) {
             if (!server || !bucket || !prefix) return;
+            prefix = normPrefix(prefix);
             let settings = {};
             try { settings = JSON.parse(localStorage.getItem('bucketeer_settings') || '{}'); } catch (e) {}
             let max = settings.historyMax !== undefined ? settings.historyMax : 50;

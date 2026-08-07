@@ -411,6 +411,104 @@ public class DuckDbRepository {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM objects WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
+        appendFilters(sql, params, keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+
+        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        } catch (SQLException e) {
+            log.error("Failed to count filtered objects: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    /** Counts cached objects scoped to a bucket and key prefix (used for batch estimates). */
+    public long queryCount(String bucket, String prefix, String keyFilter, Double minSizeKb, Double maxSizeKb,
+                           String dateFrom, String dateTo) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM objects WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+
+        appendBucketPrefix(sql, params, bucket, prefix);
+        appendFilters(sql, params, keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+
+        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        } catch (SQLException e) {
+            log.error("Failed to count filtered objects: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    /** Returns the sum of size_bytes of all cached objects matching the filters. */
+    public long queryTotalSizeBytes(String keyFilter, Double minSizeKb, Double maxSizeKb,
+                                    String dateFrom, String dateTo) {
+        StringBuilder sql = new StringBuilder("SELECT COALESCE(SUM(size_bytes), 0) FROM objects WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+
+        appendFilters(sql, params, keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+
+        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        } catch (SQLException e) {
+            log.error("Failed to sum filtered object sizes: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    /** Returns the sum of size_bytes of cached objects scoped to a bucket and key prefix. */
+    public long queryTotalSizeBytes(String bucket, String prefix, String keyFilter, Double minSizeKb, Double maxSizeKb,
+                                    String dateFrom, String dateTo) {
+        StringBuilder sql = new StringBuilder("SELECT COALESCE(SUM(size_bytes), 0) FROM objects WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+
+        appendBucketPrefix(sql, params, bucket, prefix);
+        appendFilters(sql, params, keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+
+        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        } catch (SQLException e) {
+            log.error("Failed to sum filtered object sizes: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    private static void appendBucketPrefix(StringBuilder sql, List<Object> params, String bucket, String prefix) {
+        if (bucket != null && !bucket.isBlank()) {
+            sql.append(" AND bucket = ?");
+            params.add(bucket);
+        }
+        if (prefix != null && !prefix.isBlank()) {
+            sql.append(" AND key LIKE ? ESCAPE '\\'");
+            params.add(escapeLike(prefix) + "%");
+        }
+    }
+
+    private static String escapeLike(String s) {
+        return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+    private static void appendFilters(StringBuilder sql, List<Object> params,
+                                      String keyFilter, Double minSizeKb, Double maxSizeKb,
+                                      String dateFrom, String dateTo) {
         if (keyFilter != null && !keyFilter.isBlank() && isValidRegex(keyFilter)) {
             sql.append(" AND regexp_matches(key, ?)");
             params.add(keyFilter);
@@ -430,18 +528,6 @@ public class DuckDbRepository {
         if (dateTo != null && !dateTo.isBlank()) {
             sql.append(" AND last_modified <= CAST(? AS TIMESTAMP)");
             params.add(dateTo + " 23:59:59");
-        }
-
-        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
-            for (int i = 0; i < params.size(); i++) {
-                ps.setObject(i + 1, params.get(i));
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getLong(1) : 0;
-            }
-        } catch (SQLException e) {
-            log.error("Failed to count filtered objects: {}", e.getMessage());
-            return 0;
         }
     }
 }

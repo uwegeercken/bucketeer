@@ -31,6 +31,15 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.6.2 <small class="text-muted">2026-08-07</small></h6>
+                    <ul>
+                        <li>Selection page redesign: collected objects are grouped into batches with a new table layout (No. | Server | Bucket | Prefix | Objects | Total size)</li>
+                        <li>Batch actions are unified — Move, Delete and Download operate on the <em>selected</em> batches; a selection spanning multiple servers or buckets is blocked with a clear message</li>
+                        <li>Download ZIP now contains only the selected batches instead of the whole selection</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.6.1 <small class="text-muted">2026-08-02</small></h6>
                     <ul>
                         <li>Selection page renders large collections progressively in chunks with a load counter in the title bar — the page stays responsive instead of blocking while thousands of rows are inserted</li>

@@ -25,11 +25,10 @@
                         disabled th:title="#{btn.deleteSelected}" onclick="openCartDeleteModal()">
                     <i class="bi bi-trash"></i>
                 </button>
-                <a href="/cart/download-all" class="btn btn-sm btn-outline-secondary btn-icon"
-                   th:classappend="${cartItems.isEmpty()} ? 'disabled' : ''"
-                   th:title="#{cart.downloadAll}" id="btnDownloadAll">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" id="btnDownloadAll"
+                        disabled th:title="#{cart.downloadAll}" onclick="downloadCart()">
                     <i class="bi bi-file-earmark-zip"></i>
-                </a>
+                </button>
                 <button type="button" class="btn btn-sm btn-outline-danger btn-icon"
                         onclick="clearCart()" th:title="#{cart.clear}"
                         th:disabled="${cartItems.isEmpty()}" id="btnClearCart">
@@ -51,11 +50,12 @@
             <tr>
                 <th style="width:32px"><input type="checkbox" id="cartSelectAll"
                                               th:title="#{cart.selectAll}" onchange="toggleCartSelectAll(this.checked)"/></th>
-                <th th:text="#{label.objectName}">Name</th>
+                <th class="text-center" style="width:60px" th:text="#{cart.batch.no}">No.</th>
                 <th th:text="#{cart.server}">Server</th>
                 <th th:text="#{cart.bucket}">Bucket</th>
-                <th class="text-end" style="width:110px" th:text="#{label.size}">Size (KB)</th>
-                <th style="width:210px" th:text="#{label.lastModified}">Last Modified</th>
+                <th th:text="#{snapshot.prefix}">Prefix</th>
+                <th class="text-end" style="width:120px" th:text="#{cart.batch.objects}">Objects</th>
+                <th class="text-end" style="width:120px" th:text="#{cart.batch.size}">Total size</th>
                 <th style="width:52px"></th>
             </tr>
             </thead>
@@ -100,6 +100,7 @@
     const labelBatchCount      = /*[[#{cart.batch.count}]]*/ '{0} objects';
     const labelBatchProgress   = /*[[#{cart.batch.progress}]]*/ 'Processed {0} of {1} objects...';
     const labelBatchDeleteResult = /*[[#{cart.batch.deleteResult}]]*/ 'Deleted: {0}, failed: {1}.';
+    const labelBatchMixed        = /*[[#{cart.batch.mixed}]]*/ 'Selection must contain objects of a single server and bucket.';
     const labelOpError         = /*[[#{msg.opError}]]*/ 'Operation failed:';
 
     let pendingCartDelete = null;
@@ -107,15 +108,12 @@
     let cartLoaded        = false;
 
     function removeItem(btn) {
-        const item = {
-            serverName: btn.dataset.server,
-            bucket:     btn.dataset.bucket,
-            key:        btn.dataset.key
-        };
+        const id = btn.dataset.id;
+        if (!id) return;
         fetch('/api/cart/remove', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(item)
+            body: JSON.stringify({ id: id })
         }).then(() => location.reload());
     }
 
@@ -140,21 +138,34 @@
             + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
     }
 
+    function formatSizeBytes(bytes) {
+        const n = Number(bytes) || 0;
+        if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(2) + ' MB';
+        return (n / 1024).toFixed(2) + ' KB';
+    }
+
+    function formatNumber(n) {
+        return Number(n || 0).toLocaleString();
+    }
+
     function cartRowHtml(item) {
         const checked = selectAllChecked ? ' checked' : '';
-        const attrs = ' data-server="' + escHtml(item.serverName) + '"'
-            + ' data-bucket="' + escHtml(item.bucket) + '"'
-            + ' data-key="' + escHtml(item.key) + '"';
+        const attrs = ' data-type="batch" data-id="' + escHtml(item.id) + '"'
+            + ' data-server="' + escHtml(item.serverName) + '"'
+            + ' data-bucket="' + escHtml(item.bucket) + '"';
+        const keyCount = item.keyCount || 0;
+        const objectCount = formatNumber(keyCount > 0 ? keyCount : item.count);
         return '<tr>'
             + '<td><input type="checkbox" class="cart-check"' + checked + attrs
             + ' onchange="updateCartActionButtons()"/></td>'
-            + '<td class="text-break font-monospace small">' + escHtml(item.key) + '</td>'
-            + '<td class="small">' + escHtml(item.serverName) + '</td>'
-            + '<td class="small">' + escHtml(item.bucket) + '</td>'
-            + '<td class="text-end small">' + escHtml(item.sizeKb) + '</td>'
-            + '<td class="small">' + escHtml(formatTimestamp(item.lastModified)) + '</td>'
+            + '<td class="font-monospace text-center">' + escHtml(item.seq) + '</td>'
+            + '<td>' + escHtml(item.serverName) + '</td>'
+            + '<td class="font-monospace">' + escHtml(item.bucket) + '</td>'
+            + '<td class="font-monospace">' + escHtml(item.prefix || '\u2013') + '</td>'
+            + '<td class="text-end">' + objectCount + '</td>'
+            + '<td class="text-end">' + formatSizeBytes(item.totalSizeBytes) + '</td>'
             + '<td><button type="button" class="btn btn-sm btn-outline-danger btn-icon"'
-            + ' title="' + escHtml(labelRemove) + '"' + attrs
+            + ' title="' + escHtml(labelRemove) + '" data-id="' + escHtml(item.id) + '"'
             + ' onclick="removeItem(this)"><i class="bi bi-x"></i></button></td>'
             + '</tr>';
     }
@@ -190,16 +201,36 @@
 
     function getSelectedCartItems() {
         return Array.from(document.querySelectorAll('.cart-check:checked')).map(cb => ({
+            id:         cb.dataset.id,
             serverName: cb.dataset.server,
-            bucket:     cb.dataset.bucket,
-            key:        cb.dataset.key
+            bucket:     cb.dataset.bucket
         }));
+    }
+
+    function isMixedGroup(items) {
+        const groups = new Set(items.map(i => i.serverName + '/' + i.bucket));
+        return groups.size > 1;
     }
 
     function updateCartActionButtons() {
         const anyChecked = document.querySelectorAll('.cart-check:checked').length > 0;
-        document.getElementById('btnMoveSelected').disabled = !(cartLoaded && anyChecked);
-        document.getElementById('btnDeleteSelected').disabled = !(cartLoaded && anyChecked);
+        const enabled = cartLoaded && anyChecked;
+        document.getElementById('btnMoveSelected').disabled = !enabled;
+        document.getElementById('btnDeleteSelected').disabled = !enabled;
+        document.getElementById('btnDownloadAll').disabled = !enabled;
+    }
+
+    function downloadCart() {
+        const items = getSelectedCartItems();
+        if (items.length === 0) return;
+        if (isMixedGroup(items)) {
+            const statusEl = document.getElementById('renderStatus');
+            statusEl.textContent = labelBatchMixed;
+            statusEl.style.display = '';
+            setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+            return;
+        }
+        window.location.href = '/cart/download-all?ids=' + items.map(i => encodeURIComponent(i.id)).join(',');
     }
 
     function toggleCartSelectAll(checked) {
@@ -216,8 +247,16 @@
             labelBatchCount.replace('{0}', items.length);
         const errEl = document.getElementById('cartDeleteError');
         const resultEl = document.getElementById('cartDeleteResult');
+        const confirmBtn = document.getElementById('cartDeleteConfirmBtn');
         errEl.style.display = 'none';
         resultEl.style.display = 'none';
+        if (isMixedGroup(items)) {
+            errEl.textContent = labelBatchMixed;
+            errEl.style.display = 'block';
+            confirmBtn.disabled = true;
+        } else {
+            confirmBtn.disabled = false;
+        }
         new bootstrap.Modal(document.getElementById('cartDeleteModal')).show();
     }
 
@@ -301,12 +340,15 @@
             items: items,
             endpoint: '/api/cart/move-selected',
             poll: true,
-            makePayload: (toPrefix) => ({
-                serverName: items[0].serverName,
-                bucket: items[0].bucket,
-                toPrefix: toPrefix,
-                keys: items.map(i => i.key)
-            }),
+            makePayload: (toPrefix) => {
+                return {
+                    serverName: items[0].serverName,
+                    bucket: items[0].bucket,
+                    toPrefix: toPrefix,
+                    keys: [],
+                    queries: items.map(it => ({ id: it.id }))
+                };
+            },
             handleResponse: (data, errEl, resultEl, btn) => {
                 if (data.failed > 0) {
                     const failedItem = data.items.find(i => i.status === 'FAILED');

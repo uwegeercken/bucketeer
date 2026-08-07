@@ -272,6 +272,9 @@
     const labelDelete       = /*[[#{btn.delete}]]*/ 'Delete object';
     const labelDeleteConfirm = /*[[#{modal.delete.message}]]*/ 'Delete this object permanently?\n\n{0}';
     const labelOpError       = /*[[#{msg.opError}]]*/ 'Operation failed:';
+    const labelAddingQuery   = /*[[#{cart.query.adding}]]*/ 'Adding query to selection...';
+    const labelQueryAdded    = /*[[#{cart.query.addedShort}]]*/ 'Query added to selection.';
+    const labelNoContext     = /*[[#{cart.query.noContext}]]*/ 'Server and bucket are required to add all objects.';
 
     const STORAGE_KEY  = 'bucketeer_favorites';
     const HISTORY_KEY  = 'bucketeer_history';
@@ -393,11 +396,17 @@
     }
     function saveHistory(list) { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); }
 
+    function normalizePrefix(p) {
+        p = (p || '').trim();
+        if (p && !p.endsWith('/')) p = p + '/';
+        return p;
+    }
+
     function addToHistory() {
         const combo = {
             server: currentServer || '',
             bucket: document.getElementById('bucketInput').value,
-            prefix: document.getElementById('prefixInput').value,
+            prefix: normalizePrefix(document.getElementById('prefixInput').value),
             key:    document.getElementById('keyInput').value
         };
         if (!combo.bucket && !combo.prefix && !combo.key) return;
@@ -425,7 +434,7 @@
         if (!name) return;
         const fav = { name: name.trim(), server: currentServer || '',
             bucket: document.getElementById('bucketInput').value,
-            prefix: document.getElementById('prefixInput').value,
+            prefix: normalizePrefix(document.getElementById('prefixInput').value),
             key:    document.getElementById('keyInput').value };
         if (!fav.bucket && !fav.prefix && !fav.key) return;
         const list = loadFavorites();
@@ -958,28 +967,33 @@
 
     function getSelectedItems() {
         return Array.from(document.querySelectorAll('.row-check:checked')).map(cb => ({
-            serverName:   currentServer,
-            bucket:       cb.dataset.bucket || currentBucket,
             key:          cb.dataset.key,
             sizeBytes:    parseInt(cb.dataset.sizebytes, 10),
             lastModified: cb.dataset.lastmodified ? new Date(cb.dataset.lastmodified).toISOString() : null
         }));
     }
 
-    async function addToCart(items) {
-        const res = await fetch('/api/cart/add', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(items)
-        });
-        const data = await res.json();
-        updateCartBadge(data.count);
-    }
-
-    function addSelectedToCart() {
+    async function addSelectedToCart() {
         const items = getSelectedItems();
         if (items.length === 0) return;
-        addToCart(items);
+        const server = currentServer || document.getElementById('headerServerSelect')?.value || '';
+        const bucket = document.getElementById('bucketInput')?.value || currentBucket || '';
+        if (!server || !bucket) {
+            alert(labelNoContext);
+            return;
+        }
+        try {
+            const res = await fetch('/api/cart/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serverName: server, bucket: bucket, items: items })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+            updateCartBadge(data.count);
+        } catch (e) {
+            alert(labelOpError + ' ' + e.message);
+        }
         document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
         document.getElementById('selectAll').checked = false;
         updateAddSelectedBtn();
@@ -992,39 +1006,38 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         const statusEl = document.getElementById('addAllStatus');
         statusEl.style.display = '';
-        let allItems = [];
-        let page = 0;
-        const pageSize = PAGE_SIZE;
         try {
-            while (true) {
-                statusEl.textContent = 'Loading page ' + (page + 1) + '...';
-                const params = new URLSearchParams({ page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir });
-                const keyFilter = document.getElementById('filterKey')?.value || '';
-                const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
-                const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
-                const dateFrom = document.getElementById('filterDateFrom')?.value || '';
-                const dateTo = document.getElementById('filterDateTo')?.value || '';
-                if (keyFilter) params.append('keyFilter', keyFilter);
-                if (minSizeKb) params.append('minSizeKb', minSizeKb);
-                if (maxSizeKb) params.append('maxSizeKb', maxSizeKb);
-                if (dateFrom) params.append('dateFrom', dateFrom);
-                if (dateTo) params.append('dateTo', dateTo);
-                const res = await fetch('/api/query/results?' + params.toString());
-                const data = await res.json();
-                for (const row of data.rows) {
-                    allItems.push({
-                        serverName:   currentServer,
-                        bucket:       row.bucket || currentBucket,
-                        key:          row.key,
-                        sizeBytes:    row.sizeBytes,
-                        lastModified: row.lastModified ? new Date(row.lastModified).toISOString() : null
-                    });
-                }
-                if (!data.hasMore) break;
-                page++;
+            const server = currentServer || document.getElementById('headerServerSelect')?.value || '';
+            const bucket = document.getElementById('bucketInput')?.value || currentBucket || '';
+            if (!server || !bucket) {
+                throw new Error(labelNoContext);
             }
-            statusEl.textContent = 'Adding ' + allItems.length + ' objects...';
-            if (allItems.length > 0) await addToCart(allItems);
+            const params = new URLSearchParams({
+                serverName: server,
+                bucket:     bucket,
+                prefix:     document.getElementById('prefixInput')?.value || '',
+                key:        document.getElementById('keyInput')?.value || ''
+            });
+            const keyFilter = document.getElementById('filterKey')?.value || '';
+            const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
+            const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
+            const dateFrom  = document.getElementById('filterDateFrom')?.value || '';
+            const dateTo    = document.getElementById('filterDateTo')?.value || '';
+            if (keyFilter) params.append('keyFilter', keyFilter);
+            if (minSizeKb) params.append('minSizeKb', minSizeKb);
+            if (maxSizeKb) params.append('maxSizeKb', maxSizeKb);
+            if (dateFrom) params.append('dateFrom', dateFrom);
+            if (dateTo) params.append('dateTo', dateTo);
+            statusEl.textContent = labelAddingQuery;
+            const res = await fetch('/api/cart/add-query?' + params.toString(), { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+            statusEl.textContent = labelQueryAdded;
+            updateCartBadge(data.count);
+            await new Promise(r => setTimeout(r, 1200));
+        } catch (e) {
+            statusEl.textContent = labelOpError + ' ' + e.message;
+            await new Promise(r => setTimeout(r, 3000));
         } finally {
             statusEl.style.display = 'none';
             btn.disabled = false;
