@@ -543,6 +543,7 @@
         const serverSelect = document.querySelector('select[name="serverName"]');
         const knownServers = serverSelect ? Array.from(serverSelect.options).map(o => o.value) : [];
         if (server && server !== currentServer && knownServers.includes(server)) {
+            sessionStorage.setItem('bkt_pending_combo', JSON.stringify({ bucket: bucket, prefix: prefix, key: key }));
             sessionStorage.removeItem('bkt_bucket');
             sessionStorage.removeItem('bkt_prefix');
             sessionStorage.removeItem('bkt_key');
@@ -679,6 +680,24 @@
     }
 
     function restoreFormState() {
+        try {
+            const pending = JSON.parse(sessionStorage.getItem('bkt_pending_combo') || 'null');
+            if (pending) {
+                sessionStorage.removeItem('bkt_pending_combo');
+                const sel = document.getElementById('bucketInput');
+                if (pending.bucket) {
+                    if (sel.querySelector('option[value="' + CSS.escape(pending.bucket) + '"]')) {
+                        sel.value = pending.bucket;
+                    } else if (sel.options.length > 0) {
+                        const opt = document.createElement('option');
+                        opt.value = pending.bucket; opt.textContent = pending.bucket; opt.selected = true;
+                        sel.appendChild(opt);
+                    }
+                }
+                if (pending.prefix) document.getElementById('prefixInput').value = pending.prefix;
+                if (pending.key) document.getElementById('keyInput').value = pending.key;
+            }
+        } catch (e) {}
         const bucket = sessionStorage.getItem('bkt_bucket');
         const prefix = sessionStorage.getItem('bkt_prefix');
         const key    = sessionStorage.getItem('bkt_key');

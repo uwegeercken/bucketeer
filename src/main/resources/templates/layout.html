@@ -332,38 +332,6 @@
         window.MoveModal = (function() {
             let config = null;
 
-            function collectPrefixes(keys) {
-                const prefixes = new Set();
-                for (const key of keys) {
-                    const i = key.lastIndexOf('/');
-                    if (i > 0) {
-                        const parent = key.substring(0, i + 1);
-                        let s = 0;
-                        while ((s = parent.indexOf('/', s)) >= 0 && s < parent.length) {
-                            prefixes.add(parent.substring(0, s + 1));
-                            s++;
-                        }
-                    }
-                }
-                if (keys.length > 1) {
-                    let lcp = keys[0];
-                    for (let i = 1; i < keys.length; i++) {
-                        let j = 0;
-                        while (j < lcp.length && j < keys[i].length && lcp[j] === keys[i][j]) j++;
-                        lcp = lcp.substring(0, j);
-                    }
-                    const lastSlash = lcp.lastIndexOf('/');
-                    if (lastSlash >= 0) {
-                        let s = 0;
-                        while ((s = lcp.indexOf('/', s)) >= 0 && s <= lastSlash) {
-                            prefixes.add(lcp.substring(0, s + 1));
-                            s++;
-                        }
-                    }
-                }
-                return Array.from(prefixes).sort();
-            }
-
             function open(cfg) {
                 config = cfg;
                 document.getElementById('moveModalToPrefix').value = '';
@@ -372,10 +340,16 @@
                 const prefixSelect = document.getElementById('moveModalPrefixSelect');
                 prefixSelect.innerHTML = '<option value=""></option>';
                 const prefixes = new Set();
-                const objectKeys = cfg.items.filter(i => i.key).map(i => i.key);
-                collectPrefixes(objectKeys).forEach(p => prefixes.add(p));
+                const isResolved = p => p && p.indexOf('{') < 0 && p.indexOf('}') < 0;
+                let favorites = [];
+                try { favorites = JSON.parse(localStorage.getItem('bucketeer_favorites') || '[]'); } catch (e) {}
+                favorites.forEach(f => {
+                    if (f.server === server && f.bucket === bucket && isResolved(f.prefix)) {
+                        prefixes.add(normPrefix(f.prefix));
+                    }
+                });
                 loadSharedHistory().forEach(h => {
-                    if (h.server === server && h.bucket === bucket && h.prefix) {
+                    if (h.server === server && h.bucket === bucket && isResolved(h.prefix)) {
                         prefixes.add(normPrefix(h.prefix));
                     }
                 });
