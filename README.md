@@ -23,7 +23,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.6.2.jar
+java -jar target/bucketeer-0.6.3.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -45,7 +45,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.6.2.jar
+java -jar target/bucketeer-0.6.3.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -57,7 +57,7 @@ java -jar target/bucketeer-0.6.2.jar
 For performance and batch tests (deleting / moving large selections), Bucketeer can fill an S3-compatible server with deterministic test data — without the Spring context and without a web server:
 
 ```bash
-java -jar target/bucketeer-0.6.2.jar --seed
+java -jar target/bucketeer-0.6.3.jar --seed
 ```
 
 Default structure (3000 objects, 1–10 KB, spread over 20 shard prefixes):
@@ -92,14 +92,14 @@ Spreading the objects across multiple prefixes improves the listing and batch pe
 MinIO container (docker-compose):
 
 ```bash
-java -jar target/bucketeer-0.6.2.jar --seed --endpoint=http://localhost:9000 \
+java -jar target/bucketeer-0.6.3.jar --seed --endpoint=http://localhost:9000 \
   --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
 ```
 
 NetApp StorageGRID (without a valid certificate):
 
 ```bash
-java -jar target/bucketeer-0.6.2.jar --seed --endpoint=https://storagegrid:9000 \
+java -jar target/bucketeer-0.6.3.jar --seed --endpoint=https://storagegrid:9000 \
   --access-key=AKIA... --secret-key=... --no-verify-ssl --bucket=testdata
 ```
 
@@ -108,13 +108,13 @@ Generation is **deterministic**: the same keys and sizes on every run. After del
 **Restore after a test** (empties the bucket and refills it):
 
 ```bash
-java -jar target/bucketeer-0.6.2.jar --seed --empty --count=3000 --prefixes=20
+java -jar target/bucketeer-0.6.3.jar --seed --empty --count=3000 --prefixes=20
 ```
 
 **Show the plan without writing anything**:
 
 ```bash
-java -jar target/bucketeer-0.6.2.jar --seed --dry-run
+java -jar target/bucketeer-0.6.3.jar --seed --dry-run
 ```
 
 The `--seed` mode starts neither Spring nor the web server; it detects the flag at any argument position and exits with code `0` (success) or `1` (error).
@@ -413,6 +413,8 @@ Once loading is complete, the results can be filtered without additional S3 requ
 | **Size min / max (KB)** | Filter by object size in kilobytes |
 | **Date from / to** | Filter by last-modified date |
 
+All timestamps are displayed in the **local timezone** — results, action history, key check and snapshots alike. The timezone can be changed on the **Settings** page (default: the system timezone); the **Date from / to** filters use the same timezone for their day boundaries.
+
 Filters are applied instantly with a short debounce delay. Pagination (100 objects per page) is available for large result sets.
 
 A progress indicator shows how many objects have been found while S3 pagination is still running.
@@ -558,4 +560,4 @@ Manche Schlüssel sind Ostereier.
 Algunas claves son huevos de pascua.
 
 ## Last update
-last update uwe.geercken@web.de - 2026-08-07
+last update uwe.geercken@web.de - 2026-08-08
