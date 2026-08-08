@@ -98,6 +98,30 @@ class BucketeerControllerTest {
         assertThat(duckDb.deletedKeys).isEmpty();
     }
 
+    @Test
+    @DisplayName("objectTags returns the tags for the selected server")
+    void objectTagsReturnsTags() {
+        when(useCase.getObjectTags("server", "bucket", "k.txt"))
+                .thenReturn(Map.of("env", "prod"));
+
+        Map<String, Object> resp = controller.objectTags("bucket", "k.txt");
+
+        assertThat(resp.get("ok")).isEqualTo(true);
+        assertThat(resp.get("tags")).isEqualTo(Map.of("env", "prod"));
+    }
+
+    @Test
+    @DisplayName("objectTags reports an error when the S3 call fails")
+    void objectTagsReportsFailureOnS3Error() {
+        org.mockito.Mockito.doThrow(new RuntimeException("Access Denied"))
+                .when(useCase).getObjectTags("server", "bucket", "k.txt");
+
+        Map<String, Object> resp = controller.objectTags("bucket", "k.txt");
+
+        assertThat(resp.get("ok")).isEqualTo(false);
+        assertThat(resp.get("error")).isEqualTo("Access Denied");
+    }
+
     private static class RecordingDuckDb extends DuckDbRepository {
         final List<String> deletedKeys = new ArrayList<>();
         boolean failDelete;

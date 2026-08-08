@@ -4,6 +4,7 @@ import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 
 public interface S3StoragePort {
 
@@ -16,6 +17,8 @@ public interface S3StoragePort {
     InputStream downloadObject(String serverName, String bucket, String key);
 
     io.github.uwegeercken.bucketeer.domain.model.HeadObjectResult headObject(String serverName, String bucket, String key);
+
+    Map<String, String> getObjectTags(String serverName, String bucket, String key);
 
     /**
      * Copies an object within the S3 storage.

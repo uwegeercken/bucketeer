@@ -380,6 +380,21 @@ public class BucketeerController {
         return sessionContext.getSelectedServer();
     }
 
+    @GetMapping(value = "/api/object/tags", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> objectTags(@RequestParam String bucket, @RequestParam String key) {
+        if (!StringUtils.hasText(bucket) || !StringUtils.hasText(key)) {
+            return Map.of("ok", false, "error", "Bucket and key are required");
+        }
+        String server = resolveServer(null);
+        try {
+            return Map.of("ok", true, "tags", bucketeerUseCase.getObjectTags(server, bucket, key));
+        } catch (Exception e) {
+            log.error("Failed to fetch tags for {}/{}: {}", bucket, key, e.getMessage());
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
     public record ObjectDeleteRequest(String serverName, String bucket, String key) {}
 
     public record ObjectMoveRequest(String serverName, String bucket, String sourceKey, String toPrefix) {}

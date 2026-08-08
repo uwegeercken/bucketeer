@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
@@ -97,5 +99,17 @@ class BucketeerServiceTest {
     void deleteDelegates() {
         service.deleteObject("server", "bucket", "a/file.txt");
         verify(s3StoragePort).deleteObject("server", "bucket", "a/file.txt");
+    }
+
+    @Test
+    @DisplayName("getObjectTags delegates to the storage port")
+    void getObjectTagsDelegates() {
+        when(s3StoragePort.getObjectTags("server", "bucket", "a/file.txt"))
+                .thenReturn(Map.of("env", "prod"));
+
+        Map<String, String> tags = service.getObjectTags("server", "bucket", "a/file.txt");
+
+        assertThat(tags).isEqualTo(Map.of("env", "prod"));
+        verify(s3StoragePort).getObjectTags("server", "bucket", "a/file.txt");
     }
 }

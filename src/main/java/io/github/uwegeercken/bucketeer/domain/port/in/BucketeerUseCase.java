@@ -3,6 +3,7 @@ package io.github.uwegeercken.bucketeer.domain.port.in;
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public interface BucketeerUseCase {
@@ -42,4 +43,6 @@ public interface BucketeerUseCase {
     boolean moveObject(String serverName, String bucket, String sourceKey, String targetKey);
 
     void deleteObject(String serverName, String bucket, String key);
+
+    Map<String, String> getObjectTags(String serverName, String bucket, String key);
 }

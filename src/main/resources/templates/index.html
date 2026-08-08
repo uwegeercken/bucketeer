@@ -240,6 +240,30 @@
         </div>
     </div>
 
+    <!-- Object Tags Modal -->
+    <div class="modal fade" id="tagsModal" tabindex="-1" aria-labelledby="tagsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="tagsModalLabel" th:text="#{modal.tags.title}">Object tags</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="tagsModalKey" class="text-break font-monospace small fw-semibold mb-2"></div>
+                    <table class="table table-sm mb-0" id="tagsModalTable">
+                        <tbody></tbody>
+                    </table>
+                    <div id="tagsModalNoTags" class="text-muted small" style="display:none;"></div>
+                    <div id="tagsModalError" class="alert alert-danger py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.close}">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <th:block th:replace="~{layout :: moveModal}"></th:block>
 
 </main>
@@ -271,6 +295,8 @@
     const labelMove         = /*[[#{btn.move}]]*/ 'Move object';
     const labelDelete       = /*[[#{btn.delete}]]*/ 'Delete object';
     const labelDeleteConfirm = /*[[#{modal.delete.message}]]*/ 'Delete this object permanently?\n\n{0}';
+    const labelTags          = /*[[#{btn.tags}]]*/ 'Show tags';
+    const labelTagsNoTags    = /*[[#{modal.tags.noTags}]]*/ 'No tags set for this object.';
     const labelOpError       = /*[[#{msg.opError}]]*/ 'Operation failed:';
     const labelAddingQuery   = /*[[#{cart.query.adding}]]*/ 'Adding query to selection...';
     const labelQueryAdded    = /*[[#{cart.query.addedShort}]]*/ 'Query added to selection.';
@@ -861,6 +887,7 @@
             + '<td class="small">' + escHtml(formatBucketDateTime(row.lastModified)) + '</td>'
             + '<td class="d-flex gap-1">'
             + '<a href="/download?bucket=' + encodeURIComponent(row.bucket || currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a>'
+            + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelTags) + '" aria-label="' + escHtml(labelTags) + '" onclick="openTagsModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-tag" aria-hidden="true"></i></button>'
             + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelMove) + '" aria-label="' + escHtml(labelMove) + '" onclick="openMoveModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-arrows-move" aria-hidden="true"></i></button>'
             + '<button type="button" class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelDelete) + '" aria-label="' + escHtml(labelDelete) + '" onclick="openDeleteModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-trash" aria-hidden="true"></i></button>'
             + '</td>'
@@ -1100,6 +1127,41 @@
     // --- Object Actions (move / delete) ---
 
     let pendingDelete = null;
+
+    async function openTagsModal(bucket, key) {
+        bucket = decodeURIComponent(bucket);
+        key = decodeURIComponent(key);
+        document.getElementById('tagsModalKey').textContent = key;
+        const tableEl = document.getElementById('tagsModalTable');
+        const noTagsEl = document.getElementById('tagsModalNoTags');
+        const errEl = document.getElementById('tagsModalError');
+        tableEl.querySelector('tbody').innerHTML = '';
+        noTagsEl.style.display = 'none';
+        errEl.style.display = 'none';
+        new bootstrap.Modal(document.getElementById('tagsModal')).show();
+        try {
+            const res = await fetch('/api/object/tags?bucket=' + encodeURIComponent(bucket)
+                + '&key=' + encodeURIComponent(key));
+            const data = await res.json();
+            if (!data.ok) {
+                throw new Error(data.error || '');
+            }
+            const entries = Object.entries(data.tags || {});
+            if (entries.length === 0) {
+                noTagsEl.textContent = labelTagsNoTags;
+                noTagsEl.style.display = 'block';
+                return;
+            }
+            tableEl.querySelector('tbody').innerHTML = entries.map(([k, v]) =>
+                '<tr>'
+                + '<td class="small fw-semibold font-monospace pe-3" style="width:40%;">' + escHtml(k) + '</td>'
+                + '<td class="small font-monospace">' + escHtml(v) + '</td>'
+                + '</tr>').join('');
+        } catch (e) {
+            errEl.textContent = labelOpError + ' ' + e.message;
+            errEl.style.display = 'block';
+        }
+    }
 
     function openDeleteModal(bucket, key) {
         pendingDelete = { bucket: decodeURIComponent(bucket), key: decodeURIComponent(key) };

@@ -5,13 +5,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.Tag;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -113,5 +117,40 @@ class S3AdapterTest {
 
         assertThat(result.exists()).isTrue();
         assertThat(result.sizeBytes()).isEqualTo(42L);
+    }
+
+    @Test
+    @DisplayName("getObjectTags maps the S3 tag set to a map")
+    void getObjectTagsMapsTagSet() {
+        handler = (proxy, method, args) -> {
+            if (method.getName().equals("getObjectTagging")) {
+                assertThat(args[0]).isInstanceOf(GetObjectTaggingRequest.class);
+                return GetObjectTaggingResponse.builder()
+                        .tagSet(
+                                Tag.builder().key("env").value("prod").build(),
+                                Tag.builder().key("owner").value("team-a").build())
+                        .build();
+            }
+            return method.getDefaultValue();
+        };
+
+        Map<String, String> tags = adapter.getObjectTags("server", "bucket", "key.txt");
+
+        assertThat(tags).containsExactly(
+                Map.entry("env", "prod"),
+                Map.entry("owner", "team-a"));
+    }
+
+    @Test
+    @DisplayName("getObjectTags returns an empty map when no tags are set")
+    void getObjectTagsEmptyWhenNoTags() {
+        handler = (proxy, method, args) -> {
+            if (method.getName().equals("getObjectTagging")) {
+                return GetObjectTaggingResponse.builder().build();
+            }
+            return method.getDefaultValue();
+        };
+
+        assertThat(adapter.getObjectTags("server", "bucket", "key.txt")).isEmpty();
     }
 }

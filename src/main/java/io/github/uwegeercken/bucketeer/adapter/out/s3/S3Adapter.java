@@ -12,7 +12,9 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.InputStream;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class S3Adapter implements S3StoragePort {
@@ -86,6 +88,18 @@ public class S3Adapter implements S3StoragePort {
             log.error("HEAD request failed for {}/{}: {}", bucket, key, e.getMessage());
             throw e;
         }
+    }
+
+    @Override
+    public Map<String, String> getObjectTags(String serverName, String bucket, String key) {
+        S3Client client = registry.clientFor(serverName);
+        GetObjectTaggingResponse response = client.getObjectTagging(
+                GetObjectTaggingRequest.builder().bucket(bucket).key(key).build());
+        Map<String, String> tags = new LinkedHashMap<>();
+        for (Tag tag : response.tagSet()) {
+            tags.put(tag.key(), tag.value());
+        }
+        return tags;
     }
 
     @Override

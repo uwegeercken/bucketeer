@@ -7,6 +7,7 @@ import io.github.uwegeercken.bucketeer.domain.template.PrefixTemplateEngine;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 @Service
@@ -95,5 +96,10 @@ public class BucketeerService implements BucketeerUseCase {
     @Override
     public void deleteObject(String serverName, String bucket, String key) {
         s3StoragePort.deleteObject(serverName, bucket, key);
+    }
+
+    @Override
+    public Map<String, String> getObjectTags(String serverName, String bucket, String key) {
+        return s3StoragePort.getObjectTags(serverName, bucket, key);
     }
 }
