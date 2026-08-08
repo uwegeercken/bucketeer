@@ -29,6 +29,44 @@ java -jar target/bucketeer-0.7.0.jar
 
 Open [http://localhost:8080](http://localhost:8080).
 
+### Docker / Podman
+
+Build the image (multi-stage, JDK 21):
+
+```bash
+podman build -t bucketeer:0.7.0 .
+# or: docker build -t bucketeer:0.7.0 .
+```
+
+Run the web app — data persists in a named volume (`~/.bucketeer` inside the container):
+
+```bash
+podman run -p 8080:8080 -v bucketeer-data:/root/.bucketeer bucketeer:0.7.0
+```
+
+For production, pass the encryption key as an environment variable:
+
+```bash
+podman run -p 8080:8080 -e BUCKETEER_ENCRYPTION_KEY=your-secret-key \
+  -v bucketeer-data:/root/.bucketeer bucketeer:0.7.0
+```
+
+Seed test data from a container — the `--seed` mode starts no web server and the container exits after the run:
+
+```bash
+podman run --rm bucketeer:0.7.0 --seed --endpoint=http://minio:9000 \
+  --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
+```
+
+> **Note:** inside a container network use the MinIO host/service name (e.g. `http://minio:9000`) or its container IP — `localhost:9000` only works if the seed container shares MinIO's network namespace.
+
+The [docker-compose.yaml](docker-compose.yaml) runs the full stack (bucketeer + two MinIO servers); the seed runner can be invoked against it with:
+
+```bash
+docker compose run --rm bucketeer --seed --endpoint=http://minio:9000 \
+  --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
+```
+
 ### Configuration
 
 S3 servers are configured at runtime via the **Configuration** page (`/config`).
