@@ -61,8 +61,8 @@
                 <td th:text="${server.endpoint()}" class="font-monospace small"></td>
                 <td th:text="${server.region()}"></td>
                 <td>
-                    <span th:if="${server.verifyCertificate()}" class="badge bg-success">Yes</span>
-                    <span th:if="${!server.verifyCertificate()}" class="badge bg-warning text-dark">No</span>
+                    <span th:if="${server.verifyCertificate()}" th:text="#{common.yes}">Yes</span>
+                    <span th:if="${!server.verifyCertificate()}" th:text="#{common.no}">No</span>
                 </td>
                 <td>
                     <div class="d-flex gap-1">
