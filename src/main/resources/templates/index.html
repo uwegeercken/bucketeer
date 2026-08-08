@@ -858,7 +858,7 @@
             + ' onchange="updateAddSelectedBtn()"/></td>'
             + '<td class="text-break font-monospace small">' + escHtml(row.key) + '</td>'
             + '<td class="text-end small">' + escHtml(row.sizeKb) + '</td>'
-            + '<td class="small">' + escHtml(row.lastModified) + '</td>'
+            + '<td class="small">' + escHtml(formatBucketDateTime(row.lastModified)) + '</td>'
             + '<td class="d-flex gap-1">'
             + '<a href="/download?bucket=' + encodeURIComponent(row.bucket || currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a>'
             + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelMove) + '" aria-label="' + escHtml(labelMove) + '" onclick="openMoveModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-arrows-move" aria-hidden="true"></i></button>'

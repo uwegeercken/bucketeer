@@ -15,6 +15,25 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
     <link rel="stylesheet" th:href="@{/css/bucketeer.css}"/>
     <script th:inline="javascript">
+        window.BUCKETEER_TIMEZONE = /*[[${timeZoneId}]]*/ 'UTC';
+        function formatBucketDateTime(iso) {
+            if (!iso) return '';
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return '';
+            try {
+                var parts = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: window.BUCKETEER_TIMEZONE,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit',
+                    hourCycle: 'h23'
+                }).formatToParts(d);
+                var m = {};
+                parts.forEach(function(p) { m[p.type] = p.value; });
+                return m.year + '-' + m.month + '-' + m.day + ' ' + m.hour + ':' + m.minute + ':' + m.second;
+            } catch (e) {
+                return '';
+            }
+        }
         (function() {
             var saved = localStorage.getItem('bs-theme');
             if (saved === 'dark' || saved === 'light') {

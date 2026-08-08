@@ -1,11 +1,17 @@
 package io.github.uwegeercken.bucketeer.infrastructure.db;
 
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
+import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.sql.*;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +29,35 @@ public class DuckDbRepository {
     private static final Logger log = LoggerFactory.getLogger(DuckDbRepository.class);
 
     private final Connection connection;
+
+    private TimeZoneProvider timeZoneProvider;
+
+    @Autowired
+    public void setTimeZoneProvider(TimeZoneProvider timeZoneProvider) {
+        this.timeZoneProvider = timeZoneProvider;
+    }
+
+    private ZoneId zone() {
+        return timeZoneProvider != null ? timeZoneProvider.getZone() : ZoneId.systemDefault();
+    }
+
+    private static String dayStartBoundary(String date, ZoneId zone) {
+        try {
+            return LocalDate.parse(date).atStartOfDay(zone).toInstant()
+                    .atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static String dayEndBoundary(String date, ZoneId zone) {
+        try {
+            return LocalDate.parse(date).atTime(23, 59, 59).atZone(zone).toInstant()
+                    .atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
 
     private static boolean isValidRegex(String pattern) {
         try {
@@ -145,12 +180,18 @@ public class DuckDbRepository {
             params.add(maxSizeKb * 1024);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
-            sql.append(" AND last_modified >= CAST(? AS TIMESTAMP)");
-            params.add(dateFrom + " 00:00:00");
+            String from = dayStartBoundary(dateFrom, zone());
+            if (from != null) {
+                sql.append(" AND last_modified >= CAST(? AS TIMESTAMP)");
+                params.add(from);
+            }
         }
         if (dateTo != null && !dateTo.isBlank()) {
-            sql.append(" AND last_modified <= CAST(? AS TIMESTAMP)");
-            params.add(dateTo + " 23:59:59");
+            String to = dayEndBoundary(dateTo, zone());
+            if (to != null) {
+                sql.append(" AND last_modified <= CAST(? AS TIMESTAMP)");
+                params.add(to);
+            }
         }
 
         String col = (sortBy != null && SORT_COLUMNS.contains(sortBy)) ? sortBy : "key";
@@ -213,12 +254,18 @@ public class DuckDbRepository {
             params.add(maxSizeKb * 1024);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
-            where.append(" AND last_modified >= CAST(? AS TIMESTAMP)");
-            params.add(dateFrom + " 00:00:00");
+            String from = dayStartBoundary(dateFrom, zone());
+            if (from != null) {
+                where.append(" AND last_modified >= CAST(? AS TIMESTAMP)");
+                params.add(from);
+            }
         }
         if (dateTo != null && !dateTo.isBlank()) {
-            where.append(" AND last_modified <= CAST(? AS TIMESTAMP)");
-            params.add(dateTo + " 23:59:59");
+            String to = dayEndBoundary(dateTo, zone());
+            if (to != null) {
+                where.append(" AND last_modified <= CAST(? AS TIMESTAMP)");
+                params.add(to);
+            }
         }
 
         // DuckDB COPY TO with parameterized subquery
@@ -506,9 +553,9 @@ public class DuckDbRepository {
         return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
-    private static void appendFilters(StringBuilder sql, List<Object> params,
-                                      String keyFilter, Double minSizeKb, Double maxSizeKb,
-                                      String dateFrom, String dateTo) {
+    private void appendFilters(StringBuilder sql, List<Object> params,
+                               String keyFilter, Double minSizeKb, Double maxSizeKb,
+                               String dateFrom, String dateTo) {
         if (keyFilter != null && !keyFilter.isBlank() && isValidRegex(keyFilter)) {
             sql.append(" AND regexp_matches(key, ?)");
             params.add(keyFilter);
@@ -522,12 +569,18 @@ public class DuckDbRepository {
             params.add(maxSizeKb * 1024);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
-            sql.append(" AND last_modified >= CAST(? AS TIMESTAMP)");
-            params.add(dateFrom + " 00:00:00");
+            String from = dayStartBoundary(dateFrom, zone());
+            if (from != null) {
+                sql.append(" AND last_modified >= CAST(? AS TIMESTAMP)");
+                params.add(from);
+            }
         }
         if (dateTo != null && !dateTo.isBlank()) {
-            sql.append(" AND last_modified <= CAST(? AS TIMESTAMP)");
-            params.add(dateTo + " 23:59:59");
+            String to = dayEndBoundary(dateTo, zone());
+            if (to != null) {
+                sql.append(" AND last_modified <= CAST(? AS TIMESTAMP)");
+                params.add(to);
+            }
         }
     }
 }

@@ -221,7 +221,7 @@
                 + '<td class="text-center">' + statusIcon + '</td>'
                 + '<td class="text-break font-monospace small">' + escHtml(r.key) + '</td>'
                 + '<td class="text-end small">' + sizeKb + '</td>'
-                + '<td class="small">' + escHtml(r.lastModified) + '</td>'
+                + '<td class="small">' + escHtml(formatBucketDateTime(r.lastModified)) + '</td>'
                 + '<td class="small text-muted">' + escHtml(r.etag) + '</td>'
                 + '</tr>';
         }

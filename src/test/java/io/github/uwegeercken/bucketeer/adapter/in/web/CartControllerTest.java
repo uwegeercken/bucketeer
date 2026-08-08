@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 
@@ -82,15 +83,28 @@ class CartControllerTest {
     @DisplayName("invalid date filters behave like no filter instead of throwing")
     void matchesFiltersIgnoresInvalidDates() {
         Instant t = Instant.parse("2026-08-01T12:00:00Z");
-        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, "not-a-date", "also-not")).isTrue();
+        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, "not-a-date", "also-not",
+                ZoneId.of("UTC"))).isTrue();
     }
 
     @Test
     @DisplayName("valid date filters are applied")
     void matchesFiltersAppliesValidDates() {
         Instant t = Instant.parse("2026-08-01T12:00:00Z");
-        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, "2026-08-02", null)).isFalse();
-        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, null, "2026-07-31")).isFalse();
+        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, "2026-08-02", null,
+                ZoneId.of("UTC"))).isFalse();
+        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, null, "2026-07-31",
+                ZoneId.of("UTC"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("day boundaries follow the configured timezone")
+    void matchesFiltersUsesConfiguredTimezone() {
+        Instant t = Instant.parse("2026-08-01T22:00:00Z");
+        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, "2026-08-02", null,
+                ZoneId.of("Europe/Berlin"))).isTrue();
+        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, "2026-08-02", null,
+                ZoneId.of("UTC"))).isFalse();
     }
 
     @Test

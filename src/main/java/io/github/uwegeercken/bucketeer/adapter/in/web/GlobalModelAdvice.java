@@ -2,6 +2,7 @@ package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
+import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -17,13 +18,16 @@ public class GlobalModelAdvice {
     private final BucketeerUseCase bucketeerUseCase;
     private final SessionContext sessionContext;
     private final S3Properties s3Properties;
+    private final TimeZoneProvider timeZoneProvider;
 
     public GlobalModelAdvice(BucketeerUseCase bucketeerUseCase,
                              SessionContext sessionContext,
-                             S3Properties s3Properties) {
-        this.bucketeerUseCase = bucketeerUseCase;
-        this.sessionContext   = sessionContext;
-        this.s3Properties     = s3Properties;
+                             S3Properties s3Properties,
+                             TimeZoneProvider timeZoneProvider) {
+        this.bucketeerUseCase  = bucketeerUseCase;
+        this.sessionContext    = sessionContext;
+        this.s3Properties      = s3Properties;
+        this.timeZoneProvider  = timeZoneProvider;
     }
 
     @ModelAttribute("serverNames")
@@ -57,5 +61,10 @@ public class GlobalModelAdvice {
     @ModelAttribute("appReleaseDate")
     public String appReleaseDate() {
         return s3Properties.releaseDate();
+    }
+
+    @ModelAttribute("timeZoneId")
+    public String timeZoneId() {
+        return timeZoneProvider.getZone().getId();
     }
 }

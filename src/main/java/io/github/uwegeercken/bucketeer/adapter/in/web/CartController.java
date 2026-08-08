@@ -4,6 +4,7 @@ import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,7 +22,7 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,15 +50,18 @@ public class CartController {
     private final BucketeerUseCase bucketeerUseCase;
     private final ActionHistory actionHistory;
     private final DuckDbRepository duckDb;
+    private final TimeZoneProvider timeZoneProvider;
     private final Map<String, BatchJob> batchJobs = new ConcurrentHashMap<>();
     private final ReentrantLock batchLock = new ReentrantLock();
 
     public CartController(S3StoragePort s3StoragePort, BucketeerUseCase bucketeerUseCase,
-                          ActionHistory actionHistory, DuckDbRepository duckDb) {
+                          ActionHistory actionHistory, DuckDbRepository duckDb,
+                          TimeZoneProvider timeZoneProvider) {
         this.s3StoragePort    = s3StoragePort;
         this.bucketeerUseCase = bucketeerUseCase;
         this.actionHistory    = actionHistory;
         this.duckDb           = duckDb;
+        this.timeZoneProvider = timeZoneProvider;
     }
 
     /** In-memory progress state of a background batch job (delete-selected / move-selected). */
@@ -516,7 +520,7 @@ public class CartController {
                         if (batch.exactKey() != null && !batch.exactKey().equals(obj.key())) continue;
                         if (!matchesFilters(obj.key(), obj.sizeBytes(), obj.lastModified(),
                                 batch.keyFilter(), batch.minSizeKb(), batch.maxSizeKb(),
-                                batch.dateFrom(), batch.dateTo())) continue;
+                                batch.dateFrom(), batch.dateTo(), timeZoneProvider.getZone())) continue;
                         sink.accept(obj);
                     }
                 });
@@ -563,7 +567,7 @@ public class CartController {
      */
     static boolean matchesFilters(String key, long sizeBytes, Instant lastModified,
                                   String keyFilter, Double minSizeKb, Double maxSizeKb,
-                                  String dateFrom, String dateTo) {
+                                  String dateFrom, String dateTo, ZoneId zone) {
         if (keyFilter != null && !keyFilter.isBlank()) {
             try {
                 if (!Pattern.compile(keyFilter).matcher(key).find()) {
@@ -577,30 +581,30 @@ public class CartController {
         if (maxSizeKb != null && sizeBytes > maxSizeKb * 1024) return false;
         if (lastModified != null) {
             if (dateFrom != null && !dateFrom.isBlank()) {
-                Instant from = parseDayStart(dateFrom);
+                Instant from = parseDayStart(dateFrom, zone);
                 if (from != null && lastModified.isBefore(from)) return false;
             }
             if (dateTo != null && !dateTo.isBlank()) {
-                Instant to = parseDayEnd(dateTo);
+                Instant to = parseDayEnd(dateTo, zone);
                 if (to != null && lastModified.isAfter(to)) return false;
             }
         }
         return true;
     }
 
-    /** Parses a day start boundary in UTC; invalid values behave like no filter (mirrors invalid regex). */
-    private static Instant parseDayStart(String date) {
+    /** Parses a day start boundary in the configured timezone; invalid values behave like no filter (mirrors invalid regex). */
+    private static Instant parseDayStart(String date, ZoneId zone) {
         try {
-            return LocalDate.parse(date).atStartOfDay().toInstant(ZoneOffset.UTC);
+            return LocalDate.parse(date).atStartOfDay(zone).toInstant();
         } catch (RuntimeException e) {
             return null;
         }
     }
 
-    /** Parses a day end boundary in UTC; invalid values behave like no filter. */
-    private static Instant parseDayEnd(String date) {
+    /** Parses a day end boundary in the configured timezone; invalid values behave like no filter. */
+    private static Instant parseDayEnd(String date, ZoneId zone) {
         try {
-            return LocalDate.parse(date).atTime(23, 59, 59).toInstant(ZoneOffset.UTC);
+            return LocalDate.parse(date).atTime(23, 59, 59).atZone(zone).toInstant();
         } catch (RuntimeException e) {
             return null;
         }

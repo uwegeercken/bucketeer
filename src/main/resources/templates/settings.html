@@ -93,6 +93,26 @@
             </div>
         </div>
 
+        <div class="panel-title mt-4" th:text="#{settings.section.timezone}">Timezone</div>
+
+        <div class="mb-4">
+            <label class="form-label fw-semibold small" th:text="#{settings.timeZone.label}">
+                Timezone
+            </label>
+            <div class="d-flex align-items-center gap-3">
+                <select id="timeZoneSelect" class="form-select form-select-sm" style="max-width: 300px;">
+                    <option th:value="${systemTimeZoneId}"
+                            th:text="'System default (' + ${systemTimeZoneId} + ')'"
+                            th:selected="${timeZoneId == systemTimeZoneId}"></option>
+                    <option th:each="z : ${timeZoneOptions}" th:value="${z}" th:text="${z}"
+                            th:selected="${z == timeZoneId}"></option>
+                </select>
+                <span class="text-muted small" th:text="#{settings.timeZone.hint}">
+                    Used for displaying timestamps and for interpreting the date filters.
+                </span>
+            </div>
+        </div>
+
         <div class="d-flex gap-2">
             <button class="btn btn-sm btn-primary" onclick="saveSettings()"
                     th:text="#{settings.save}">Save</button>
@@ -174,11 +194,14 @@
         settings.filterHistoryMax = filterHistoryMax;
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 
-        // Save retention days to server
+        // Save retention days and timezone to server
         await fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ snapshotRetentionDays: retentionDays })
+            body: JSON.stringify({
+                snapshotRetentionDays: retentionDays,
+                timeZoneId: document.getElementById('timeZoneSelect').value
+            })
         });
 
         const msg = document.getElementById('saveMsg');
@@ -198,11 +221,16 @@
         document.getElementById('retentionDaysInput').classList.remove('is-invalid');
         document.getElementById('historyMaxInput').classList.remove('is-invalid');
         document.getElementById('filterHistoryMaxInput').classList.remove('is-invalid');
+        const tzSelect = document.getElementById('timeZoneSelect');
+        if (tzSelect.options.length > 0) tzSelect.value = tzSelect.options[0].value;
 
         fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ snapshotRetentionDays: DEFAULT_RETENTION_DAYS })
+            body: JSON.stringify({
+                snapshotRetentionDays: DEFAULT_RETENTION_DAYS,
+                timeZoneId: tzSelect.value
+            })
         });
     }
 

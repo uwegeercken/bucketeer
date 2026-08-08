@@ -1,7 +1,10 @@
 package io.github.uwegeercken.bucketeer.domain.template.function;
 
+import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -18,6 +21,17 @@ import java.util.regex.Pattern;
 public class DateFunction implements TemplateFunction {
 
     private static final Pattern OFFSET_PATTERN = Pattern.compile("^([+-])(\\d+)([dhwMy])$");
+
+    private TimeZoneProvider timeZoneProvider;
+
+    @Autowired
+    public void setTimeZoneProvider(TimeZoneProvider timeZoneProvider) {
+        this.timeZoneProvider = timeZoneProvider;
+    }
+
+    private ZoneId zone() {
+        return timeZoneProvider != null ? timeZoneProvider.getZone() : ZoneId.systemDefault();
+    }
 
     @Override public String name() { return "date"; }
     @Override public int expectedArgCount() { return 1; }
@@ -47,7 +61,7 @@ public class DateFunction implements TemplateFunction {
         if (args.isEmpty()) throw new TemplateFunctionException(
                 "Function 'date': pattern argument is required");
         String pattern = args.getFirst();
-        ZonedDateTime now = ZonedDateTime.now();
+        ZonedDateTime now = ZonedDateTime.now(zone());
         if (args.size() >= 2) now = applyOffset(now, args.get(1).trim());
         try {
             return DateTimeFormatter.ofPattern(pattern).format(now);

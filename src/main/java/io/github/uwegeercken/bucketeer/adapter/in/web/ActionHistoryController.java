@@ -2,6 +2,7 @@ package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
+import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
 import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -12,26 +13,34 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Controller
 public class ActionHistoryController {
 
     private static final Logger log = LoggerFactory.getLogger(ActionHistoryController.class);
+    private static final DateTimeFormatter DISPLAY_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ActionHistory actionHistory;
     private final ObjectMapper mapper;
+    private final TimeZoneProvider timeZoneProvider;
 
-    public ActionHistoryController(ActionHistory actionHistory, ObjectMapper mapper) {
+    public ActionHistoryController(ActionHistory actionHistory, ObjectMapper mapper,
+                                   TimeZoneProvider timeZoneProvider) {
         this.actionHistory = actionHistory;
         this.mapper = mapper;
+        this.timeZoneProvider = timeZoneProvider;
     }
 
     @GetMapping("/history")
     public String historyPage(Model model) {
         model.addAttribute("historyRows", actionHistory.list().stream()
-                .map(ActionHistoryController::toDisplayRow)
+                .map(e -> toDisplayRow(e, timeZoneProvider.getZone()))
                 .toList());
         model.addAttribute("backUrl", "/");
         return "history";
@@ -75,10 +84,9 @@ public class ActionHistoryController {
         );
     }
 
-    private static Map<String, Object> toDisplayRow(ActionEntry e) {
+    private static Map<String, Object> toDisplayRow(ActionEntry e, ZoneId zone) {
         return Map.of(
-                "time",      e.timestamp().atZone(java.time.ZoneId.systemDefault())
-                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                "time",      e.timestamp().atZone(zone).format(DISPLAY_FORMAT),
                 "batchId",   e.batchId() != null ? e.batchId() : "",
                 "status",    statusKey(e.status()),
                 "server",    e.server(),
@@ -92,6 +100,6 @@ public class ActionHistoryController {
         if (status == ActionEntry.Status.NOT_AFFECTED) {
             return "notAffected";
         }
-        return status.name().toLowerCase(java.util.Locale.ROOT);
+        return status.name().toLowerCase(Locale.ROOT);
     }
 }
