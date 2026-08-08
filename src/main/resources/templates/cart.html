@@ -54,6 +54,7 @@
                 <th th:text="#{cart.server}">Server</th>
                 <th th:text="#{cart.bucket}">Bucket</th>
                 <th th:text="#{snapshot.prefix}">Prefix</th>
+                <th th:text="#{cart.batch.filters}">Filters</th>
                 <th class="text-end" style="width:120px" th:text="#{cart.batch.objects}">Objects</th>
                 <th class="text-end" style="width:120px" th:text="#{cart.batch.size}">Total size</th>
                 <th style="width:52px"></th>
@@ -102,6 +103,11 @@
     const labelBatchDeleteResult = /*[[#{cart.batch.deleteResult}]]*/ 'Deleted: {0}, failed: {1}.';
     const labelBatchMixed        = /*[[#{cart.batch.mixed}]]*/ 'Selection must contain objects of a single server and bucket.';
     const labelOpError         = /*[[#{msg.opError}]]*/ 'Operation failed:';
+    const labelFilterKey        = /*[[#{label.filterKey}]]*/ 'Name contains';
+    const labelFilterSizeMin    = /*[[#{label.filterSizeMin}]]*/ 'Size min (KB)';
+    const labelFilterSizeMax    = /*[[#{label.filterSizeMax}]]*/ 'Size max (KB)';
+    const labelFilterDateFrom   = /*[[#{label.filterDateFrom}]]*/ 'Date from';
+    const labelFilterDateTo     = /*[[#{label.filterDateTo}]]*/ 'Date to';
 
     let pendingCartDelete = null;
     let selectAllChecked  = false;
@@ -162,12 +168,23 @@
             + '<td>' + escHtml(item.serverName) + '</td>'
             + '<td class="font-monospace">' + escHtml(item.bucket) + '</td>'
             + '<td class="font-monospace">' + escHtml(item.prefix || '\u2013') + '</td>'
+            + '<td class="font-monospace">' + renderUsedFilters(item) + '</td>'
             + '<td class="text-end">' + objectCount + '</td>'
             + '<td class="text-end">' + formatSizeBytes(item.totalSizeBytes) + '</td>'
             + '<td><button type="button" class="btn btn-sm btn-outline-danger btn-icon"'
             + ' title="' + escHtml(labelRemove) + '" data-id="' + escHtml(item.id) + '"'
             + ' onclick="removeItem(this)"><i class="bi bi-x"></i></button></td>'
             + '</tr>';
+    }
+
+    function renderUsedFilters(item) {
+        const parts = [];
+        if (item.keyFilter)         parts.push(escHtml(labelFilterKey) + ': ' + escHtml(item.keyFilter));
+        if (item.minSizeKb != null) parts.push(escHtml(labelFilterSizeMin) + ': ' + escHtml(String(item.minSizeKb)));
+        if (item.maxSizeKb != null) parts.push(escHtml(labelFilterSizeMax) + ': ' + escHtml(String(item.maxSizeKb)));
+        if (item.dateFrom)          parts.push(escHtml(labelFilterDateFrom) + ': ' + escHtml(item.dateFrom));
+        if (item.dateTo)            parts.push(escHtml(labelFilterDateTo) + ': ' + escHtml(item.dateTo));
+        return parts.length ? parts.join(' \u00b7 ') : '\u2013';
     }
 
     async function renderCartRows() {
