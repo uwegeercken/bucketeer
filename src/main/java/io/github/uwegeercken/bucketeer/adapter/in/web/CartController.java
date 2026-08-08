@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -49,6 +50,7 @@ public class CartController {
     private final ActionHistory actionHistory;
     private final DuckDbRepository duckDb;
     private final Map<String, BatchJob> batchJobs = new ConcurrentHashMap<>();
+    private final ReentrantLock batchLock = new ReentrantLock();
 
     public CartController(S3StoragePort s3StoragePort, BucketeerUseCase bucketeerUseCase,
                           ActionHistory actionHistory, DuckDbRepository duckDb) {
@@ -72,7 +74,7 @@ public class CartController {
     }
 
     /** Stable identity of a concrete object (server, bucket, key) used for de-duplication. */
-    private record EntryKey(String server, String bucket, String key) {}
+    record EntryKey(String server, String bucket, String key) {}
 
     @SuppressWarnings("unchecked")
     private List<CartBatch> getCart(HttpSession session) {
@@ -311,35 +313,48 @@ public class CartController {
 
     private void runDeleteSelected(BatchJob job, List<CartActionRequest> actions, HttpSession session) {
         String batchId = nextBatchId();
-        Set<EntryKey> keys = collectKeys(session, actions);
-        job.total = keys.size();
-        int deleted = 0;
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (EntryKey k : keys) {
-            job.processed.incrementAndGet();
+        Set<EntryKey> failedKeys = new HashSet<>();
+        try {
+            batchLock.lock();
             try {
-                bucketeerUseCase.deleteObject(k.server(), k.bucket(), k.key());
-                deleted++;
-                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.SELECTION,
-                        batchId, k.server(), k.bucket(), k.key(), null,
-                        ActionEntry.Status.DELETED, null));
-                results.add(Map.of("key", k.key(), "status", "DELETED"));
-            } catch (Exception e) {
-                log.error("Delete failed for {}/{}: {}", k.bucket(), k.key(), e.getMessage());
-                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.SELECTION,
-                        batchId, k.server(), k.bucket(), k.key(), null,
-                        ActionEntry.Status.FAILED, e.getMessage()));
-                results.add(Map.of("key", k.key(), "status", "FAILED", "error", e.getMessage()));
+                Set<EntryKey> keys = collectKeys(session, actions);
+                job.total = keys.size();
+                int deleted = 0;
+                List<Map<String, Object>> results = new ArrayList<>();
+                for (EntryKey k : keys) {
+                    job.processed.incrementAndGet();
+                    try {
+                        bucketeerUseCase.deleteObject(k.server(), k.bucket(), k.key());
+                        deleted++;
+                        actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.SELECTION,
+                                batchId, k.server(), k.bucket(), k.key(), null,
+                                ActionEntry.Status.DELETED, null));
+                        results.add(Map.of("key", k.key(), "status", "DELETED"));
+                    } catch (Exception e) {
+                        failedKeys.add(k);
+                        log.error("Delete failed for {}/{}: {}", k.bucket(), k.key(), e.getMessage());
+                        actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.SELECTION,
+                                batchId, k.server(), k.bucket(), k.key(), null,
+                                ActionEntry.Status.FAILED, e.getMessage()));
+                        results.add(Map.of("key", k.key(), "status", "FAILED", "error", e.getMessage()));
+                    }
+                }
+                job.result = Map.of(
+                        "processed", keys.size(),
+                        "deleted",   deleted,
+                        "failed",    keys.size() - deleted,
+                        "items",     results
+                );
+            } finally {
+                batchLock.unlock();
             }
+            removeProcessedBatches(session, actions, failedKeys);
+        } catch (Exception e) {
+            log.error("Delete-selected job failed: {}", e.getMessage(), e);
+            job.error = e.getMessage();
+        } finally {
+            job.done = true;
         }
-        removeProcessedBatches(session, actions);
-        job.result = Map.of(
-                "processed", keys.size(),
-                "deleted",   deleted,
-                "failed",    keys.size() - deleted,
-                "items",     results
-        );
-        job.done = true;
     }
 
     @PostMapping(value = "/api/cart/move-selected", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -371,52 +386,65 @@ public class CartController {
 
     private void runMoveSelected(BatchJob job, CartMoveRequest req, HttpSession session) {
         String batchId = nextBatchId();
-        Set<EntryKey> keys = collectMoveKeys(session, req);
-        job.total = keys.size();
-        int moved = 0;
-        int skipped = 0;
-        int failed = 0;
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (EntryKey k : keys) {
-            job.processed.incrementAndGet();
-            String targetKey = targetKey(k.key(), req.toPrefix());
-            if (targetKey.equals(k.key())) {
-                skipped++;
-                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
-                        batchId, k.server(), k.bucket(), k.key(), targetKey,
-                        ActionEntry.Status.SKIPPED, "Target equals source"));
-                results.add(Map.of("key", k.key(), "targetKey", targetKey, "status", "SKIPPED"));
-                continue;
-            }
+        Set<EntryKey> failedKeys = new HashSet<>();
+        try {
+            batchLock.lock();
             try {
-                boolean movedFlag = bucketeerUseCase.moveObject(k.server(), k.bucket(), k.key(), targetKey);
-                if (movedFlag) {
-                    moved++;
-                } else {
-                    skipped++;
+                Set<EntryKey> keys = collectMoveKeys(session, req);
+                job.total = keys.size();
+                int moved = 0;
+                int skipped = 0;
+                int failed = 0;
+                List<Map<String, Object>> results = new ArrayList<>();
+                for (EntryKey k : keys) {
+                    job.processed.incrementAndGet();
+                    String targetKey = targetKey(k.key(), req.toPrefix());
+                    if (targetKey.equals(k.key())) {
+                        skipped++;
+                        actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
+                                batchId, k.server(), k.bucket(), k.key(), targetKey,
+                                ActionEntry.Status.SKIPPED, "Target equals source"));
+                        results.add(Map.of("key", k.key(), "targetKey", targetKey, "status", "SKIPPED"));
+                        continue;
+                    }
+                    try {
+                        boolean movedFlag = bucketeerUseCase.moveObject(k.server(), k.bucket(), k.key(), targetKey);
+                        if (movedFlag) {
+                            moved++;
+                        } else {
+                            skipped++;
+                        }
+                        actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
+                                batchId, k.server(), k.bucket(), k.key(), targetKey,
+                                movedFlag ? ActionEntry.Status.MOVED : ActionEntry.Status.SKIPPED, null));
+                        results.add(Map.of("key", k.key(), "targetKey", targetKey,
+                                "status", movedFlag ? "MOVED" : "SKIPPED"));
+                    } catch (Exception e) {
+                        failed++;
+                        failedKeys.add(k);
+                        log.error("Move failed for {}/{}: {}", k.bucket(), k.key(), e.getMessage());
+                        actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
+                                batchId, k.server(), k.bucket(), k.key(), targetKey,
+                                ActionEntry.Status.FAILED, e.getMessage()));
+                        results.add(Map.of("key", k.key(), "targetKey", targetKey, "status", "FAILED", "error", e.getMessage()));
+                    }
                 }
-                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
-                        batchId, k.server(), k.bucket(), k.key(), targetKey,
-                        movedFlag ? ActionEntry.Status.MOVED : ActionEntry.Status.SKIPPED, null));
-                results.add(Map.of("key", k.key(), "targetKey", targetKey,
-                        "status", movedFlag ? "MOVED" : "SKIPPED"));
-            } catch (Exception e) {
-                failed++;
-                log.error("Move failed for {}/{}: {}", k.bucket(), k.key(), e.getMessage());
-                actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.SELECTION,
-                        batchId, k.server(), k.bucket(), k.key(), targetKey,
-                        ActionEntry.Status.FAILED, e.getMessage()));
-                results.add(Map.of("key", k.key(), "targetKey", targetKey, "status", "FAILED", "error", e.getMessage()));
+                job.result = Map.of(
+                        "moved",   moved,
+                        "skipped", skipped,
+                        "failed",  failed,
+                        "items",   results
+                );
+            } finally {
+                batchLock.unlock();
             }
+            removeProcessedBatches(session, req.queries(), failedKeys);
+        } catch (Exception e) {
+            log.error("Move-selected job failed: {}", e.getMessage(), e);
+            job.error = e.getMessage();
+        } finally {
+            job.done = true;
         }
-        removeProcessedBatches(session, req.queries());
-        job.result = Map.of(
-                "moved",   moved,
-                "skipped", skipped,
-                "failed",  failed,
-                "items",   results
-        );
-        job.done = true;
     }
 
     /**
@@ -439,7 +467,9 @@ public class CartController {
         Set<EntryKey> keys = new LinkedHashSet<>();
         if (req.keys() != null) {
             for (String key : req.keys()) {
-                keys.add(new EntryKey(req.serverName(), req.bucket(), key));
+                if (key != null && !key.endsWith("/")) {
+                    keys.add(new EntryKey(req.serverName(), req.bucket(), key));
+                }
             }
         }
         if (req.queries() != null) {
@@ -456,6 +486,7 @@ public class CartController {
     private void collectBatchKeys(CartBatch batch, Set<EntryKey> sink) {
         if (!batch.isLiveQuery()) {
             for (String key : batch.keys()) {
+                if (key.endsWith("/")) continue;
                 sink.add(new EntryKey(batch.serverName(), batch.bucket(), key));
             }
         } else {
@@ -491,8 +522,12 @@ public class CartController {
                 });
     }
 
-    /** Removes the batch entries that were executed (all keys of a key batch or the live query batch). */
-    private void removeProcessedBatches(HttpSession session, List<CartActionRequest> actions) {
+    /**
+     * Removes the batch entries that were executed successfully. A batch is only removed when none
+     * of its objects failed - failed keys stay in the cart so the operation can be retried.
+     */
+    private void removeProcessedBatches(HttpSession session, List<CartActionRequest> actions,
+                                        Set<EntryKey> failedKeys) {
         List<CartBatch> cart = getCart(session);
         Set<String> processedIds = new HashSet<>();
         if (actions != null) {
@@ -502,7 +537,23 @@ public class CartController {
                 }
             }
         }
-        cart.removeIf(b -> processedIds.contains(b.id()));
+        cart.removeIf(b -> processedIds.contains(b.id()) && batchFullySucceeded(b, failedKeys));
+    }
+
+    /** True if none of the batch's objects failed; live query batches are kept when anything failed. */
+    static boolean batchFullySucceeded(CartBatch batch, Set<EntryKey> failedKeys) {
+        if (failedKeys == null || failedKeys.isEmpty()) {
+            return true;
+        }
+        if (batch.isLiveQuery()) {
+            return false;
+        }
+        for (String key : batch.keys()) {
+            if (failedKeys.contains(new EntryKey(batch.serverName(), batch.bucket(), key))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -526,15 +577,33 @@ public class CartController {
         if (maxSizeKb != null && sizeBytes > maxSizeKb * 1024) return false;
         if (lastModified != null) {
             if (dateFrom != null && !dateFrom.isBlank()) {
-                Instant from = LocalDate.parse(dateFrom).atStartOfDay().toInstant(ZoneOffset.UTC);
-                if (lastModified.isBefore(from)) return false;
+                Instant from = parseDayStart(dateFrom);
+                if (from != null && lastModified.isBefore(from)) return false;
             }
             if (dateTo != null && !dateTo.isBlank()) {
-                Instant to = LocalDate.parse(dateTo).atTime(23, 59, 59).toInstant(ZoneOffset.UTC);
-                if (lastModified.isAfter(to)) return false;
+                Instant to = parseDayEnd(dateTo);
+                if (to != null && lastModified.isAfter(to)) return false;
             }
         }
         return true;
+    }
+
+    /** Parses a day start boundary in UTC; invalid values behave like no filter (mirrors invalid regex). */
+    private static Instant parseDayStart(String date) {
+        try {
+            return LocalDate.parse(date).atStartOfDay().toInstant(ZoneOffset.UTC);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Parses a day end boundary in UTC; invalid values behave like no filter. */
+    private static Instant parseDayEnd(String date) {
+        try {
+            return LocalDate.parse(date).atTime(23, 59, 59).toInstant(ZoneOffset.UTC);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     @GetMapping(value = "/api/cart/batch/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)

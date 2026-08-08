@@ -209,10 +209,12 @@
             + '</tr></thead><tbody>';
 
         for (const r of data.results) {
-            const rowClass = r.exists ? '' : 'table-danger';
-            const statusIcon = r.exists
-                ? '<i class="bi bi-check-circle-fill text-success"></i>'
-                : '<i class="bi bi-x-circle-fill text-danger"></i>';
+            const rowClass = r.error ? 'table-warning' : r.exists ? '' : 'table-danger';
+            const statusIcon = r.error
+                ? '<i class="bi bi-exclamation-triangle-fill text-warning" title="' + escHtml(r.error) + '"></i>'
+                : r.exists
+                    ? '<i class="bi bi-check-circle-fill text-success"></i>'
+                    : '<i class="bi bi-x-circle-fill text-danger"></i>';
             const sizeKb = r.sizeBytes != null ? (r.sizeBytes / 1024).toFixed(2) : '';
 
             html += '<tr class="' + rowClass + '">'

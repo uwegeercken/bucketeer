@@ -22,6 +22,20 @@ services:
     volumes:
       - minio-data:/data
 
+  minio2:
+    image: minio/minio:latest
+    container_name: minio2
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data2:/data
+
 volumes:
   bucketeer-data:
   minio-data:
+  minio-data2:

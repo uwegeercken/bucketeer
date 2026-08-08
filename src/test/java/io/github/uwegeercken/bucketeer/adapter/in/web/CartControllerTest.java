@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,6 +14,11 @@ class CartControllerTest {
     private static CartBatch batch(String id, String server, String bucket) {
         return new CartBatch(id, 1, server, bucket, null, null, null, null, null, null, null,
                 0, List.of(), 0, 0, Instant.now());
+    }
+
+    private static CartBatch batchWithKeys(String id, String server, String bucket, String... keys) {
+        return new CartBatch(id, 1, server, bucket, null, null, null, null, null, null, null,
+                0, List.of(keys), keys.length, 0, Instant.now());
     }
 
     @Test
@@ -70,5 +76,46 @@ class CartControllerTest {
     void nullTargetPrefix() {
         assertThat(CartController.targetKey("a/b/c.txt", null))
                 .isEqualTo("c.txt");
+    }
+
+    @Test
+    @DisplayName("invalid date filters behave like no filter instead of throwing")
+    void matchesFiltersIgnoresInvalidDates() {
+        Instant t = Instant.parse("2026-08-01T12:00:00Z");
+        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, "not-a-date", "also-not")).isTrue();
+    }
+
+    @Test
+    @DisplayName("valid date filters are applied")
+    void matchesFiltersAppliesValidDates() {
+        Instant t = Instant.parse("2026-08-01T12:00:00Z");
+        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, "2026-08-02", null)).isFalse();
+        assertThat(CartController.matchesFilters("a", 10, t, null, null, null, null, "2026-07-31")).isFalse();
+    }
+
+    @Test
+    @DisplayName("a batch with no failed keys is fully succeeded")
+    void batchFullySucceededWithoutFailures() {
+        CartBatch b = batchWithKeys("1", "S", "B", "a.txt", "b.txt");
+        assertThat(CartController.batchFullySucceeded(b, Set.of())).isTrue();
+        assertThat(CartController.batchFullySucceeded(b, Set.of(new CartController.EntryKey("S", "B", "other.txt")))).isTrue();
+    }
+
+    @Test
+    @DisplayName("a key batch with a failed key is kept in the cart")
+    void batchFullySucceededKeepsOnKeyFailure() {
+        CartBatch b = batchWithKeys("1", "S", "B", "a.txt", "b.txt");
+        assertThat(CartController.batchFullySucceeded(
+                b, Set.of(new CartController.EntryKey("S", "B", "a.txt")))).isFalse();
+    }
+
+    @Test
+    @DisplayName("a live query batch is kept when anything failed")
+    void batchFullySucceededKeepsLiveQueryOnAnyFailure() {
+        CartBatch live = new CartBatch("2", 1, "S", "B", "pre/", null, null, null, null, null, null,
+                0, List.of(), 5, 0, Instant.now());
+        assertThat(CartController.batchFullySucceeded(
+                live, Set.of(new CartController.EntryKey("S", "B", "x.txt")))).isFalse();
+        assertThat(CartController.batchFullySucceeded(live, Set.of())).isTrue();
     }
 }

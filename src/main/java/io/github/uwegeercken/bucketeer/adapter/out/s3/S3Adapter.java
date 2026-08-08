@@ -79,9 +79,12 @@ public class S3Adapter implements S3StoragePort {
             );
         } catch (NoSuchKeyException e) {
             return HeadObjectResult.notFound();
-        } catch (Exception e) {
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404) {
+                return HeadObjectResult.notFound();
+            }
             log.error("HEAD request failed for {}/{}: {}", bucket, key, e.getMessage());
-            return HeadObjectResult.notFound();
+            throw e;
         }
     }
 

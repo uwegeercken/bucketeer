@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -74,14 +75,26 @@ public class KeyCheckController {
 
         for (String key : keys) {
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                HeadObjectResult result = s3StoragePort.headObject(serverName, bucket, key);
-                results.add(Map.of(
-                        "key", key,
-                        "exists", result.exists(),
-                        "sizeBytes", result.sizeBytes(),
-                        "lastModified", result.lastModified() != null ? result.lastModified().toString() : "",
-                        "etag", result.eTag() != null ? result.eTag() : ""
-                ));
+                Map<String, Object> row;
+                try {
+                    HeadObjectResult result = s3StoragePort.headObject(serverName, bucket, key);
+                    row = new HashMap<>();
+                    row.put("key", key);
+                    row.put("exists", result.exists());
+                    row.put("sizeBytes", result.sizeBytes());
+                    row.put("lastModified", result.lastModified() != null ? result.lastModified().toString() : "");
+                    row.put("etag", result.eTag() != null ? result.eTag() : "");
+                } catch (Exception e) {
+                    log.error("Key check failed for {}/{}: {}", bucket, key, e.getMessage());
+                    row = new HashMap<>();
+                    row.put("key", key);
+                    row.put("exists", false);
+                    row.put("sizeBytes", null);
+                    row.put("lastModified", "");
+                    row.put("etag", "");
+                    row.put("error", e.getMessage());
+                }
+                results.add(row);
                 synchronized (processed) {
                     processed[0]++;
                 }

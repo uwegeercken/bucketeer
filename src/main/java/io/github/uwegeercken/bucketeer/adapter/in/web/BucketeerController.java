@@ -317,17 +317,21 @@ public class BucketeerController {
         String server = resolveServer(req.serverName());
         try {
             bucketeerUseCase.deleteObject(server, req.bucket(), req.key());
-            duckDb.deleteByKey(req.bucket(), req.key());
-            CartController.removeItem(session, server, req.bucket(), req.key());
-            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.RESULTS,
-                    null, server, req.bucket(), req.key(), null, ActionEntry.Status.DELETED, null));
-            return Map.of("ok", true);
         } catch (Exception e) {
             log.error("Delete failed for {}/{}: {}", req.bucket(), req.key(), e.getMessage());
             actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.RESULTS,
                     null, server, req.bucket(), req.key(), null, ActionEntry.Status.FAILED, e.getMessage()));
             return Map.of("ok", false, "error", e.getMessage());
         }
+        try {
+            duckDb.deleteByKey(req.bucket(), req.key());
+            CartController.removeItem(session, server, req.bucket(), req.key());
+        } catch (Exception e) {
+            log.error("Failed to update results/cart after delete {}/{}: {}", req.bucket(), req.key(), e.getMessage());
+        }
+        actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.DELETE, ActionEntry.Origin.RESULTS,
+                null, server, req.bucket(), req.key(), null, ActionEntry.Status.DELETED, null));
+        return Map.of("ok", true);
     }
 
     @PostMapping(value = "/api/object/move", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -345,14 +349,9 @@ public class BucketeerController {
                     ActionEntry.Status.SKIPPED, "Target equals source"));
             return Map.of("ok", true, "skipped", true, "sameKey", true);
         }
+        boolean moved;
         try {
-            boolean moved = bucketeerUseCase.moveObject(server, req.bucket(), req.sourceKey(), targetKey);
-            duckDb.deleteByKey(req.bucket(), req.sourceKey());
-            CartController.removeItem(session, server, req.bucket(), req.sourceKey());
-            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.RESULTS,
-                    null, server, req.bucket(), req.sourceKey(), targetKey,
-                    moved ? ActionEntry.Status.MOVED : ActionEntry.Status.SKIPPED, null));
-            return Map.of("ok", true, "skipped", !moved);
+            moved = bucketeerUseCase.moveObject(server, req.bucket(), req.sourceKey(), targetKey);
         } catch (Exception e) {
             log.error("Move failed for {}/{}: {}", req.bucket(), req.sourceKey(), e.getMessage());
             actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.RESULTS,
@@ -360,6 +359,18 @@ public class BucketeerController {
                     ActionEntry.Status.FAILED, e.getMessage()));
             return Map.of("ok", false, "error", e.getMessage());
         }
+        if (moved) {
+            try {
+                duckDb.deleteByKey(req.bucket(), req.sourceKey());
+                CartController.removeItem(session, server, req.bucket(), req.sourceKey());
+            } catch (Exception e) {
+                log.error("Failed to update results/cart after move {}/{}: {}", req.bucket(), req.sourceKey(), e.getMessage());
+            }
+        }
+        actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.MOVE, ActionEntry.Origin.RESULTS,
+                null, server, req.bucket(), req.sourceKey(), targetKey,
+                moved ? ActionEntry.Status.MOVED : ActionEntry.Status.SKIPPED, null));
+        return Map.of("ok", true, "skipped", !moved);
     }
 
     private String resolveServer(String serverName) {
