@@ -31,6 +31,15 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.7.0 <small class="text-muted">2026-08-08</small></h6>
+                    <ul>
+                        <li>Major framework update: Spring Boot 4 (with Jackson 3) — faster startup, modern baseline</li>
+                        <li>AWS SDK updated to 2.51.3 and DuckDB to 1.5.5.1</li>
+                        <li>Snapshot comparison fixed: the older snapshot is always the baseline and the newer the target, so added/removed are logical regardless of the selection order; the diff title shows <em>server - bucket - prefix - saved versus saved</em></li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.6.3 <small class="text-muted">2026-08-08</small></h6>
                     <ul>
                         <li>All timestamps are displayed in the local timezone: results, action history, key check and snapshots</li>

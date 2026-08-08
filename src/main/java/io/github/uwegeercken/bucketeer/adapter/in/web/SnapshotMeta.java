@@ -1,9 +1,7 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -28,9 +26,7 @@ public record SnapshotMeta(
         long rowCount
 ) implements Serializable {
 
-    private static final ObjectMapper mapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     private static final DateTimeFormatter ID_FORMAT = DateTimeFormatter.ofPattern("yyMMddHHmmss");
 

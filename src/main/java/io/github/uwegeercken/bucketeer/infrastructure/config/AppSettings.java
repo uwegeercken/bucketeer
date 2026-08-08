@@ -1,7 +1,8 @@
 package io.github.uwegeercken.bucketeer.infrastructure.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,8 @@ public class AppSettings {
     private static final Logger log = LoggerFactory.getLogger(AppSettings.class);
     private static final Path SETTINGS_PATH = Path.of(System.getProperty("user.home"), ".bucketeer", "settings.json");
 
-    private final ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    private final ObjectMapper mapper = JsonMapper.builder()
+            .enable(SerializationFeature.INDENT_OUTPUT).build();
     private volatile int snapshotRetentionDays = 30;
     private volatile String timeZoneId = ZoneId.systemDefault().getId();
 
@@ -67,14 +69,14 @@ public class AppSettings {
         if (!Files.exists(SETTINGS_PATH)) return;
         try {
             Map<String, Object> data = mapper.readValue(SETTINGS_PATH.toFile(),
-                    new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                    new tools.jackson.core.type.TypeReference<>() {});
             Object val = data.get("snapshotRetentionDays");
             if (val instanceof Number n) snapshotRetentionDays = n.intValue();
             Object tz = data.get("timeZoneId");
             if (tz instanceof String s) {
                 timeZoneId = isValidZoneId(s) ? s.trim() : ZoneId.systemDefault().getId();
             }
-        } catch (IOException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             log.error("Failed to load settings from {}: {}", SETTINGS_PATH, e.getMessage());
         }
     }
@@ -87,7 +89,6 @@ public class AppSettings {
             data.put("timeZoneId", timeZoneId);
             mapper.writeValue(SETTINGS_PATH.toFile(), data);
         } catch (IOException e) {
-            log.error("Failed to save settings: {}", e.getMessage());
-        }
+            log.error("Failed to save settings: {}", e.getMessage());        }
     }
 }

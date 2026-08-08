@@ -86,6 +86,11 @@
         return formatBucketDateTime(value);
     }
 
+    function formatMsg(tpl) {
+        const args = Array.prototype.slice.call(arguments, 1);
+        return tpl.replace(/\{(\d+)\}/g, function (m, i) { return args[i] !== undefined ? args[i] : m; });
+    }
+
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
@@ -181,7 +186,16 @@
         downloadBtn.style.display = 'none';
         diffId1 = ids[0];
         diffId2 = ids[1];
-        titleEl.textContent = labelDiffTitle + ' ' + ids[0] + ' vs ' + ids[1];
+
+        let oldSnap = s1;
+        let newSnap = s2;
+        if (new Date(s1.createdAt) > new Date(s2.createdAt)) {
+            oldSnap = s2;
+            newSnap = s1;
+        }
+        titleEl.textContent = formatMsg(labelDiffTitle,
+            oldSnap.serverName || '', oldSnap.bucket || '', oldSnap.prefix || '',
+            formatDateTime(oldSnap.createdAt), formatDateTime(newSnap.createdAt));
         summaryEl.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div> Comparing...';
         contentEl.innerHTML = '';
 
@@ -201,7 +215,9 @@
             const removedCount = data.removed.length;
             const changedCount = data.changed.length;
 
-            titleEl.textContent = labelDiffTitle + ' ' + data.snapshot1Name + ' vs ' + data.snapshot2Name;
+            titleEl.textContent = formatMsg(labelDiffTitle,
+                data.server || '', data.bucket || '', data.prefix || '',
+                formatDateTime(data.oldCreatedAt), formatDateTime(data.newCreatedAt));
 
             if (addedCount === 0 && removedCount === 0 && changedCount === 0) {
                 summaryEl.innerHTML = '<span class="text-success">' + escHtml(labelDiffNoChanges) + '</span>';

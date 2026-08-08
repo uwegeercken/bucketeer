@@ -1,8 +1,9 @@
 package io.github.uwegeercken.bucketeer.infrastructure.config.server;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -26,7 +27,8 @@ public class ServerConfigRepository {
     public ServerConfigRepository(CredentialEncryptor encryptor) {
         this.encryptor  = encryptor;
         this.configPath = Path.of(System.getProperty("user.home"), CONFIG_FILE);
-        this.mapper     = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+        this.mapper     = JsonMapper.builder()
+                .enable(SerializationFeature.INDENT_OUTPUT).build();
     }
 
     public boolean configFileExists() {
@@ -51,7 +53,7 @@ public class ServerConfigRepository {
             log.error("Failed to decrypt server credentials - encryption key may have changed. " +
                     "Please re-enter credentials via /config: {}", e.getMessage());
             return List.of();
-        } catch (IOException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             log.error("Failed to load server config from {}: {}", configPath, e.getMessage());
             return List.of();
         }

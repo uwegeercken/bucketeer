@@ -1,9 +1,7 @@
 package io.github.uwegeercken.bucketeer.infrastructure.history;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,9 +35,7 @@ public class ActionHistory {
 
     ActionHistory(Path file) {
         this.file = file;
-        this.mapper = new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        this.mapper = new ObjectMapper();
     }
 
     /** Appends an entry to the log. Failures are logged as error messages only. */
@@ -68,7 +64,7 @@ public class ActionHistory {
                     if (line.isBlank()) return;
                     try {
                         entries.add(mapper.readValue(line, ActionEntry.class));
-                    } catch (JsonProcessingException e) {
+                    } catch (JacksonException e) {
                         log.error("Failed to parse action history entry: {}", e.getMessage());
                     }
                 });

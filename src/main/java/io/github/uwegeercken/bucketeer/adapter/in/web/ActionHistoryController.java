@@ -1,6 +1,6 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
 import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
 import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;

@@ -9,5 +9,5 @@ server:
   port: 8080
 
 bucketeer:
-  version: "0.6.3"
+  version: "0.7.0"
   release-date: "2026-08-08"
