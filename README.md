@@ -29,6 +29,20 @@ java -jar target/bucketeer-0.7.0.jar
 
 Open [http://localhost:8080](http://localhost:8080).
 
+### Custom port
+
+The default port 8080 can be changed without recompiling:
+
+```bash
+# command line
+java -jar target/bucketeer-0.7.0.jar --server.port=9000
+
+# or environment variable (same priority as the command line)
+SERVER_PORT=9000 java -jar target/bucketeer-0.7.0.jar
+```
+
+Open [http://localhost:9000](http://localhost:9000) then.
+
 ### Docker / Podman
 
 Build the image (multi-stage, JDK 21):
