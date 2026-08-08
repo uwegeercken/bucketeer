@@ -31,6 +31,15 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.7.1 <small class="text-muted">2026-08-08</small></h6>
+                    <ul>
+                        <li>Object tags: every result row has a new tag icon that opens a dialog showing the S3 tags of the object (empty tag set is shown explicitly)</li>
+                        <li>Selection page: each batch now shows a Filters column listing exactly the filters that were applied (filter name and value); live-query batches are separated from direct key selections</li>
+                        <li>SeedRunner now tags every seeded object with <em>type=testdata</em> and <em>loader=seedrunner</em>, so seeded test data is easy to identify</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.7.0 <small class="text-muted">2026-08-08</small></h6>
                     <ul>
                         <li>Major framework update: Spring Boot 4 (with Jackson 3) — faster startup, modern baseline</li>

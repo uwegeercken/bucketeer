@@ -2,6 +2,10 @@ package io.github.uwegeercken.bucketeer.application;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.services.s3.model.Tag;
+
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,5 +58,15 @@ class SeedRunnerTest {
         assertThat(SeedRunner.formatBytes(2048)).isEqualTo("2.00 KB");
         assertThat(SeedRunner.formatBytes(5 * 1024 * 1024L)).isEqualTo("5.00 MB");
         assertThat(SeedRunner.formatBytes(3L * 1024 * 1024 * 1024)).isEqualTo("3.00 GB");
+    }
+
+    @Test
+    @DisplayName("applies the type and loader tags to every object")
+    void objectTags() {
+        var tagging = SeedRunner.objectTags();
+        assertThat(tagging.tagSet()).hasSize(2);
+        var tags = tagging.tagSet().stream()
+                .collect(Collectors.toMap(Tag::key, Tag::value));
+        assertThat(tags).isEqualTo(Map.of("type", "testdata", "loader", "seedrunner"));
     }
 }

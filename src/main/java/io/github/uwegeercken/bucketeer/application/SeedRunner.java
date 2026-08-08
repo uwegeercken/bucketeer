@@ -17,6 +17,8 @@ import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
+import software.amazon.awssdk.services.s3.model.Tag;
+import software.amazon.awssdk.services.s3.model.Tagging;
 
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -42,6 +44,15 @@ public final class SeedRunner {
 
     private SeedRunner() {}
 
+    /** Tags applied to every seeded object. */
+    static Tagging objectTags() {
+        return Tagging.builder()
+                .tagSet(
+                        Tag.builder().key("type").value("testdata").build(),
+                        Tag.builder().key("loader").value("seedrunner").build())
+                .build();
+    }
+
     public static int run(String[] args) {
         Options opts = Options.parse(args);
         if (opts == null) {
@@ -55,6 +66,7 @@ public final class SeedRunner {
         System.out.println("  prefixes : " + opts.prefixes);
         System.out.println("  size     : " + opts.sizeMin + ".." + opts.sizeMax + " bytes");
         System.out.println("  parallel : " + opts.parallel);
+        System.out.println("  tags     : type=testdata, loader=seedrunner");
         if (opts.noVerifySsl) System.out.println("  ssl      : verify disabled");
         if (opts.empty) System.out.println("  empty    : true");
 
@@ -114,7 +126,11 @@ public final class SeedRunner {
                 final long size = sizes[i];
                 pool.submit(() -> {
                     try {
-                        s3.putObject(PutObjectRequest.builder().bucket(opts.bucket).key(key).build(),
+                        s3.putObject(PutObjectRequest.builder()
+                                        .bucket(opts.bucket)
+                                        .key(key)
+                                        .tagging(objectTags())
+                                        .build(),
                                 RequestBody.fromBytes(content(key, size)));
                     } catch (Exception e) {
                         failed.incrementAndGet();

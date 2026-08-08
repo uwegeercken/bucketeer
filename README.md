@@ -9,6 +9,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
 - **Selection &amp; bulk download** — collect objects across queries and download them all as a ZIP. **Note:** rendering the selection page inserts one row per selected object into the DOM. Very large selections (e.g. 100,000+ objects) take a while to render; the batch **Move Selected / Delete Selected** actions become active only once the list has finished loading. For very large datasets, keep the selection small (e.g. avoid "add all" for tens of thousands of objects).
 - **Move &amp; delete objects** — move (same bucket, copy + delete) or delete individual objects from the results, or apply batch operations (delete / prefix-based move) to the selection; existing targets are skipped and reported
+- **Object tags** — view the S3 tags of any object via the tag icon in the results table
 - **Action history** — every move/delete is recorded in `~/.bucketeer/actions/actions.jsonl` and can be reviewed on the **Action History** page (`/history`)
 - **Snapshots** — save query results as Parquet, compare snapshots over time and export the diff (added / removed / changed objects)
 - **Key Check** — upload a CSV with keys and verify which ones exist on the server
@@ -24,7 +25,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.7.0.jar
+java -jar target/bucketeer-0.7.1.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -35,10 +36,10 @@ The default port 8080 can be changed without recompiling:
 
 ```bash
 # command line
-java -jar target/bucketeer-0.7.0.jar --server.port=9000
+java -jar target/bucketeer-0.7.1.jar --server.port=9000
 
 # or environment variable (same priority as the command line)
-SERVER_PORT=9000 java -jar target/bucketeer-0.7.0.jar
+SERVER_PORT=9000 java -jar target/bucketeer-0.7.1.jar
 ```
 
 Open [http://localhost:9000](http://localhost:9000) then.
@@ -48,27 +49,27 @@ Open [http://localhost:9000](http://localhost:9000) then.
 Build the image (multi-stage, JDK 21):
 
 ```bash
-podman build -t bucketeer:0.7.0 .
-# or: docker build -t bucketeer:0.7.0 .
+podman build -t bucketeer:0.7.1 .
+# or: docker build -t bucketeer:0.7.1 .
 ```
 
 Run the web app — data persists in a named volume (`~/.bucketeer` inside the container):
 
 ```bash
-podman run -p 8080:8080 -v bucketeer-data:/root/.bucketeer bucketeer:0.7.0
+podman run -p 8080:8080 -v bucketeer-data:/root/.bucketeer bucketeer:0.7.1
 ```
 
 For production, pass the encryption key as an environment variable:
 
 ```bash
 podman run -p 8080:8080 -e BUCKETEER_ENCRYPTION_KEY=your-secret-key \
-  -v bucketeer-data:/root/.bucketeer bucketeer:0.7.0
+  -v bucketeer-data:/root/.bucketeer bucketeer:0.7.1
 ```
 
 Seed test data from a container — the `--seed` mode starts no web server and the container exits after the run:
 
 ```bash
-podman run --rm bucketeer:0.7.0 --seed --endpoint=http://minio:9000 \
+podman run --rm bucketeer:0.7.1 --seed --endpoint=http://minio:9000 \
   --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
 ```
 
@@ -98,7 +99,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.7.0.jar
+java -jar target/bucketeer-0.7.1.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -110,7 +111,7 @@ java -jar target/bucketeer-0.7.0.jar
 For performance and batch tests (deleting / moving large selections), Bucketeer can fill an S3-compatible server with deterministic test data — without the Spring context and without a web server:
 
 ```bash
-java -jar target/bucketeer-0.7.0.jar --seed
+java -jar target/bucketeer-0.7.1.jar --seed
 ```
 
 Default structure (3000 objects, 1–10 KB, spread over 20 shard prefixes):
@@ -145,29 +146,31 @@ Spreading the objects across multiple prefixes improves the listing and batch pe
 MinIO container (docker-compose):
 
 ```bash
-java -jar target/bucketeer-0.7.0.jar --seed --endpoint=http://localhost:9000 \
+java -jar target/bucketeer-0.7.1.jar --seed --endpoint=http://localhost:9000 \
   --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
 ```
 
 NetApp StorageGRID (without a valid certificate):
 
 ```bash
-java -jar target/bucketeer-0.7.0.jar --seed --endpoint=https://storagegrid:9000 \
+java -jar target/bucketeer-0.7.1.jar --seed --endpoint=https://storagegrid:9000 \
   --access-key=AKIA... --secret-key=... --no-verify-ssl --bucket=testdata
 ```
 
 Generation is **deterministic**: the same keys and sizes on every run. After delete/move tests, restore the original state manually by running the seed command again (optionally emptying the bucket first with `--empty`).
 
+Every seeded object is tagged with `type=testdata` and `loader=seedrunner`, so seeded data can be identified and filtered in S3 and in Bucketeer via the tag dialog.
+
 **Restore after a test** (empties the bucket and refills it):
 
 ```bash
-java -jar target/bucketeer-0.7.0.jar --seed --empty --count=3000 --prefixes=20
+java -jar target/bucketeer-0.7.1.jar --seed --empty --count=3000 --prefixes=20
 ```
 
 **Show the plan without writing anything**:
 
 ```bash
-java -jar target/bucketeer-0.7.0.jar --seed --dry-run
+java -jar target/bucketeer-0.7.1.jar --seed --dry-run
 ```
 
 The `--seed` mode starts neither Spring nor the web server; it detects the flag at any argument position and exits with code `0` (success) or `1` (error).
@@ -222,7 +225,8 @@ The selection lets you collect objects across multiple searches and download the
 - Or click the **cart-check** icon to add all currently filtered results
 
 **Selection page (`/cart`):**
-- Items are grouped into batches; each batch shows its server, bucket, prefix, object count and total size
+- Items are grouped into batches; each batch shows its server, bucket, prefix, the filters that were applied (Filters column), object count and total size
+- Live-query batches (created via "add all currently filtered results") show their applied filters; direct key selections show no filters
 - Tick the batch checkboxes and use **Move selected**, **Delete selected** or **Download as ZIP** – all batch actions operate on the **selected** batches only
 - Move / delete / download are blocked when the selection spans **multiple servers or buckets** (a clear message is shown)
 - **Clear selection** – removes all items
@@ -241,6 +245,10 @@ Both actions also work as **batch operations** on the selection page (`/cart`). 
 > **Skip semantics:** Objects whose target key already exists are **not overwritten** — they are skipped and recorded as `SKIPPED` in the **Action History**. When you move many objects at once (e.g. hundreds), it is **your responsibility** to ensure target keys are unique; otherwise objects are skipped. Check the Action History (`/history`) to see exactly what was moved, skipped or failed.
 
 Every action (successful, skipped or failed) is recorded in the **Action History**.
+
+### Object Tags
+
+Every object row in the results table has a **tag icon** that opens a read-only dialog showing the S3 tags of the object. Tags are fetched live from the server (key/value pairs); an object without tags shows "no tags" instead of an error. Seeded test data is tagged with `type=testdata` and `loader=seedrunner`.
 
 ### Action History (`/history`)
 
