@@ -26,7 +26,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.7.1.jar
+java -jar target/bucketeer-0.7.2.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -37,10 +37,10 @@ The default port 8080 can be changed without recompiling:
 
 ```bash
 # command line
-java -jar target/bucketeer-0.7.1.jar --server.port=9000
+java -jar target/bucketeer-0.7.2.jar --server.port=9000
 
 # or environment variable (same priority as the command line)
-SERVER_PORT=9000 java -jar target/bucketeer-0.7.1.jar
+SERVER_PORT=9000 java -jar target/bucketeer-0.7.2.jar
 ```
 
 Open [http://localhost:9000](http://localhost:9000) then.
@@ -50,27 +50,27 @@ Open [http://localhost:9000](http://localhost:9000) then.
 Build the image (multi-stage, JDK 21):
 
 ```bash
-podman build -t bucketeer:0.7.1 .
-# or: docker build -t bucketeer:0.7.1 .
+podman build -t bucketeer:0.7.2 .
+# or: docker build -t bucketeer:0.7.2 .
 ```
 
 Run the web app — data persists in a named volume (`~/.bucketeer` inside the container):
 
 ```bash
-podman run -p 8080:8080 -v bucketeer-data:/root/.bucketeer bucketeer:0.7.1
+podman run -p 8080:8080 -v bucketeer-data:/root/.bucketeer bucketeer:0.7.2
 ```
 
 For production, pass the encryption key as an environment variable:
 
 ```bash
 podman run -p 8080:8080 -e BUCKETEER_ENCRYPTION_KEY=your-secret-key \
-  -v bucketeer-data:/root/.bucketeer bucketeer:0.7.1
+  -v bucketeer-data:/root/.bucketeer bucketeer:0.7.2
 ```
 
 Seed test data from a container — the `--seed` mode starts no web server and the container exits after the run:
 
 ```bash
-podman run --rm bucketeer:0.7.1 --seed --endpoint=http://minio:9000 \
+podman run --rm bucketeer:0.7.2 --seed --endpoint=http://minio:9000 \
   --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
 ```
 
@@ -100,7 +100,7 @@ The auto-generated key means zero configuration for personal use. For production
 
 ```bash
 export BUCKETEER_ENCRYPTION_KEY=your-secret-key
-java -jar target/bucketeer-0.7.1.jar
+java -jar target/bucketeer-0.7.2.jar
 ```
 
 > **Warning:** if the key changes or is lost, existing credentials in `~/.bucketeer/servers.json` can no longer be decrypted. Re-enter server credentials via the Configuration page in that case.
@@ -112,7 +112,7 @@ java -jar target/bucketeer-0.7.1.jar
 For performance and batch tests (deleting / moving large selections), Bucketeer can fill an S3-compatible server with deterministic test data — without the Spring context and without a web server:
 
 ```bash
-java -jar target/bucketeer-0.7.1.jar --seed
+java -jar target/bucketeer-0.7.2.jar --seed
 ```
 
 Default structure (3000 objects, 1–10 KB, spread over 20 shard prefixes):
@@ -147,14 +147,14 @@ Spreading the objects across multiple prefixes improves the listing and batch pe
 MinIO container (docker-compose):
 
 ```bash
-java -jar target/bucketeer-0.7.1.jar --seed --endpoint=http://localhost:9000 \
+java -jar target/bucketeer-0.7.2.jar --seed --endpoint=http://localhost:9000 \
   --access-key=admin --secret-key=admin123 --bucket=testdata --count=3000 --prefixes=20
 ```
 
 NetApp StorageGRID (without a valid certificate):
 
 ```bash
-java -jar target/bucketeer-0.7.1.jar --seed --endpoint=https://storagegrid:9000 \
+java -jar target/bucketeer-0.7.2.jar --seed --endpoint=https://storagegrid:9000 \
   --access-key=AKIA... --secret-key=... --no-verify-ssl --bucket=testdata
 ```
 
@@ -165,13 +165,13 @@ Every seeded object is tagged with `type=testdata` and `loader=seedrunner`, so s
 **Restore after a test** (empties the bucket and refills it):
 
 ```bash
-java -jar target/bucketeer-0.7.1.jar --seed --empty --count=3000 --prefixes=20
+java -jar target/bucketeer-0.7.2.jar --seed --empty --count=3000 --prefixes=20
 ```
 
 **Show the plan without writing anything**:
 
 ```bash
-java -jar target/bucketeer-0.7.1.jar --seed --dry-run
+java -jar target/bucketeer-0.7.2.jar --seed --dry-run
 ```
 
 The `--seed` mode starts neither Spring nor the web server; it detects the flag at any argument position and exits with code `0` (success) or `1` (error).
