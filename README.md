@@ -67,6 +67,13 @@ podman run -p 8080:8080 -e BUCKETEER_ENCRYPTION_KEY=your-secret-key \
   -v bucketeer-data:/root/.bucketeer bucketeer:0.7.2
 ```
 
+Pull the ready to use image from Docker Hub:
+
+```bash
+podman pull uwegeercken/bucketeer:0.7.2
+```
+
+### Test Data
 Seed test data from a container — the `--seed` mode starts no web server and the container exits after the run:
 
 ```bash
