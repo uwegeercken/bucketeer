@@ -249,7 +249,7 @@ Every action (successful, skipped or failed) is recorded in the **Action History
 
 ### Object Tags
 
-Every result row has a **&#8942; button** that opens the row context menu; right-clicking the row does the same. The menu offers download, copy download link, show tags, move and delete. The read-only **tags dialog** shows the S3 tags of the object, fetched live from the server (key/value pairs); an object without tags shows "no tags" instead of an error. Seeded test data is tagged with `type=testdata` and `loader=seedrunner`.
+Every result row has a **&#8942; button** that opens the row context menu; right-clicking the row does the same. The menu offers download, copy download link, show tags, move and delete. The read-only **tags dialog** shows the S3 tags of the object, fetched live from the server (key/value pairs); an object without tags shows "no tags" instead of an error. Seeded test data is tagged with `type=testdata` and `loader=seedrunner`. The same context menu pattern is used consistently on the **Key Check** and **Snapshots** pages for their per-row actions.
 
 ### Action History (`/history`)
 
@@ -496,8 +496,8 @@ Snapshots save the complete result set of a query (all objects under the searche
 - Dedicated page listing all saved snapshots with server, bucket, prefix, date and object count
 - **Compare selected** – select exactly two snapshots with checkboxes and click **Compare selected** to show a diff (added, removed, changed objects)
 - Both snapshots must have the same server, bucket and prefix to be comparable
-- **Open in file manager** – reveals the snapshot parquet file in the OS file manager
-- **Delete** – removes a snapshot
+- **Open in file manager** – reveals the snapshot parquet file in the OS file manager (via the snapshot row's &#8942; context menu)
+- **Delete** – removes a snapshot (via the snapshot row's &#8942; context menu)
 
 **Diff export:**
 - After comparing two snapshots, the diff can be downloaded as CSV
@@ -533,6 +533,7 @@ The Key Check page (`/keycheck`) verifies whether keys from a CSV file exist in 
 **Results:**
 - Table shows each key with status (exists / missing), size, last modified, and ETag
 - Summary badges: count of existing and missing keys
+- Existing rows have a **&#8942; button** (right-click works too) opening the same row context menu as the results page: download, copy download link, show tags, move and delete; after a delete or move the check is automatically re-run for the affected key
 - Export results as CSV with the same delimiter and header format as the input
 
 **Export format:**

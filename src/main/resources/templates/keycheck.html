@@ -81,6 +81,11 @@
         <div id="resultsTable"></div>
     </div>
 
+    <th:block th:replace="~{layout :: tagsModal}"></th:block>
+    <th:block th:replace="~{layout :: deleteModal}"></th:block>
+    <th:block th:replace="~{layout :: moveModal}"></th:block>
+    <th:block th:replace="~{layout :: rowContextMenu}"></th:block>
+
 </main>
 
 <footer th:replace="~{layout :: footer}"></footer>
@@ -99,6 +104,8 @@
     const labelKeycheckEtag        = /*[[#{keycheck.etag}]]*/ 'ETag';
     const labelKeycheckStatus      = /*[[#{keycheck.status}]]*/ 'Status';
     const labelKeycheckExport      = /*[[#{keycheck.export}]]*/ 'Export CSV';
+    const labelRowMenu             = /*[[#{btn.rowMenu}]]*/ 'Actions';
+    const currentServer            = /*[[${selectedServer}]]*/ '';
 
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -173,7 +180,7 @@
                 return;
             }
 
-            showResults(data);
+            showResults(data, bucket);
         } catch (err) {
             progressPanel.style.display = 'none';
             checkBtn.disabled = false;
@@ -182,7 +189,7 @@
         }
     }
 
-    function showResults(data) {
+    function showResults(data, bucket) {
         const panel = document.getElementById('resultsPanel');
         const summaryEl = document.getElementById('summary');
         const tableEl = document.getElementById('resultsTable');
@@ -206,6 +213,7 @@
             + '<th class="text-end">' + escHtml(labelKeycheckSize) + '</th>'
             + '<th>' + escHtml(labelKeycheckLastModified) + '</th>'
             + '<th>' + escHtml(labelKeycheckEtag) + '</th>'
+            + '<th style="width:44px"></th>'
             + '</tr></thead><tbody>';
 
         for (const r of data.results) {
@@ -216,6 +224,9 @@
                     ? '<i class="bi bi-check-circle-fill text-success"></i>'
                     : '<i class="bi bi-x-circle-fill text-danger"></i>';
             const sizeKb = r.sizeBytes != null ? (r.sizeBytes / 1024).toFixed(2) : '';
+            const menuCell = (r.exists && !r.error)
+                ? '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon row-menu-btn" title="' + escHtml(labelRowMenu) + '" aria-label="' + escHtml(labelRowMenu) + '" data-bucket="' + escHtml(bucket) + '" data-key="' + escHtml(r.key) + '"><i class="bi bi-three-dots" aria-hidden="true"></i></button>'
+                : '';
 
             html += '<tr class="' + rowClass + '">'
                 + '<td class="text-center">' + statusIcon + '</td>'
@@ -223,6 +234,7 @@
                 + '<td class="text-end small">' + sizeKb + '</td>'
                 + '<td class="small">' + escHtml(formatBucketDateTime(r.lastModified)) + '</td>'
                 + '<td class="small text-muted">' + escHtml(r.etag) + '</td>'
+                + '<td class="text-center">' + menuCell + '</td>'
                 + '</tr>';
         }
 
@@ -236,11 +248,39 @@
         window.location.href = '/api/keycheck/export?delimiter=' + encodeURIComponent(delimiter) + '&hasHeader=' + hasHeader;
     }
 
+    function rerunCheck() {
+        const fileInput = document.getElementById('fileInput');
+        const checkBtn = document.getElementById('checkBtn');
+        if (!fileInput.files.length || checkBtn.disabled) return;
+        startCheck(new Event('submit'));
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         loadBuckets();
         const bucketInput = document.getElementById('bucketInput');
         bucketInput.addEventListener('mousedown', refreshBucketList);
         bucketInput.addEventListener('focus', refreshBucketList);
+
+        const tableContainer = document.getElementById('resultsTable');
+
+        tableContainer.addEventListener('contextmenu', e => {
+            const tr = e.target.closest('tr');
+            if (!tr) return;
+            e.preventDefault();
+            const btn = tr.querySelector('.row-menu-btn');
+            if (!btn) return;
+            window.ObjectActions.openMenu(btn.dataset.bucket, btn.dataset.key, e.clientX, e.clientY, currentServer);
+        });
+
+        tableContainer.addEventListener('click', e => {
+            const btn = e.target.closest('.row-menu-btn');
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            window.ObjectActions.openMenu(btn.dataset.bucket, btn.dataset.key, rect.left, rect.bottom + 2, currentServer);
+        });
+
+        window.addEventListener('bucketeer:objectDeleted', rerunCheck);
+        window.addEventListener('bucketeer:objectMoved', rerunCheck);
     });
 </script>
 </body>

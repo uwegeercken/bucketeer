@@ -288,6 +288,57 @@
         })();
     </script>
 
+    <!-- Shared context menu logic (row kebab button + right-click) -->
+    <script th:inline="javascript">
+        window.BucketeerContextMenu = (function() {
+            var active = null;
+
+            function position(menu, x, y) {
+                menu.style.display = 'block';
+                var rect = menu.getBoundingClientRect();
+                var padding = 4;
+                var left = x;
+                var top = y;
+                if (left + rect.width + padding > window.innerWidth) {
+                    left = window.innerWidth - rect.width - padding;
+                }
+                if (top + rect.height + padding > window.innerHeight) {
+                    top = window.innerHeight - rect.height - padding;
+                }
+                menu.style.left = Math.max(padding, left) + 'px';
+                menu.style.top = Math.max(padding, top) + 'px';
+                menu.classList.add('show');
+            }
+
+            function open(menu, x, y) {
+                close();
+                active = menu;
+                position(menu, x, y);
+            }
+
+            function close() {
+                if (!active) return;
+                active.classList.remove('show');
+                active.style.display = 'none';
+                active = null;
+            }
+
+            document.addEventListener('click', function(e) {
+                if (!active) return;
+                if (!active.contains(e.target) && !e.target.closest('.row-menu-btn')) {
+                    close();
+                }
+            });
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') close();
+            });
+            window.addEventListener('scroll', close, true);
+            window.addEventListener('resize', close);
+
+            return { open: open, close: close };
+        })();
+    </script>
+
 </footer>
 
 <!-- Move modal fragment (shared by selection and query results pages) -->
@@ -519,4 +570,302 @@
             if (typeof window.refreshComboDropdown === 'function') window.refreshComboDropdown();
         };
     </script>
+</th:block>
+
+<!-- Object tags modal fragment (shared by query results and key check pages) -->
+<th:block th:fragment="tagsModal">
+    <div class="modal fade" id="tagsModal" tabindex="-1" aria-labelledby="tagsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="tagsModalLabel" th:text="#{modal.tags.title}">Object tags</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="tagsModalKey" class="text-break font-monospace small fw-semibold mb-2"></div>
+                    <table class="table table-sm mb-0" id="tagsModalTable">
+                        <tbody></tbody>
+                    </table>
+                    <div id="tagsModalNoTags" class="text-muted small" style="display:none;"></div>
+                    <div id="tagsModalError" class="alert alert-danger py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.close}">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!-- Delete object modal fragment (shared by query results and key check pages) -->
+<th:block th:fragment="deleteModal">
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="deleteModalLabel" th:text="#{modal.delete.title}">Delete object</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="deleteModalMessage" class="text-break font-monospace small mb-2"></div>
+                    <div id="deleteModalError" class="alert alert-danger py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="deleteModalConfirmBtn" th:text="#{btn.delete}">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!-- Row context menu fragment (object actions: download / copy link / tags / move / delete) -->
+<th:block th:fragment="rowContextMenu">
+    <div id="rowContextMenu" class="dropdown-menu row-context-menu" role="menu">
+        <a class="dropdown-item" id="ctxDownload" role="menuitem" href="#"><i class="bi bi-download me-2" aria-hidden="true"></i><span th:text="#{label.download}">Download</span></a>
+        <button type="button" class="dropdown-item" id="ctxCopyLink" role="menuitem"><i class="bi bi-link-45deg me-2" aria-hidden="true"></i><span id="ctxCopyLinkText" th:text="#{btn.copyDownloadLink}">Copy download link</span></button>
+        <div class="dropdown-divider"></div>
+        <button type="button" class="dropdown-item" id="ctxTags" role="menuitem"><i class="bi bi-tag me-2" aria-hidden="true"></i><span th:text="#{btn.tags}">Show tags</span></button>
+        <button type="button" class="dropdown-item" id="ctxMove" role="menuitem"><i class="bi bi-arrows-move me-2" aria-hidden="true"></i><span th:text="#{btn.move}">Move object</span></button>
+        <button type="button" class="dropdown-item text-danger" id="ctxDelete" role="menuitem"><i class="bi bi-trash me-2" aria-hidden="true"></i><span th:text="#{btn.delete}">Delete object</span></button>
+    </div>
+
+    <script th:inline="javascript">
+        const rowMenuLabels = {
+            download: /*[[#{label.download}]]*/ 'Download',
+            copy:     /*[[#{btn.copyDownloadLink}]]*/ 'Copy download link',
+            copied:   /*[[#{btn.copied}]]*/ 'Copied',
+            opError:  /*[[#{msg.opError}]]*/ 'Operation failed:',
+            noTags:   /*[[#{modal.tags.noTags}]]*/ 'No tags set for this object.',
+            delete:   /*[[#{modal.delete.message}]]*/ 'Delete this object permanently?\n\n{0}'
+        };
+
+        function menuEscHtml(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        window.ObjectActions = (function() {
+            let ctxRow = null;
+            let copyTimer = null;
+
+            function getDownloadUrl(bucket, key) {
+                return window.location.origin + '/download?bucket=' + encodeURIComponent(bucket)
+                    + '&key=' + encodeURIComponent(key);
+            }
+
+            function resetCopyLabel() {
+                const el = document.getElementById('ctxCopyLinkText');
+                if (el) el.textContent = rowMenuLabels.copy;
+                if (copyTimer) {
+                    clearTimeout(copyTimer);
+                    copyTimer = null;
+                }
+            }
+
+            function openMenu(bucket, key, x, y, serverName) {
+                const menu = document.getElementById('rowContextMenu');
+                if (!menu) return;
+                ctxRow = { bucket: bucket, key: key, serverName: serverName || '' };
+                document.getElementById('ctxDownload').href = getDownloadUrl(bucket, key);
+                resetCopyLabel();
+                window.BucketeerContextMenu.open(menu, x, y);
+            }
+
+            function takeRow() {
+                if (!ctxRow) return null;
+                const r = ctxRow;
+                ctxRow = null;
+                window.BucketeerContextMenu.close();
+                return r;
+            }
+
+            function writeClipboardText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(text);
+                }
+                return new Promise((resolve, reject) => {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try {
+                        document.execCommand('copy');
+                        resolve();
+                    } catch (e) {
+                        reject(e);
+                    } finally {
+                        ta.remove();
+                    }
+                });
+            }
+
+            async function copyDownloadLink() {
+                if (!ctxRow) return;
+                const url = getDownloadUrl(ctxRow.bucket, ctxRow.key);
+                const copyTextEl = document.getElementById('ctxCopyLinkText');
+                try {
+                    await writeClipboardText(url);
+                    copyTextEl.textContent = rowMenuLabels.copied;
+                    if (copyTimer) clearTimeout(copyTimer);
+                    copyTimer = setTimeout(() => {
+                        copyTextEl.textContent = rowMenuLabels.copy;
+                        copyTimer = null;
+                    }, 1600);
+                } catch (e) {
+                    copyTextEl.textContent = rowMenuLabels.opError;
+                }
+            }
+
+            async function openTagsModal(bucket, key) {
+                document.getElementById('tagsModalKey').textContent = key;
+                const tableEl = document.getElementById('tagsModalTable');
+                const noTagsEl = document.getElementById('tagsModalNoTags');
+                const errEl = document.getElementById('tagsModalError');
+                tableEl.querySelector('tbody').innerHTML = '';
+                noTagsEl.style.display = 'none';
+                errEl.style.display = 'none';
+                new bootstrap.Modal(document.getElementById('tagsModal')).show();
+                try {
+                    const res = await fetch('/api/object/tags?bucket=' + encodeURIComponent(bucket)
+                        + '&key=' + encodeURIComponent(key));
+                    const data = await res.json();
+                    if (!data.ok) {
+                        throw new Error(data.error || '');
+                    }
+                    const entries = Object.entries(data.tags || {});
+                    if (entries.length === 0) {
+                        noTagsEl.textContent = rowMenuLabels.noTags;
+                        noTagsEl.style.display = 'block';
+                        return;
+                    }
+                    tableEl.querySelector('tbody').innerHTML = entries.map(([k, v]) =>
+                        '<tr>'
+                        + '<td class="small fw-semibold font-monospace pe-3" style="width:40%;">' + menuEscHtml(k) + '</td>'
+                        + '<td class="small font-monospace">' + menuEscHtml(v) + '</td>'
+                        + '</tr>').join('');
+                } catch (e) {
+                    errEl.textContent = rowMenuLabels.opError + ' ' + e.message;
+                    errEl.style.display = 'block';
+                }
+            }
+
+            function openMoveModal(bucket, key, serverName) {
+                const sourceKey = key;
+                window.MoveModal.open({
+                    title: /*[[#{modal.move.title}]]*/ 'Move object',
+                    items: [{ serverName: serverName || '', bucket: bucket, key: sourceKey }],
+                    endpoint: '/api/object/move',
+                    makePayload: (toPrefix) => ({
+                        bucket: bucket,
+                        sourceKey: sourceKey,
+                        toPrefix: toPrefix
+                    }),
+                    handleResponse: async (data, errEl, resultEl, btn) => {
+                        if (data.sameKey) {
+                            errEl.textContent = moveModalLabels.invalid;
+                            errEl.style.display = 'block';
+                            btn.disabled = false;
+                        } else if (data.skipped) {
+                            resultEl.classList.add('alert-success');
+                            resultEl.textContent = moveModalLabels.skipped;
+                            resultEl.style.display = 'block';
+                        } else if (data.ok) {
+                            bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
+                            window.dispatchEvent(new CustomEvent('bucketeer:objectMoved'));
+                            return true;
+                        } else {
+                            errEl.textContent = moveModalLabels.opError + ' ' + (data.error || '');
+                            errEl.style.display = 'block';
+                            btn.disabled = false;
+                        }
+                    }
+                });
+            }
+
+            let pendingDelete = null;
+
+            function openDeleteModal(bucket, key) {
+                pendingDelete = { bucket: bucket, key: key };
+                document.getElementById('deleteModalMessage').textContent =
+                    rowMenuLabels.delete.replace('{0}', key);
+                const errEl = document.getElementById('deleteModalError');
+                errEl.style.display = 'none';
+                new bootstrap.Modal(document.getElementById('deleteModal')).show();
+            }
+
+            async function confirmDelete() {
+                if (!pendingDelete) return;
+                const btn = document.getElementById('deleteModalConfirmBtn');
+                btn.disabled = true;
+                const errEl = document.getElementById('deleteModalError');
+                try {
+                    const res = await fetch('/api/object/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ bucket: pendingDelete.bucket, key: pendingDelete.key })
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                        bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                        const detail = { bucket: pendingDelete.bucket, key: pendingDelete.key };
+                        pendingDelete = null;
+                        window.dispatchEvent(new CustomEvent('bucketeer:objectDeleted', { detail: detail }));
+                    } else {
+                        errEl.textContent = rowMenuLabels.opError + ' ' + (data.error || '');
+                        errEl.style.display = 'block';
+                    }
+                } catch (e) {
+                    errEl.textContent = rowMenuLabels.opError + ' ' + e.message;
+                    errEl.style.display = 'block';
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const menu = document.getElementById('rowContextMenu');
+                if (!menu) return;
+                document.getElementById('ctxDownload').addEventListener('click', () => { takeRow(); });
+                document.getElementById('ctxCopyLink').addEventListener('click', copyDownloadLink);
+                document.getElementById('ctxTags').addEventListener('click', () => {
+                    const r = takeRow();
+                    if (r) openTagsModal(r.bucket, r.key);
+                });
+                document.getElementById('ctxMove').addEventListener('click', () => {
+                    const r = takeRow();
+                    if (r) openMoveModal(r.bucket, r.key, r.serverName);
+                });
+                document.getElementById('ctxDelete').addEventListener('click', () => {
+                    const r = takeRow();
+                    if (r) openDeleteModal(r.bucket, r.key);
+                });
+            });
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const confirmBtn = document.getElementById('deleteModalConfirmBtn');
+                if (confirmBtn) confirmBtn.addEventListener('click', confirmDelete);
+                const modalEl = document.getElementById('deleteModal');
+                if (modalEl) modalEl.addEventListener('hidden.bs.modal', () => { pendingDelete = null; });
+            });
+
+            return {
+                openMenu: openMenu,
+                openTagsModal: openTagsModal,
+                openMoveModal: openMoveModal,
+                openDeleteModal: openDeleteModal
+            };
+        })();
+    </script>
+</th:block>
+
+<!-- Snapshot context menu fragment (open in file manager / delete) -->
+<th:block th:fragment="snapshotContextMenu">
+    <div id="snapshotContextMenu" class="dropdown-menu row-context-menu" role="menu">
+        <button type="button" class="dropdown-item" id="snapCtxReveal" role="menuitem"><i class="bi bi-folder2-open me-2" aria-hidden="true"></i><span th:text="#{snapshot.reveal}">Open in file manager</span></button>
+        <button type="button" class="dropdown-item text-danger" id="snapCtxDelete" role="menuitem"><i class="bi bi-trash me-2" aria-hidden="true"></i><span th:text="#{snapshot.delete}">Delete snapshot</span></button>
+    </div>
 </th:block>

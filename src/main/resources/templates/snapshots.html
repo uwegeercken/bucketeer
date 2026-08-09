@@ -54,6 +54,8 @@
         <div id="diffContent"></div>
     </div>
 
+    <th:block th:replace="~{layout :: snapshotContextMenu}"></th:block>
+
 </main>
 
 <footer th:replace="~{layout :: footer}"></footer>
@@ -64,8 +66,6 @@
     const labelSnapshotCount   = /*[[#{snapshot.count}]]*/ 'Objects';
     const labelSnapshotActions = /*[[#{snapshot.actions}]]*/ 'Actions';
     const labelSnapshotCompareSel = /*[[#{snapshot.compareSelected}]]*/ 'Compare selected';
-    const labelSnapshotDelete  = /*[[#{snapshot.delete}]]*/ 'Delete snapshot';
-    const labelSnapshotReveal  = /*[[#{snapshot.reveal}]]*/ 'Open in file manager';
     const labelSnapshotConfirm = /*[[#{snapshot.confirm.delete}]]*/ 'Delete this snapshot?';
     const labelSnapshotEmpty   = /*[[#{snapshot.empty}]]*/ 'No snapshots saved yet.';
     const labelDiffAdded       = /*[[#{snapshot.diff.added}]]*/ 'Added';
@@ -77,6 +77,7 @@
     const labelSnapshotBucket  = /*[[#{snapshot.bucket}]]*/ 'Bucket';
     const labelSnapshotPrefix  = /*[[#{snapshot.prefix}]]*/ 'Prefix';
     const labelSnapshotMismatch = /*[[#{snapshot.compareMismatch}]]*/ 'Snapshots must have the same server, bucket and prefix.';
+    const labelRowMenu          = /*[[#{btn.rowMenu}]]*/ 'Actions';
 
     let diffId1 = null;
     let diffId2 = null;
@@ -131,9 +132,8 @@
                         + '<td class="small font-monospace text-break">' + escHtml(s.prefix) + '</td>'
                         + '<td class="small">' + formatDateTime(s.createdAt) + '</td>'
                         + '<td class="text-end small">' + s.rowCount + '</td>'
-                        + '<td class="d-flex gap-1">'
-                        + '<button class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelSnapshotReveal) + ': ' + escHtml(s.fileName) + '" onclick="revealSnapshot(\'' + s.id + '\')"><i class="bi bi-folder2-open"></i></button>'
-                        + '<button class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelSnapshotDelete) + '" onclick="deleteSnapshot(\'' + s.id + '\')"><i class="bi bi-trash"></i></button>'
+                        + '<td class="text-center">'
+                        + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon row-menu-btn" title="' + escHtml(labelRowMenu) + '" aria-label="' + escHtml(labelRowMenu) + '" data-id="' + s.id + '"><i class="bi bi-three-dots" aria-hidden="true"></i></button>'
                         + '</td></tr>';
                 }).join('')
                 + '</tbody></table>';
@@ -270,8 +270,49 @@
         }
     }
 
+    let ctxSnapshotId = null;
+
+    function openSnapshotMenu(id, x, y) {
+        ctxSnapshotId = id;
+        window.BucketeerContextMenu.open(document.getElementById('snapshotContextMenu'), x, y);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         loadSnapshots();
+
+        const container = document.getElementById('snapshotList');
+
+        container.addEventListener('contextmenu', e => {
+            const tr = e.target.closest('tr');
+            if (!tr) return;
+            e.preventDefault();
+            const btn = tr.querySelector('.row-menu-btn');
+            if (!btn) return;
+            openSnapshotMenu(btn.dataset.id, e.clientX, e.clientY);
+        });
+
+        container.addEventListener('click', e => {
+            const btn = e.target.closest('.row-menu-btn');
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            openSnapshotMenu(btn.dataset.id, rect.left, rect.bottom + 2);
+        });
+
+        document.getElementById('snapCtxReveal').addEventListener('click', () => {
+            if (!ctxSnapshotId) return;
+            const id = ctxSnapshotId;
+            ctxSnapshotId = null;
+            window.BucketeerContextMenu.close();
+            revealSnapshot(id);
+        });
+
+        document.getElementById('snapCtxDelete').addEventListener('click', () => {
+            if (!ctxSnapshotId) return;
+            const id = ctxSnapshotId;
+            ctxSnapshotId = null;
+            window.BucketeerContextMenu.close();
+            deleteSnapshot(id);
+        });
     });
 </script>
 </body>
