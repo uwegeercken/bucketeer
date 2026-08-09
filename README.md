@@ -9,7 +9,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
 - **Selection &amp; bulk download** — collect objects across queries and download them all as a ZIP. **Note:** rendering the selection page inserts one row per selected object into the DOM. Very large selections (e.g. 100,000+ objects) take a while to render; the batch **Move Selected / Delete Selected** actions become active only once the list has finished loading. For very large datasets, keep the selection small (e.g. avoid "add all" for tens of thousands of objects).
 - **Move &amp; delete objects** — move (same bucket, copy + delete) or delete individual objects from the results, or apply batch operations (delete / prefix-based move) to the selection; existing targets are skipped and reported
-- **Object tags** — view the S3 tags of any object via the tag icon in the results table
+- **Object tags** — view the S3 tags of any object via the row context menu (right-click a result row or use the &#8942; button)
 - **Action history** — every move/delete is recorded in `~/.bucketeer/actions/actions.jsonl` and can be reviewed on the **Action History** page (`/history`)
 - **Snapshots** — save query results as Parquet, compare snapshots over time and export the diff (added / removed / changed objects)
 - **Key Check** — upload a CSV with keys and verify which ones exist on the server
@@ -237,9 +237,9 @@ Duplicate items (same server + bucket + key) are not added twice.
 
 ### Move & Delete Objects
 
-Every object row in the results panel offers two actions next to the download button:
-- **Move** (arrows icon) – opens a dialog to enter the target key in the same bucket. Move is implemented as S3 **copy + delete**: the source is only deleted after a successful copy. If an object already exists at the target, the move is **skipped and reported** instead of overwritten.
-- **Delete** (trash icon) – permanently deletes the object after a confirmation dialog.
+Open the row context menu (right-click a result row or use the &#8942; button) to access per-object actions:
+- **Move** – opens a dialog to enter the target key in the same bucket. Move is implemented as S3 **copy + delete**: the source is only deleted after a successful copy. If an object already exists at the target, the move is **skipped and reported** instead of overwritten.
+- **Delete** – permanently deletes the object after a confirmation dialog.
 
 Both actions also work as **batch operations** on the selection page (`/cart`). Batch moves replace the **object's own folder** (everything up to the last `/`) with the target prefix: `data/shard-00/test1/file.odt` moved to `archive/` becomes `archive/file.odt`. Objects keep only their file name — files collected from subfolders are moved **flat** into the target prefix. You only enter the target prefix; the source folder is taken from each object's key.
 
@@ -249,7 +249,7 @@ Every action (successful, skipped or failed) is recorded in the **Action History
 
 ### Object Tags
 
-Every object row in the results table has a **tag icon** that opens a read-only dialog showing the S3 tags of the object. Tags are fetched live from the server (key/value pairs); an object without tags shows "no tags" instead of an error. Seeded test data is tagged with `type=testdata` and `loader=seedrunner`.
+Every result row has a **&#8942; button** that opens the row context menu; right-clicking the row does the same. The menu offers download, copy download link, show tags, move and delete. The read-only **tags dialog** shows the S3 tags of the object, fetched live from the server (key/value pairs); an object without tags shows "no tags" instead of an error. Seeded test data is tagged with `type=testdata` and `loader=seedrunner`.
 
 ### Action History (`/history`)
 

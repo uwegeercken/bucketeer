@@ -140,6 +140,14 @@ footer {
     line-height: 1;
 }
 
+/* Row context menu */
+.row-context-menu {
+    position: fixed;
+    z-index: 2000;
+    min-width: 12rem;
+    font-size: 0.875rem;
+}
+
 /* Help page */
 .function-name {
     font-family: monospace;

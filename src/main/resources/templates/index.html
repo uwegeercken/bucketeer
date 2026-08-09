@@ -188,7 +188,7 @@
                 <th style="width:210px;cursor:pointer;" onclick="toggleSort('last_modified')" id="th-last_modified">
                     <span th:text="#{label.lastModified}">Last Modified</span> <i class="bi bi-arrow-down-up small text-muted"></i>
                 </th>
-                <th style="width:90px"></th>
+                <th style="width:44px"></th>
             </tr>
             </thead>
             <tbody id="resultsBody"></tbody>
@@ -266,6 +266,16 @@
 
     <th:block th:replace="~{layout :: moveModal}"></th:block>
 
+    <!-- Row context menu -->
+    <div id="rowContextMenu" class="dropdown-menu row-context-menu" role="menu">
+        <a class="dropdown-item" id="ctxDownload" role="menuitem" href="#"><i class="bi bi-download me-2" aria-hidden="true"></i><span th:text="#{label.download}">Download</span></a>
+        <button type="button" class="dropdown-item" id="ctxCopyLink" role="menuitem"><i class="bi bi-link-45deg me-2" aria-hidden="true"></i><span id="ctxCopyLinkText" th:text="#{btn.copyDownloadLink}">Copy download link</span></button>
+        <div class="dropdown-divider"></div>
+        <button type="button" class="dropdown-item" id="ctxTags" role="menuitem"><i class="bi bi-tag me-2" aria-hidden="true"></i><span th:text="#{btn.tags}">Show tags</span></button>
+        <button type="button" class="dropdown-item" id="ctxMove" role="menuitem"><i class="bi bi-arrows-move me-2" aria-hidden="true"></i><span th:text="#{btn.move}">Move object</span></button>
+        <button type="button" class="dropdown-item text-danger" id="ctxDelete" role="menuitem"><i class="bi bi-trash me-2" aria-hidden="true"></i><span th:text="#{btn.delete}">Delete object</span></button>
+    </div>
+
 </main>
 
 <footer th:replace="~{layout :: footer}"></footer>
@@ -275,7 +285,6 @@
     const currentServer  = /*[[${selectedServer}]]*/ '';
     const currentBucket  = /*[[${bucket}]]*/ '';
     const queryStarted   = /*[[${queryStarted}]]*/ false;
-    const labelDownload  = /*[[#{label.download}]]*/ 'Download';
     const labelNoFav     = /*[[#{msg.noFavorites}]]*/ 'No favorites yet.';
     const labelObjFound  = /*[[#{msg.objectsFound}]]*/ 'objects found...';
     const labelObjTotal  = /*[[#{msg.objectsTotal}]]*/ 'objects loaded.';
@@ -292,11 +301,11 @@
     const labelLimitReached = /*[[#{msg.queryLimitReached}]]*/ 'limit reached';
     const labelDeleteFav    = /*[[#{btn.deleteFavorite}]]*/ 'Delete favorite';
     const labelDeleteHist   = /*[[#{btn.deleteHistoryEntry}]]*/ 'Delete history entry';
-    const labelMove         = /*[[#{btn.move}]]*/ 'Move object';
-    const labelDelete       = /*[[#{btn.delete}]]*/ 'Delete object';
     const labelDeleteConfirm = /*[[#{modal.delete.message}]]*/ 'Delete this object permanently?\n\n{0}';
-    const labelTags          = /*[[#{btn.tags}]]*/ 'Show tags';
     const labelTagsNoTags    = /*[[#{modal.tags.noTags}]]*/ 'No tags set for this object.';
+    const labelRowMenu       = /*[[#{btn.rowMenu}]]*/ 'Actions';
+    const labelCopyDownloadLink = /*[[#{btn.copyDownloadLink}]]*/ 'Copy download link';
+    const labelCopied        = /*[[#{btn.copied}]]*/ 'Copied';
     const labelOpError       = /*[[#{msg.opError}]]*/ 'Operation failed:';
     const labelAddingQuery   = /*[[#{cart.query.adding}]]*/ 'Adding query to selection...';
     const labelQueryAdded    = /*[[#{cart.query.addedShort}]]*/ 'Query added to selection.';
@@ -885,11 +894,8 @@
             + '<td class="text-break font-monospace small">' + escHtml(row.key) + '</td>'
             + '<td class="text-end small">' + escHtml(row.sizeKb) + '</td>'
             + '<td class="small">' + escHtml(formatBucketDateTime(row.lastModified)) + '</td>'
-            + '<td class="d-flex gap-1">'
-            + '<a href="/download?bucket=' + encodeURIComponent(row.bucket || currentBucket) + '&key=' + encodeURIComponent(row.key) + '" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelDownload) + '" aria-label="' + escHtml(labelDownload) + '"><i class="bi bi-download" aria-hidden="true"></i></a>'
-            + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelTags) + '" aria-label="' + escHtml(labelTags) + '" onclick="openTagsModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-tag" aria-hidden="true"></i></button>'
-            + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="' + escHtml(labelMove) + '" aria-label="' + escHtml(labelMove) + '" onclick="openMoveModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-arrows-move" aria-hidden="true"></i></button>'
-            + '<button type="button" class="btn btn-sm btn-outline-danger btn-icon" title="' + escHtml(labelDelete) + '" aria-label="' + escHtml(labelDelete) + '" onclick="openDeleteModal(\'' + encodeURIComponent(row.bucket || currentBucket) + '\',\'' + encodeURIComponent(row.key) + '\')"><i class="bi bi-trash" aria-hidden="true"></i></button>'
+            + '<td class="text-center">'
+            + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon row-menu-btn" title="' + escHtml(labelRowMenu) + '" aria-label="' + escHtml(labelRowMenu) + '" data-bucket="' + escHtml(row.bucket || currentBucket) + '" data-key="' + escHtml(row.key) + '"><i class="bi bi-three-dots" aria-hidden="true"></i></button>'
             + '</td>'
             + '</tr>'
         ).join('');
@@ -1129,8 +1135,6 @@
     let pendingDelete = null;
 
     async function openTagsModal(bucket, key) {
-        bucket = decodeURIComponent(bucket);
-        key = decodeURIComponent(key);
         document.getElementById('tagsModalKey').textContent = key;
         const tableEl = document.getElementById('tagsModalTable');
         const noTagsEl = document.getElementById('tagsModalNoTags');
@@ -1164,7 +1168,7 @@
     }
 
     function openDeleteModal(bucket, key) {
-        pendingDelete = { bucket: decodeURIComponent(bucket), key: decodeURIComponent(key) };
+        pendingDelete = { bucket: bucket, key: key };
         document.getElementById('deleteModalMessage').textContent =
             labelDeleteConfirm.replace('{0}', pendingDelete.key);
         const errEl = document.getElementById('deleteModalError');
@@ -1202,13 +1206,13 @@
     }
 
     function openMoveModal(bucket, key) {
-        const sourceKey = decodeURIComponent(key);
+        const sourceKey = key;
         MoveModal.open({
             title: /*[[#{modal.move.title}]]*/ 'Move object',
-            items: [{ serverName: currentServer, bucket: decodeURIComponent(bucket), key: sourceKey }],
+            items: [{ serverName: currentServer, bucket: bucket, key: sourceKey }],
             endpoint: '/api/object/move',
             makePayload: (toPrefix) => ({
-                bucket: decodeURIComponent(bucket),
+                bucket: bucket,
                 sourceKey: sourceKey,
                 toPrefix: toPrefix
             }),
@@ -1233,6 +1237,95 @@
                 }
             }
         });
+    }
+
+    // --- Row context menu ---
+
+    let ctxRow = null;
+    let ctxCopyTimer = null;
+
+    function getDownloadUrl(bucket, key) {
+        return window.location.origin + '/download?bucket=' + encodeURIComponent(bucket)
+            + '&key=' + encodeURIComponent(key);
+    }
+
+    function openRowMenu(bucket, key, x, y) {
+        const menu = document.getElementById('rowContextMenu');
+        ctxRow = { bucket: bucket, key: key };
+
+        document.getElementById('ctxDownload').href = getDownloadUrl(bucket, key);
+
+        if (ctxCopyTimer) {
+            clearTimeout(ctxCopyTimer);
+            ctxCopyTimer = null;
+        }
+        document.getElementById('ctxCopyLinkText').textContent = labelCopyDownloadLink;
+
+        menu.style.display = 'block';
+        const rect = menu.getBoundingClientRect();
+        const padding = 4;
+        let left = x;
+        let top = y;
+        if (left + rect.width + padding > window.innerWidth) {
+            left = window.innerWidth - rect.width - padding;
+        }
+        if (top + rect.height + padding > window.innerHeight) {
+            top = window.innerHeight - rect.height - padding;
+        }
+        menu.style.left = Math.max(padding, left) + 'px';
+        menu.style.top = Math.max(padding, top) + 'px';
+        menu.classList.add('show');
+    }
+
+    function closeRowMenu() {
+        const menu = document.getElementById('rowContextMenu');
+        if (ctxCopyTimer) {
+            clearTimeout(ctxCopyTimer);
+            ctxCopyTimer = null;
+        }
+        document.getElementById('ctxCopyLinkText').textContent = labelCopyDownloadLink;
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+        ctxRow = null;
+    }
+
+    function writeClipboardText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise((resolve, reject) => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand('copy');
+                resolve();
+            } catch (e) {
+                reject(e);
+            } finally {
+                ta.remove();
+            }
+        });
+    }
+
+    async function copyDownloadLink() {
+        if (!ctxRow) return;
+        const url = getDownloadUrl(ctxRow.bucket, ctxRow.key);
+        const copyTextEl = document.getElementById('ctxCopyLinkText');
+        try {
+            await writeClipboardText(url);
+            copyTextEl.textContent = labelCopied;
+            if (ctxCopyTimer) clearTimeout(ctxCopyTimer);
+            ctxCopyTimer = setTimeout(() => {
+                copyTextEl.textContent = labelCopyDownloadLink;
+                ctxCopyTimer = null;
+            }, 1600);
+        } catch (e) {
+            copyTextEl.textContent = labelOpError;
+        }
     }
 
     // --- Easter Egg ---
@@ -1425,6 +1518,62 @@
         document.getElementById('deleteModal').addEventListener('hidden.bs.modal', () => {
             pendingDelete = null;
         });
+
+        const resultsBody = document.getElementById('resultsBody');
+        const rowMenu = document.getElementById('rowContextMenu');
+
+        resultsBody.addEventListener('contextmenu', e => {
+            const tr = e.target.closest('tr');
+            if (!tr) return;
+            e.preventDefault();
+            const btn = tr.querySelector('.row-menu-btn');
+            openRowMenu(btn.dataset.bucket, btn.dataset.key, e.clientX, e.clientY);
+        });
+
+        resultsBody.addEventListener('click', e => {
+            const btn = e.target.closest('.row-menu-btn');
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            openRowMenu(btn.dataset.bucket, btn.dataset.key, rect.left, rect.bottom + 2);
+        });
+
+        document.getElementById('ctxTags').addEventListener('click', () => {
+            if (!ctxRow) return;
+            const { bucket, key } = ctxRow;
+            closeRowMenu();
+            openTagsModal(bucket, key);
+        });
+        document.getElementById('ctxMove').addEventListener('click', () => {
+            if (!ctxRow) return;
+            const { bucket, key } = ctxRow;
+            closeRowMenu();
+            openMoveModal(bucket, key);
+        });
+        document.getElementById('ctxDelete').addEventListener('click', () => {
+            if (!ctxRow) return;
+            const { bucket, key } = ctxRow;
+            closeRowMenu();
+            openDeleteModal(bucket, key);
+        });
+        document.getElementById('ctxCopyLink').addEventListener('click', () => {
+            if (!ctxRow) return;
+            copyDownloadLink();
+        });
+        document.getElementById('ctxDownload').addEventListener('click', closeRowMenu);
+
+        document.addEventListener('click', e => {
+            if (!rowMenu.classList.contains('show')) return;
+            if (!rowMenu.contains(e.target) && !e.target.closest('.row-menu-btn')) {
+                closeRowMenu();
+            }
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeRowMenu();
+        });
+        window.addEventListener('scroll', () => {
+            if (rowMenu.classList.contains('show')) closeRowMenu();
+        }, true);
+        window.addEventListener('resize', closeRowMenu);
     });
 </script>
 </body>
