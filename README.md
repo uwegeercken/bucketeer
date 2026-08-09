@@ -18,7 +18,8 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Zero-config security** — S3 credentials are encrypted at rest in `~/.bucketeer/servers.json`
 - **Built on Spring Boot 4** (Java 21, Jackson 3) — major framework update since 0.7.0
 
-![img_2.png](img_2.png)
+![img.png](img.png)
+
 ---
 
 ## Running
