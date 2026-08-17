@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.regex.Pattern;
 
 @Controller
 public class KeyCheckController {
@@ -189,7 +190,7 @@ public class KeyCheckController {
                 first = false;
                 String trimmed = line.trim();
                 if (!trimmed.isEmpty()) {
-                    String[] parts = trimmed.split(String.valueOf(sep), -1);
+                    String[] parts = trimmed.split(Pattern.quote(String.valueOf(sep)), -1);
                     if (parts.length > 0 && !parts[0].trim().isEmpty()) {
                         keys.add(parts[0].trim());
                     }
