@@ -7,16 +7,17 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Browse &amp; search** — paginated results, client-side filtering by name (regular expressions), size and last-modified date, sortable columns
 - **Prefix templates** — build S3 prefixes dynamically with functions (`left`, `right`, `upper`, `lower`, `everyNth`, `substring`, `repeat`) and date placeholders; functions can be nested and combined with literal suffixes
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
-- **Selection &amp; bulk download** — collect objects across queries and download them all as a ZIP. **Note:** rendering the selection page inserts one row per selected object into the DOM. Very large selections (e.g. 100,000+ objects) take a while to render; the batch **Move Selected / Delete Selected** actions become active only once the list has finished loading. For very large datasets, keep the selection small (e.g. avoid "add all" for tens of thousands of objects).
+- **Selection &amp; bulk download** — collect objects across queries as batches and download them all as a ZIP
 - **Move &amp; delete objects** — move (same bucket, copy + delete) or delete individual objects from the results, or apply batch operations (delete / prefix-based move) to the selection; existing targets are skipped and reported
 - **Object tags** — view the S3 tags of any object via the row context menu (right-click a result row or use the &#8942; button)
 - **Action history** — every move/delete is recorded in `~/.bucketeer/actions/actions.jsonl` and can be reviewed on the **Action History** page (`/history`)
 - **Snapshots** — save query results as Parquet, compare snapshots over time and export the diff (added / removed / changed objects)
 - **Key Check** — upload a CSV with keys and verify which ones exist on the server
 - **Text Tools** — Base64 / URL encode &amp; decode, timestamp ↔ date conversion, JSON pretty / minify, SHA-256
-- **Dark mode** and German / English / Spanish UI
 - **Zero-config security** — S3 credentials are encrypted at rest in `~/.bucketeer/servers.json`
 - **Built on Spring Boot 4** (Java 21, Jackson 3) — major framework update since 0.7.0
+- **UI Languages** German / English / Spanish
+- **Dark mode**
 
 ![img.png](img.png)
 
@@ -226,21 +227,20 @@ Click the same header again to reverse the sort direction.
 
 ### Selection
 
-The selection lets you collect objects across multiple searches and download them all at once as a ZIP file.
+The selection lets you collect objects across multiple searches as **batches** and download them all at once as a ZIP file.
 
 **Adding items:**
 - Select individual rows with the checkboxes and click the **cart-plus** icon
-- Or click the **cart-check** icon to add all currently filtered results
+- Or click the **cart-check** icon to add all currently filtered results as a single batch
 
 **Selection page (`/cart`):**
-- Items are grouped into batches; each batch shows its server, bucket, prefix, the filters that were applied (Filters column), object count and total size
-- Live-query batches (created via "add all currently filtered results") show their applied filters; direct key selections show no filters
-- Tick the batch checkboxes and use **Move selected**, **Delete selected** or **Download as ZIP** – all batch actions operate on the **selected** batches only
-- Move / delete / download are blocked when the selection spans **multiple servers or buckets** (a clear message is shown)
-- **Clear selection** – removes all items
+- Each batch shows its server, bucket, prefix, applied filters, object count and total size
+- Tick batch checkboxes and use **Move selected**, **Delete selected** or **Download as ZIP** — all actions operate on the **selected** batches only
+- Move / delete / download are blocked when the selection spans **multiple servers or buckets**
+- **Clear selection** removes all batches
 
 The selection persists across searches and page navigations within the same session.
-Duplicate items (same server + bucket + key) are not added twice.
+Duplicate batches (same server, bucket, and key set) are not added twice.
 
 ### Move & Delete Objects
 
@@ -630,4 +630,4 @@ Manche Schlüssel sind Ostereier.
 Algunas claves son huevos de pascua.
 
 ## Last update
-last update uwe.geercken@web.de - 2026-08-08
+last update uwe.geercken@web.de - 2026-08-09
