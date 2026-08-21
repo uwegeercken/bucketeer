@@ -19,7 +19,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **UI Languages** German / English / Spanish
 - **Dark mode**
 
-![img.png](img.png)
+![img_1.png](img_1.png)
 
 ---
 
