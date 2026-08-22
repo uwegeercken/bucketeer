@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.sql.*;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -27,6 +28,10 @@ import java.util.regex.PatternSyntaxException;
 public class DuckDbRepository {
 
     private static final Logger log = LoggerFactory.getLogger(DuckDbRepository.class);
+
+    public record DateRange(Instant min, Instant max) {}
+    public record SizeRange(long min, long max) {}
+    public record FileTypeCount(String ext, long count) {}
 
     private final Connection connection;
 
@@ -536,6 +541,69 @@ public class DuckDbRepository {
             log.error("Failed to sum filtered object sizes: {}", e.getMessage());
             return 0;
         }
+    }
+
+    public DateRange queryDateRange(String keyFilter, Double minSizeKb, Double maxSizeKb,
+                                    String dateFrom, String dateTo) {
+        StringBuilder sql = new StringBuilder("SELECT MIN(last_modified), MAX(last_modified) FROM objects WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        appendFilters(sql, params, keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Timestamp minTs = rs.getTimestamp(1);
+                    Timestamp maxTs = rs.getTimestamp(2);
+                    return new DateRange(
+                            minTs != null ? minTs.toInstant() : null,
+                            maxTs != null ? maxTs.toInstant() : null);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to query date range: {}", e.getMessage());
+        }
+        return new DateRange(null, null);
+    }
+
+    public SizeRange querySizeRange(String keyFilter, Double minSizeKb, Double maxSizeKb,
+                                    String dateFrom, String dateTo) {
+        StringBuilder sql = new StringBuilder("SELECT MIN(size_bytes), MAX(size_bytes) FROM objects WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        appendFilters(sql, params, keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new SizeRange(rs.getLong(1), rs.getLong(2));
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to query size range: {}", e.getMessage());
+        }
+        return new SizeRange(0, 0);
+    }
+
+    public List<FileTypeCount> queryFileTypeDistribution(String keyFilter, Double minSizeKb, Double maxSizeKb,
+                                                        String dateFrom, String dateTo) {
+        StringBuilder sql = new StringBuilder(
+                "WITH ext AS (SELECT COALESCE(NULLIF(regexp_extract(key, '\\.([^.]+)$', 1), ''), 'Andere') AS ext "
+                        + "FROM objects WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        appendFilters(sql, params, keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+        sql.append(") SELECT ext, COUNT(*) AS cnt FROM ext GROUP BY ext ORDER BY cnt DESC");
+        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) ps.setObject(i + 1, params.get(i));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<FileTypeCount> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(new FileTypeCount(rs.getString("ext"), rs.getLong("cnt")));
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            log.error("Failed to query file type distribution: {}", e.getMessage());
+        }
+        return List.of();
     }
 
     private static void appendBucketPrefix(StringBuilder sql, List<Object> params, String bucket, String prefix) {

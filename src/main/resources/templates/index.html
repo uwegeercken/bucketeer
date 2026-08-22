@@ -166,6 +166,10 @@
         <!-- Result count -->
         <div id="resultCount" style="display:none;" class="mb-2">
             <span class="text-muted small" id="resultCountText"></span>
+            <i class="bi bi-info-circle text-muted small ms-1" role="img"
+               id="resultsInfoIcon" style="display:none; cursor:pointer;"
+               data-bs-toggle="popover" data-bs-trigger="hover"
+               data-bs-placement="right" data-bs-html="true"></i>
         </div>
 
         <!-- Pagination top -->
@@ -257,6 +261,10 @@
     const labelAddingQuery   = /*[[#{cart.query.adding}]]*/ 'Adding query to selection...';
     const labelQueryAdded    = /*[[#{cart.query.addedShort}]]*/ 'Query added to selection.';
     const labelNoContext     = /*[[#{cart.query.noContext}]]*/ 'Server and bucket are required to add all objects.';
+    const labelInfoDateRange = /*[[#{msg.info.dateRange}]]*/ 'Date min/max';
+    const labelInfoSizeRange = /*[[#{msg.info.sizeRange}]]*/ 'Size min/max';
+    const labelInfoFileTypes = /*[[#{msg.info.fileTypes}]]*/ 'File types';
+    const labelInfoOther     = /*[[#{msg.info.other}]]*/ 'Other';
 
     const STORAGE_KEY  = 'bucketeer_favorites';
     const HISTORY_KEY  = 'bucketeer_history';
@@ -653,6 +661,36 @@
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    function formatSizeReadable(bytes) {
+        const n = Number(bytes) || 0;
+        if (n >= 1024 * 1024 * 1024) return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(2) + ' MB';
+        return (n / 1024).toFixed(2) + ' KB';
+    }
+
+    function formatCountAbbreviated(n) {
+        const num = Number(n) || 0;
+        if (num >= 1000000) return (num / 1000000).toFixed(2).replace('.', ',') + ' M';
+        return num.toLocaleString('de-DE');
+    }
+
+    function buildResultsInfoHtml(data) {
+        const parts = [];
+        if (data.minDate && data.maxDate)
+            parts.push(labelInfoDateRange + ': ' + formatBucketDateTime(data.minDate) + ' / ' + formatBucketDateTime(data.maxDate));
+        if (data.minSizeBytes || data.maxSizeBytes)
+            parts.push(labelInfoSizeRange + ': ' + formatSizeReadable(data.minSizeBytes) + ' / ' + formatSizeReadable(data.maxSizeBytes));
+        if (data.fileTypes && data.fileTypes.length > 0) {
+            const top5 = data.fileTypes.slice(0, 5);
+            const rest = data.fileTypes.slice(5);
+            const sum = rest.reduce((a, b) => a + b.count, 0);
+            const items = top5.map(ft => ft.ext.charAt(0).toUpperCase() + ft.ext.slice(1) + ':' + formatCountAbbreviated(ft.count));
+            if (sum > 0) items.push(labelInfoOther + ':' + formatCountAbbreviated(sum));
+            parts.push(labelInfoFileTypes + ': ' + items.join(', '));
+        }
+        return parts.join('<br/>') || 'Keine Daten';
+    }
+
     function saveFormState() {
         sessionStorage.setItem('bkt_bucket', document.getElementById('bucketInput').value);
         sessionStorage.setItem('bkt_prefix', document.getElementById('prefixInput').value);
@@ -854,6 +892,16 @@
         countEl.style.display = 'flex';
         document.getElementById('resultCountText').textContent = total + ' ' + labelObjMatch;
         document.getElementById('btnSaveSnapshot').disabled = total === 0;
+
+        const infoIcon = document.getElementById('resultsInfoIcon');
+        if (total > 0 && ((data.minDate && data.maxDate) || (data.fileTypes && data.fileTypes.length > 0))) {
+            infoIcon.style.display = '';
+            const existing = bootstrap.Popover.getInstance(infoIcon);
+            if (existing) existing.dispose();
+            new bootstrap.Popover(infoIcon, { trigger: 'hover', placement: 'right', html: true, content: buildResultsInfoHtml(data) });
+        } else {
+            infoIcon.style.display = 'none';
+        }
 
         ['paginationTop', 'paginationBottom'].forEach(id => {
             const el = document.getElementById(id);

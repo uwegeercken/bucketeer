@@ -198,6 +198,10 @@ public class BucketeerController {
         List<S3Object> results = duckDb.query(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo, page, pageSize, sortBy, sortDir);
         long total = duckDb.queryCount(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
 
+        DuckDbRepository.DateRange dateRange = duckDb.queryDateRange(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+        DuckDbRepository.SizeRange sizeRange = duckDb.querySizeRange(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+        List<DuckDbRepository.FileTypeCount> fileTypes = duckDb.queryFileTypeDistribution(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
+
 
         List<Map<String, Object>> rows = results.stream()
                 .map(obj -> Map.<String, Object>of(
@@ -210,13 +214,20 @@ public class BucketeerController {
                 ))
                 .toList();
 
-        return Map.of(
-                "rows",     rows,
-                "total",    total,
-                "page",     page,
-                "pageSize", pageSize,
-                "hasMore",  (long)(page + 1) * pageSize < total
-        );
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("rows", rows);
+        response.put("total", total);
+        response.put("page", page);
+        response.put("pageSize", pageSize);
+        response.put("hasMore", (long)(page + 1) * pageSize < total);
+        response.put("minDate", dateRange.min() != null ? dateRange.min().toString() : null);
+        response.put("maxDate", dateRange.max() != null ? dateRange.max().toString() : null);
+        response.put("minSizeBytes", sizeRange.min());
+        response.put("maxSizeBytes", sizeRange.max());
+        response.put("fileTypes", fileTypes.stream()
+                .map(ft -> Map.<String, Object>of("ext", ft.ext(), "count", ft.count()))
+                .toList());
+        return response;
     }
 
     @GetMapping("/api/query/export")
