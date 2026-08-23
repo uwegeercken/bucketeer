@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -192,8 +194,15 @@ public class SnapshotController {
             tmpFile.deleteOnExit();
             duckDb.exportDiffToCsvTwoSnapshots(pathOld.toString(), pathNew.toString(), tmpFile.getAbsolutePath());
 
-            String filename = "diff-" + older.name().replaceAll("[^a-zA-Z0-9._-]", "_")
-                    + "-vs-" + newer.name().replaceAll("[^a-zA-Z0-9._-]", "_") + ".csv";
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+            String rawPrefix = (older.prefix() != null ? older.prefix() : "").replaceAll("/$", "");
+            String safePrefix = rawPrefix.replaceAll(" ", "_").replaceAll("/", "-");
+            String filename = "diff_bucketeer_"
+                    + older.serverName().replaceAll("[^a-zA-Z0-9_-]", "_") + "_"
+                    + older.bucket().replaceAll("[^a-zA-Z0-9_-]", "_") + "_"
+                    + safePrefix.replaceAll("[^a-zA-Z0-9_-]", "_") + "_"
+                    + older.createdAt().atZone(ZoneId.systemDefault()).format(fmt) + "_vs_"
+                    + newer.createdAt().atZone(ZoneId.systemDefault()).format(fmt) + ".csv";
             FileSystemResource resource = new FileSystemResource(tmpFile);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
