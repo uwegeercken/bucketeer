@@ -432,8 +432,12 @@
                 const sameGroup = cfg.items.every(i => i.serverName === server && i.bucket === bucket);
                 cfg.sameGroup = sameGroup;
                 document.getElementById('moveModalInfo').textContent = server + ' / ' + bucket;
+                const cartChecked = document.querySelectorAll('.cart-check:checked');
+                const totalObjects = cartChecked.length > 0
+                    ? Array.from(cartChecked).reduce((sum, cb) => sum + (Number(cb.dataset.count) || 0), 0)
+                    : cfg.items.length;
                 document.getElementById('moveModalCount').textContent =
-                    moveModalLabels.count.replace('{0}', cfg.items.length);
+                    moveModalLabels.count.replace('{0}', typeof formatNumber === 'function' ? formatNumber(totalObjects) : totalObjects);
                 if (cfg.title) {
                     document.getElementById('moveModalLabel').textContent = cfg.title;
                 }

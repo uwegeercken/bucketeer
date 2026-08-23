@@ -156,11 +156,13 @@
 
     function cartRowHtml(item) {
         const checked = selectAllChecked ? ' checked' : '';
+        const keyCount = item.keyCount || 0;
+        const objectCountValue = keyCount > 0 ? keyCount : item.count;
         const attrs = ' data-type="batch" data-id="' + escHtml(item.id) + '"'
             + ' data-server="' + escHtml(item.serverName) + '"'
-            + ' data-bucket="' + escHtml(item.bucket) + '"';
-        const keyCount = item.keyCount || 0;
-        const objectCount = formatNumber(keyCount > 0 ? keyCount : item.count);
+            + ' data-bucket="' + escHtml(item.bucket) + '"'
+            + ' data-count="' + objectCountValue + '"';
+        const objectCount = formatNumber(objectCountValue);
         return '<tr>'
             + '<td><input type="checkbox" class="cart-check"' + checked + attrs
             + ' onchange="updateCartActionButtons()"/></td>'
@@ -260,8 +262,10 @@
         const items = getSelectedCartItems();
         if (items.length === 0) return;
         pendingCartDelete = items;
+        const totalObjects = Array.from(document.querySelectorAll('.cart-check:checked'))
+            .reduce((sum, cb) => sum + (Number(cb.dataset.count) || 0), 0);
         document.getElementById('cartDeleteCount').textContent =
-            labelBatchCount.replace('{0}', items.length);
+            labelBatchCount.replace('{0}', formatNumber(totalObjects));
         const errEl = document.getElementById('cartDeleteError');
         const resultEl = document.getElementById('cartDeleteResult');
         const confirmBtn = document.getElementById('cartDeleteConfirmBtn');
