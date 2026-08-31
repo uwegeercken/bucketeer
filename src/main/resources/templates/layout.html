@@ -93,6 +93,8 @@
                    th:title="#{nav.cart}"><i class="bi bi-list-check"></i></a>
                 <a class="btn btn-sm btn-outline-light" href="/keycheck"
                    th:title="#{nav.keycheck}"><i class="bi bi-clipboard-check"></i></a>
+                <button class="btn btn-sm btn-outline-light" onclick="openUploadModal()"
+                        th:title="#{btn.upload}"><i class="bi bi-upload"></i></button>
                 <a class="btn btn-sm btn-outline-light" href="/snapshots"
                    onclick="if(typeof saveFormState==='function') saveFormState()"
                    th:title="#{nav.snapshots}"><i class="bi bi-bookmarks"></i></a>
@@ -872,4 +874,176 @@
         <button type="button" class="dropdown-item" id="snapCtxReveal" role="menuitem"><i class="bi bi-folder2-open me-2" aria-hidden="true"></i><span th:text="#{snapshot.reveal}">Open in file manager</span></button>
         <button type="button" class="dropdown-item text-danger" id="snapCtxDelete" role="menuitem"><i class="bi bi-trash me-2" aria-hidden="true"></i><span th:text="#{snapshot.delete}">Delete snapshot</span></button>
     </div>
+</th:block>
+
+<!-- Upload modal fragment -->
+<th:block th:fragment="uploadModal">
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="uploadModalLabel" th:text="#{btn.upload}">Upload</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold" for="uploadServerSelect" th:text="#{label.server}">Server</label>
+                            <select id="uploadServerSelect" class="form-select form-select-sm" onchange="loadUploadBuckets()">
+                                <option value="">--</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold" for="uploadBucketSelect" th:text="#{label.bucket}">Bucket</label>
+                            <select id="uploadBucketSelect" class="form-select form-select-sm" onchange="loadUploadPrefixHistory()">
+                                <option value="">--</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold" for="uploadPrefixInput" th:text="#{upload.prefix}">Prefix</label>
+                        <input type="text" id="uploadPrefixInput" class="form-control form-control-sm font-monospace"
+                               placeholder="events/shard-00/"/>
+                        <select id="uploadPrefixSelect" class="form-select form-select-sm font-monospace mt-1"
+                                onchange="if(this.value) document.getElementById('uploadPrefixInput').value = this.value;">
+                            <option value="">--</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold" for="uploadFileInput" th:text="#{label.file}">File</label>
+                        <input type="file" id="uploadFileInput" class="form-control form-control-sm"
+                               onchange="onUploadFileSelected()"/>
+                    </div>
+                    <div id="uploadFileInfo" class="text-muted small mb-2" style="display:none;"></div>
+                    <div id="uploadError" class="alert alert-danger py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                    <div id="uploadSuccess" class="alert alert-success py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-primary" id="uploadConfirmBtn" disabled
+                            onclick="doUpload()" th:text="#{btn.upload}">Upload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openUploadModal() {
+            document.getElementById('uploadError').style.display = 'none';
+            document.getElementById('uploadSuccess').style.display = 'none';
+            document.getElementById('uploadFileInfo').style.display = 'none';
+            document.getElementById('uploadFileInput').value = '';
+            document.getElementById('uploadConfirmBtn').disabled = true;
+            document.getElementById('uploadPrefixInput').value = '';
+            document.getElementById('uploadPrefixSelect').value = '';
+            loadUploadServers();
+            new bootstrap.Modal(document.getElementById('uploadModal')).show();
+        }
+
+        async function loadUploadServers() {
+            const select = document.getElementById('uploadServerSelect');
+            try {
+                const res = await fetch('/api/server-names');
+                const servers = await res.json();
+                select.innerHTML = '<option value="">--</option>'
+                    + servers.map(s => '<option value="' + escHtml(s) + '">' + escHtml(s) + '</option>').join('');
+                const hdr = document.getElementById('headerServerSelect');
+                if (hdr && hdr.value) select.value = hdr.value;
+                if (select.value) loadUploadBuckets();
+            } catch { select.innerHTML = '<option value="">--</option>'; }
+        }
+
+        async function loadUploadBuckets() {
+            const server = document.getElementById('uploadServerSelect').value;
+            const select = document.getElementById('uploadBucketSelect');
+            if (!server) { select.innerHTML = '<option value="">--</option>'; return; }
+            try {
+                const res = await fetch('/api/buckets?serverName=' + encodeURIComponent(server));
+                const buckets = await res.json();
+                select.innerHTML = '<option value="">--</option>'
+                    + buckets.map(b => '<option value="' + escHtml(b) + '">' + escHtml(b) + '</option>').join('');
+                if (select.value) loadUploadPrefixHistory();
+            } catch { select.innerHTML = '<option value="">--</option>'; }
+        }
+
+        function loadUploadPrefixHistory() {
+            const server = document.getElementById('uploadServerSelect').value;
+            const bucket = document.getElementById('uploadBucketSelect').value;
+            const select = document.getElementById('uploadPrefixSelect');
+            select.innerHTML = '<option value="">--</option>';
+            const prefixes = new Set();
+            const isResolved = p => p && p.indexOf('{') < 0 && p.indexOf('}') < 0;
+            try {
+                const favs = JSON.parse(localStorage.getItem('bucketeer_favorites') || '[]');
+                favs.forEach(f => { if (f.server === server && f.bucket === bucket && isResolved(f.prefix)) prefixes.add(f.prefix); });
+            } catch {}
+            try {
+                const hist = JSON.parse(localStorage.getItem('bucketeer_history') || '[]');
+                hist.forEach(h => { if (h.server === server && h.bucket === bucket && isResolved(h.prefix)) prefixes.add(h.prefix); });
+            } catch {}
+            Array.from(prefixes).sort().forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = p;
+                select.appendChild(opt);
+            });
+        }
+
+        function onUploadFileSelected() {
+            const file = document.getElementById('uploadFileInput').files[0];
+            const btn = document.getElementById('uploadConfirmBtn');
+            const info = document.getElementById('uploadFileInfo');
+            if (file) {
+                const size = file.size >= 1024 * 1024 ? (file.size / (1024 * 1024)).toFixed(2) + ' MB'
+                    : (file.size / 1024).toFixed(2) + ' KB';
+                info.textContent = file.name + ' (' + size + ')';
+                info.style.display = '';
+                btn.disabled = false;
+            } else {
+                info.style.display = 'none';
+                btn.disabled = true;
+            }
+        }
+
+        async function doUpload() {
+            const server = document.getElementById('uploadServerSelect').value;
+            const bucket = document.getElementById('uploadBucketSelect').value;
+            const prefix = document.getElementById('uploadPrefixInput').value.trim();
+            const file = document.getElementById('uploadFileInput').files[0];
+            const errEl = document.getElementById('uploadError');
+            const okEl = document.getElementById('uploadSuccess');
+            const btn = document.getElementById('uploadConfirmBtn');
+            errEl.style.display = 'none';
+            okEl.style.display = 'none';
+            if (!server || !bucket || !file) {
+                errEl.textContent = 'Server, bucket and file are required.';
+                errEl.style.display = 'block';
+                return;
+            }
+            btn.disabled = true;
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('serverName', server);
+            fd.append('bucket', bucket);
+            fd.append('prefix', prefix);
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    okEl.textContent = 'Uploaded: ' + data.key + ' (' + (typeof formatSizeReadable === 'function' ? formatSizeReadable(data.size) : data.size) + ')';
+                    okEl.style.display = 'block';
+                    setTimeout(() => bootstrap.Modal.getInstance(document.getElementById('uploadModal'))?.hide(), 1500);
+                } else {
+                    errEl.textContent = 'Upload failed: ' + (data.error || 'Unknown error');
+                    errEl.style.display = 'block';
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                errEl.textContent = 'Upload failed: ' + e.message;
+                errEl.style.display = 'block';
+                btn.disabled = false;
+            }
+        }
+    </script>
 </th:block>

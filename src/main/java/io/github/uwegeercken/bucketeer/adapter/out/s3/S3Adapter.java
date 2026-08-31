@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
@@ -130,5 +131,16 @@ public class S3Adapter implements S3StoragePort {
     public void deleteObject(String serverName, String bucket, String key) {
         S3Client client = registry.clientFor(serverName);
         client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+    }
+
+    @Override
+    public void putObject(String serverName, String bucket, String key, byte[] data) {
+        S3Client client = registry.clientFor(serverName);
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .contentLength((long) data.length)
+                .build();
+        client.putObject(request, RequestBody.fromBytes(data));
     }
 }

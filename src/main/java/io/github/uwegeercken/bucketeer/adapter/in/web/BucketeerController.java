@@ -17,6 +17,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -154,10 +155,21 @@ public class BucketeerController {
         return "redirect:/";
     }
 
+    @GetMapping(value = "/api/server-names", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public List<String> listServerNames() {
+        try {
+            return bucketeerUseCase.serverNames();
+        } catch (Exception e) {
+            log.error("Failed to list server names: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
     @GetMapping(value = "/api/buckets", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public List<String> listBuckets() {
-        String server = sessionContext.getSelectedServer();
+    public List<String> listBuckets(@RequestParam(required = false) String serverName) {
+        String server = (serverName != null && !serverName.isBlank()) ? serverName : sessionContext.getSelectedServer();
         if (server == null) return List.of();
         try {
             return bucketeerUseCase.listBuckets(server);
@@ -228,6 +240,24 @@ public class BucketeerController {
                 .map(ft -> Map.<String, Object>of("ext", ft.ext(), "count", ft.count()))
                 .toList());
         return response;
+    }
+
+    @PostMapping(value = "/api/upload", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam String serverName,
+            @RequestParam String bucket,
+            @RequestParam(required = false, defaultValue = "") String prefix) {
+        String filename = StringUtils.hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "upload";
+        String key = prefix.isEmpty() ? filename : (prefix.endsWith("/") ? prefix + filename : prefix + "/" + filename);
+        try {
+            s3StoragePort.putObject(serverName, bucket, key, file.getBytes());
+            return Map.of("success", true, "key", key, "size", file.getSize());
+        } catch (Exception e) {
+            log.error("Upload failed for {}/{}: {}", bucket, key, e.getMessage());
+            return Map.of("success", false, "error", e.getMessage());
+        }
     }
 
     @GetMapping("/api/query/export")

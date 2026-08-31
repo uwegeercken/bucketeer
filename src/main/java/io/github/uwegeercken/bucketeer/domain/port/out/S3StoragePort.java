@@ -30,4 +30,6 @@ public interface S3StoragePort {
                        String destinationBucket, String destinationKey, boolean overwrite);
 
     void deleteObject(String serverName, String bucket, String key);
+
+    void putObject(String serverName, String bucket, String key, byte[] data);
 }
