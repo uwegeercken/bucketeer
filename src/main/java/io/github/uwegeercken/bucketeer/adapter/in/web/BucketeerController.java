@@ -7,6 +7,7 @@ import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;
+import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
@@ -37,19 +38,22 @@ public class BucketeerController {
     private final DuckDbRepository duckDb;
     private final ThreadPoolTaskExecutor executor;
     private final ActionHistory actionHistory;
+    private final AppSettings appSettings;
 
     public BucketeerController(BucketeerUseCase bucketeerUseCase,
                                S3StoragePort s3StoragePort,
                                SessionContext sessionContext,
                                DuckDbRepository duckDb,
                                ThreadPoolTaskExecutor executor,
-                               ActionHistory actionHistory) {
+                               ActionHistory actionHistory,
+                               AppSettings appSettings) {
         this.bucketeerUseCase = bucketeerUseCase;
         this.s3StoragePort    = s3StoragePort;
         this.sessionContext   = sessionContext;
         this.duckDb           = duckDb;
         this.executor         = executor;
         this.actionHistory    = actionHistory;
+        this.appSettings      = appSettings;
     }
 
     @GetMapping("/")
@@ -251,11 +255,25 @@ public class BucketeerController {
             @RequestParam(required = false, defaultValue = "") String prefix) {
         String filename = StringUtils.hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "upload";
         String key = prefix.isEmpty() ? filename : (prefix.endsWith("/") ? prefix + filename : prefix + "/" + filename);
+        String server = resolveServer(serverName);
+        long maxFileBytes = appSettings.getMaxFileSizeMb() * 1024L * 1024L;
+        if (file.getSize() > maxFileBytes) {
+            String msg = "File '" + filename + "' (" + file.getSize() + " bytes) exceeds the configured max file size of "
+                    + appSettings.getMaxFileSizeMb() + " MB.";
+            log.warn(msg);
+            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.UPLOAD, ActionEntry.Origin.RESULTS,
+                    null, server, bucket, key, null, ActionEntry.Status.FAILED, msg));
+            return Map.of("success", false, "error", msg);
+        }
         try {
-            s3StoragePort.putObject(serverName, bucket, key, file.getBytes());
+            s3StoragePort.putObject(server, bucket, key, file.getBytes());
+            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.UPLOAD, ActionEntry.Origin.RESULTS,
+                    null, server, bucket, key, null, ActionEntry.Status.UPLOADED, null));
             return Map.of("success", true, "key", key, "size", file.getSize());
         } catch (Exception e) {
             log.error("Upload failed for {}/{}: {}", bucket, key, e.getMessage());
+            actionHistory.append(new ActionEntry(Instant.now(), ActionEntry.Action.UPLOAD, ActionEntry.Origin.RESULTS,
+                    null, server, bucket, key, null, ActionEntry.Status.FAILED, e.getMessage()));
             return Map.of("success", false, "error", e.getMessage());
         }
     }

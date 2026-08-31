@@ -911,30 +911,48 @@
                         </select>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label small fw-semibold" for="uploadFileInput" th:text="#{label.file}">File</label>
-                        <input type="file" id="uploadFileInput" class="form-control form-control-sm"
+                        <label class="form-label small fw-semibold" for="uploadFileInput" th:text="#{label.files}">Files</label>
+                        <input type="file" id="uploadFileInput" class="form-control form-control-sm" multiple
                                onchange="onUploadFileSelected()"/>
                     </div>
                     <div id="uploadFileInfo" class="text-muted small mb-2" style="display:none;"></div>
+                    <div id="uploadProgress" class="small mb-2" style="display:none;">
+                        <div id="uploadProgressList" class="mb-1"></div>
+                        <div class="progress" style="height:7px;">
+                            <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                                 style="width:0%"></div>
+                        </div>
+                    </div>
                     <div id="uploadError" class="alert alert-danger py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
                     <div id="uploadSuccess" class="alert alert-success py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.cancel}">Cancel</button>
                     <button type="button" class="btn btn-sm btn-primary" id="uploadConfirmBtn" disabled
-                            onclick="doUpload()" th:text="#{btn.upload}">Upload</button>
+                            onclick="doUpload()" th:text="#{btn.upload}"
+                            th:attr="data-upload-singular=#{btn.upload},data-upload-plural=#{upload.nfiles}">Upload</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        if (typeof escHtml !== 'function') {
+            function escHtml(s) {
+                return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            }
+        }
+
         function openUploadModal() {
             document.getElementById('uploadError').style.display = 'none';
             document.getElementById('uploadSuccess').style.display = 'none';
             document.getElementById('uploadFileInfo').style.display = 'none';
+            document.getElementById('uploadProgress').style.display = 'none';
+            document.getElementById('uploadProgressList').innerHTML = '';
+            document.getElementById('uploadProgressBar').style.width = '0%';
             document.getElementById('uploadFileInput').value = '';
             document.getElementById('uploadConfirmBtn').disabled = true;
+            setUploadButtonText();
             document.getElementById('uploadPrefixInput').value = '';
             document.getElementById('uploadPrefixSelect').value = '';
             loadUploadServers();
@@ -991,18 +1009,33 @@
         }
 
         function onUploadFileSelected() {
-            const file = document.getElementById('uploadFileInput').files[0];
+            const files = document.getElementById('uploadFileInput').files;
             const btn = document.getElementById('uploadConfirmBtn');
             const info = document.getElementById('uploadFileInfo');
-            if (file) {
-                const size = file.size >= 1024 * 1024 ? (file.size / (1024 * 1024)).toFixed(2) + ' MB'
-                    : (file.size / 1024).toFixed(2) + ' KB';
-                info.textContent = file.name + ' (' + size + ')';
+            if (files.length) {
+                info.innerHTML = Array.from(files).map(f => {
+                    const size = f.size >= 1024 * 1024 ? (f.size / (1024 * 1024)).toFixed(2) + ' MB'
+                        : (f.size / 1024).toFixed(2) + ' KB';
+                    return '<div>' + escHtml(f.name) + ' (' + size + ')</div>';
+                }).join('');
                 info.style.display = '';
                 btn.disabled = false;
             } else {
                 info.style.display = 'none';
                 btn.disabled = true;
+            }
+            setUploadButtonText();
+        }
+
+        function setUploadButtonText() {
+            const files = document.getElementById('uploadFileInput').files;
+            const btn = document.getElementById('uploadConfirmBtn');
+            const count = files.length;
+            if (count > 1) {
+                const plural = btn.dataset.uploadPlural || 'Upload {n} files';
+                btn.textContent = plural.replace('{n}', count);
+            } else {
+                btn.textContent = btn.dataset.uploadSingular || 'Upload';
             }
         }
 
@@ -1010,38 +1043,68 @@
             const server = document.getElementById('uploadServerSelect').value;
             const bucket = document.getElementById('uploadBucketSelect').value;
             const prefix = document.getElementById('uploadPrefixInput').value.trim();
-            const file = document.getElementById('uploadFileInput').files[0];
+            const files = Array.from(document.getElementById('uploadFileInput').files);
             const errEl = document.getElementById('uploadError');
             const okEl = document.getElementById('uploadSuccess');
             const btn = document.getElementById('uploadConfirmBtn');
+            const prog = document.getElementById('uploadProgress');
+            const progList = document.getElementById('uploadProgressList');
+            const progBar = document.getElementById('uploadProgressBar');
             errEl.style.display = 'none';
             okEl.style.display = 'none';
-            if (!server || !bucket || !file) {
+            if (!server || !bucket || files.length === 0) {
                 errEl.textContent = 'Server, bucket and file are required.';
                 errEl.style.display = 'block';
                 return;
             }
             btn.disabled = true;
-            const fd = new FormData();
-            fd.append('file', file);
-            fd.append('serverName', server);
-            fd.append('bucket', bucket);
-            fd.append('prefix', prefix);
-            try {
-                const res = await fetch('/api/upload', { method: 'POST', body: fd });
-                const data = await res.json();
-                if (data.success) {
-                    okEl.textContent = 'Uploaded: ' + data.key + ' (' + (typeof formatSizeReadable === 'function' ? formatSizeReadable(data.size) : data.size) + ')';
-                    okEl.style.display = 'block';
-                    setTimeout(() => bootstrap.Modal.getInstance(document.getElementById('uploadModal'))?.hide(), 1500);
-                } else {
-                    errEl.textContent = 'Upload failed: ' + (data.error || 'Unknown error');
-                    errEl.style.display = 'block';
-                    btn.disabled = false;
+            prog.style.display = 'block';
+            progBar.style.width = '0%';
+            let done = 0, okCount = 0, failCount = 0;
+            const results = [];
+            for (const file of files) {
+                const key = prefix === '' ? file.name
+                    : (prefix.endsWith('/') ? prefix + file.name : prefix + '/' + file.name);
+                const fd = new FormData();
+                fd.append('file', file);
+                fd.append('serverName', server);
+                fd.append('bucket', bucket);
+                fd.append('prefix', prefix);
+                let status = 'ok';
+                let msg = key;
+                try {
+                    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.success) {
+                        okCount++;
+                        msg = key + ' (' + (typeof formatSizeReadable === 'function' ? formatSizeReadable(data.size) : data.size) + ')';
+                    } else {
+                        status = 'fail';
+                        failCount++;
+                        msg = key + ' — ' + (data.error || 'Unknown error');
+                    }
+                } catch (e) {
+                    status = 'fail';
+                    failCount++;
+                    msg = key + ' — ' + e.message;
                 }
-            } catch (e) {
-                errEl.textContent = 'Upload failed: ' + e.message;
-                errEl.style.display = 'block';
+                results.push({ name: file.name, status: status, msg: msg });
+                done++;
+                progBar.style.width = ((done / files.length) * 100) + '%';
+                progList.innerHTML = results.map((r, i) => {
+                    const mark = r.status === 'ok' ? '&#10003;' : '&#10007;';
+                    const color = r.status === 'ok' ? 'text-success' : 'text-danger';
+                    return '<div class="' + color + '">' + mark + ' <span class="text-body">' + escHtml(r.msg) + '</span></div>';
+                }).join('');
+            }
+            progBar.classList.remove('progress-bar-animated');
+            if (failCount === 0) {
+                okEl.textContent = (files.length > 1 ? 'Uploaded: {n} files.' : 'Uploaded: ' + results[0].msg).replace('{n}', okCount);
+                okEl.style.display = 'block';
+                setTimeout(() => bootstrap.Modal.getInstance(document.getElementById('uploadModal'))?.hide(), 1800);
+            } else {
+                okEl.textContent = okCount + ' uploaded, ' + failCount + ' failed.';
+                okEl.style.display = 'block';
                 btn.disabled = false;
             }
         }

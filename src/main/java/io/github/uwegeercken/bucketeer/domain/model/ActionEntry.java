@@ -18,9 +18,9 @@ public record ActionEntry(
         String error
 ) {
 
-    public enum Action { MOVE, DELETE }
+    public enum Action { MOVE, DELETE, UPLOAD }
 
     public enum Origin { RESULTS, SELECTION }
 
-    public enum Status { MOVED, SKIPPED, DELETED, NOT_AFFECTED, FAILED }
+    public enum Status { MOVED, SKIPPED, DELETED, UPLOADED, NOT_AFFECTED, FAILED }
 }

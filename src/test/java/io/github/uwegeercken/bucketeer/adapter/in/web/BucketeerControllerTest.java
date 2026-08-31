@@ -5,11 +5,13 @@ import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;
+import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +28,8 @@ class BucketeerControllerTest {
     private BucketeerUseCase useCase;
     private RecordingDuckDb duckDb;
     private BucketeerController controller;
+    private S3StoragePort storage;
+    private AppSettings appSettings;
 
     @BeforeEach
     void setUp() {
@@ -37,10 +41,12 @@ class BucketeerControllerTest {
                 return "server";
             }
         };
-        S3StoragePort storage = mock(S3StoragePort.class);
+        storage = mock(S3StoragePort.class);
         ActionHistory actionHistory = new RecordingActionHistory();
+        appSettings = mock(AppSettings.class);
+        when(appSettings.getMaxFileSizeMb()).thenReturn(100);
         controller = new BucketeerController(useCase, storage, sessionContext, duckDb,
-                new ThreadPoolTaskExecutor(), actionHistory);
+                new ThreadPoolTaskExecutor(), actionHistory, appSettings);
     }
 
     @Test
@@ -120,6 +126,22 @@ class BucketeerControllerTest {
 
         assertThat(resp.get("ok")).isEqualTo(false);
         assertThat(resp.get("error")).isEqualTo("Access Denied");
+    }
+
+    @Test
+    @DisplayName("uploadFile rejects a file larger than the configured max file size without calling S3")
+    void uploadRejectsOversizedFile() throws Exception {
+        org.mockito.Mockito.when(appSettings.getMaxFileSizeMb()).thenReturn(1);
+        MultipartFile big = new org.springframework.mock.web.MockMultipartFile(
+                "file", "big.bin", "application/octet-stream", new byte[2 * 1024 * 1024]);
+
+        Map<String, Object> resp = controller.uploadFile(big, "server", "bucket", "");
+
+        assertThat(resp.get("success")).isEqualTo(false);
+        assertThat(resp.get("error").toString()).contains("exceeds the configured max file size");
+        org.mockito.Mockito.verify(storage, org.mockito.Mockito.never())
+                .putObject(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     private static class RecordingDuckDb extends DuckDbRepository {

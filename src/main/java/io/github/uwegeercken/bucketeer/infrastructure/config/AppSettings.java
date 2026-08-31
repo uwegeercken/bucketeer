@@ -24,6 +24,8 @@ public class AppSettings {
             .enable(SerializationFeature.INDENT_OUTPUT).build();
     private volatile int snapshotRetentionDays = 30;
     private volatile String timeZoneId = ZoneId.systemDefault().getId();
+    private volatile int maxFileSizeMb = 100;
+    private volatile int maxRequestSizeMb = 500;
 
     public AppSettings() {
         load();
@@ -42,6 +44,26 @@ public class AppSettings {
         return timeZoneId;
     }
 
+    public int getMaxFileSizeMb() {
+        return maxFileSizeMb;
+    }
+
+    /** Sets the maximum single-file size for uploads in MB (1..2048). */
+    public void setMaxFileSizeMb(int mb) {
+        this.maxFileSizeMb = mb >= 1 ? Math.min(mb, 2048) : 100;
+        save();
+    }
+
+    public int getMaxRequestSizeMb() {
+        return maxRequestSizeMb;
+    }
+
+    /** Sets the maximum total request size for uploads in MB (1..2048). */
+    public void setMaxRequestSizeMb(int mb) {
+        this.maxRequestSizeMb = mb >= 1 ? Math.min(mb, 2048) : 500;
+        save();
+    }
+
     /** Sets the time zone id; invalid or blank values fall back to the system default. */
     public void setTimeZoneId(String timeZoneId) {
         this.timeZoneId = timeZoneId != null && isValidZoneId(timeZoneId)
@@ -52,7 +74,9 @@ public class AppSettings {
     public Map<String, Object> toMap() {
         return Map.of(
                 "snapshotRetentionDays", snapshotRetentionDays,
-                "timeZoneId", timeZoneId);
+                "timeZoneId", timeZoneId,
+                "maxFileSizeMb", maxFileSizeMb,
+                "maxRequestSizeMb", maxRequestSizeMb);
     }
 
     private static boolean isValidZoneId(String id) {
@@ -63,6 +87,10 @@ public class AppSettings {
         } catch (java.time.DateTimeException e) {
             return false;
         }
+    }
+
+    private static int clipMb(int mb) {
+        return mb >= 1 ? Math.min(mb, 2048) : 100;
     }
 
     private void load() {
@@ -76,6 +104,10 @@ public class AppSettings {
             if (tz instanceof String s) {
                 timeZoneId = isValidZoneId(s) ? s.trim() : ZoneId.systemDefault().getId();
             }
+            Object mfs = data.get("maxFileSizeMb");
+            if (mfs instanceof Number n) maxFileSizeMb = clipMb(n.intValue());
+            Object mrs = data.get("maxRequestSizeMb");
+            if (mrs instanceof Number n) maxRequestSizeMb = clipMb(n.intValue());
         } catch (tools.jackson.core.JacksonException e) {
             log.error("Failed to load settings from {}: {}", SETTINGS_PATH, e.getMessage());
         }
@@ -87,6 +119,8 @@ public class AppSettings {
             Map<String, Object> data = new HashMap<>();
             data.put("snapshotRetentionDays", snapshotRetentionDays);
             data.put("timeZoneId", timeZoneId);
+            data.put("maxFileSizeMb", maxFileSizeMb);
+            data.put("maxRequestSizeMb", maxRequestSizeMb);
             mapper.writeValue(SETTINGS_PATH.toFile(), data);
         } catch (IOException e) {
             log.error("Failed to save settings: {}", e.getMessage());        }

@@ -44,6 +44,8 @@ public class SettingsController {
         model.addAttribute("timeZoneId", appSettings.getTimeZoneId());
         model.addAttribute("systemTimeZoneId", ZoneId.systemDefault().getId());
         model.addAttribute("timeZoneOptions", COMMON_ZONES);
+        model.addAttribute("maxFileSizeMb", appSettings.getMaxFileSizeMb());
+        model.addAttribute("maxRequestSizeMb", appSettings.getMaxRequestSizeMb());
         return "settings";
     }
 
@@ -66,6 +68,18 @@ public class SettingsController {
             Object tz = body.get("timeZoneId");
             if (tz instanceof String s) {
                 appSettings.setTimeZoneId(s);
+            }
+        }
+        if (body.containsKey("maxFileSizeMb")) {
+            Object val = body.get("maxFileSizeMb");
+            if (val instanceof Number n) {
+                appSettings.setMaxFileSizeMb(n.intValue());
+            }
+        }
+        if (body.containsKey("maxRequestSizeMb")) {
+            Object val = body.get("maxRequestSizeMb");
+            if (val instanceof Number n) {
+                appSettings.setMaxRequestSizeMb(n.intValue());
             }
         }
         return ResponseEntity.ok(appSettings.toMap());

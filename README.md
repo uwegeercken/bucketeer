@@ -9,7 +9,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
 - **Selection &amp; bulk download** — collect objects across queries as batches and download them all as a ZIP
 - **Move &amp; delete objects** — move (same bucket, copy + delete) or delete individual objects from the results, or apply batch operations (delete / prefix-based move) to the selection; existing targets are skipped and reported
-- **File upload** — upload a local file to any configured server and bucket, with an optional target prefix
+- **File upload** — upload local files to any configured server and bucket, with an optional target prefix; every upload is recorded in the Action History
 - **Object tags** — view the S3 tags of any object via the row context menu (right-click a result row or use the &#8942; button)
 - **Action history** — every move/delete is recorded in `~/.bucketeer/actions/actions.jsonl` and can be reviewed on the **Action History** page (`/history`)
 - **Snapshots** — save query results as Parquet, compare snapshots over time and export the diff (added / removed / changed objects)
