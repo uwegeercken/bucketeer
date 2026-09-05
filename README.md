@@ -14,7 +14,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **File upload** — upload single or multiple files to any configured server and bucket, with an optional target prefix
 - **Object tags** — view S3 tags of any object via the row context menu
 - **Action history** — every move/delete/upload is recorded and can be reviewed on the **Action History** page
-- **Snapshots** — save query results as Parquet, compare snapshots over time and export the diff
+- **Snapshots** — save query results as Parquet, compare snapshots over time, export the diff, and load a saved snapshot back into the results table (filterable, no S3 scan)
 - **Key Check** — upload a CSV with keys and verify which ones exist on the server
 - **Text Tools** — Base64 / URL encode &amp; decode, timestamp ↔ date conversion, JSON pretty / minify, SHA-256
 - **Zero-config security** — S3 credentials encrypted at rest
@@ -26,7 +26,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.7.4.jar
+java -jar target/bucketeer-0.7.6.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -44,7 +44,7 @@ The full documentation lives in the [GitHub Wiki](https://github.com/uwegeercken
 - [Prefix Templates](https://github.com/uwegeercken/bucketeer/wiki/Prefix-Templates) — syntax, references, functions, wildcard and chaining
 - [Prefix Template Examples](https://github.com/uwegeercken/bucketeer/wiki/Prefix-Template-Examples) — 12 worked examples
 - [Query & Filtering](https://github.com/uwegeercken/bucketeer/wiki/Query-and-Filtering) — how searches and filters work
-- [Snapshots](https://github.com/uwegeercken/bucketeer/wiki/Snapshots) — save, compare and clean up snapshots
+- [Snapshots](https://github.com/uwegeercken/bucketeer/wiki/Snapshots) — save, compare, clean up, and load snapshots back into the results
 - [Key Check](https://github.com/uwegeercken/bucketeer/wiki/Key-Check) — verify keys from a CSV against S3
 - [Text Tools](https://github.com/uwegeercken/bucketeer/wiki/Text-Tools) — encoding, timestamp and hashing utilities
 - [Development](https://github.com/uwegeercken/bucketeer/wiki/Development) — brief notes on extending the app

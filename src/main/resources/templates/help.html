@@ -31,6 +31,16 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.7.6 <small class="text-muted">2026-09-05</small></h6>
+                    <ul>
+                        <li><strong>Snapshot query</strong>: load a saved snapshot back into the results table via its row context menu (<em>Load into results</em>). The data is read from the snapshot file (no S3 scan), the search section is prefilled with the snapshot's server/bucket/prefix, and the status line shows the snapshot's save date and time. All results features (filter, sort, pagination, selection, export, save snapshot) keep working on the loaded data</li>
+                        <li>Results status line now shows the wall-clock completion time next to the object count and load duration, e.g. <em>[14:32:05] · 12.4s</em></li>
+                        <li>New <em>Clear results</em> button (<em>×</em>) in the results title bar empties the results table and resets the query session</li>
+                        <li>Fixed: size filters now compare the rounded size displayed in the table, so a filter at the exact displayed value (e.g. <code>min 11,43 KB</code>) keeps the corresponding object visible</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.7.4 <small class="text-muted">2026-08-31</small></h6>
                     <ul>
                         <li>File upload: a new upload button in the navigation bar lets you upload local files to any configured server and bucket, with an optional target prefix (suggestions from your favorites and search history); every upload is recorded in the Action History</li>
