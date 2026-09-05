@@ -177,12 +177,12 @@ public class DuckDbRepository {
             params.add(keyFilter);
         }
         if (minSizeKb != null) {
-            sql.append(" AND size_bytes >= ?");
-            params.add(minSizeKb * 1024);
+            sql.append(" AND ROUND(size_bytes / 1024.0, 2) >= ?");
+            params.add(minSizeKb);
         }
         if (maxSizeKb != null) {
-            sql.append(" AND size_bytes <= ?");
-            params.add(maxSizeKb * 1024);
+            sql.append(" AND ROUND(size_bytes / 1024.0, 2) <= ?");
+            params.add(maxSizeKb);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
             String from = dayStartBoundary(dateFrom, zone());
@@ -251,12 +251,12 @@ public class DuckDbRepository {
             params.add(keyFilter);
         }
         if (minSizeKb != null) {
-            where.append(" AND size_bytes >= ?");
-            params.add(minSizeKb * 1024);
+            where.append(" AND ROUND(size_bytes / 1024.0, 2) >= ?");
+            params.add(minSizeKb);
         }
         if (maxSizeKb != null) {
-            where.append(" AND size_bytes <= ?");
-            params.add(maxSizeKb * 1024);
+            where.append(" AND ROUND(size_bytes / 1024.0, 2) <= ?");
+            params.add(maxSizeKb);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
             String from = dayStartBoundary(dateFrom, zone());
@@ -298,6 +298,23 @@ public class DuckDbRepository {
         } catch (SQLException e) {
             log.error("Failed to export all to Parquet: {}", e.getMessage());
             throw new RuntimeException("Parquet export failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Replaces the current objects table with the contents of a snapshot Parquet file.
+     * The Parquet columns must match the objects schema (key, bucket, size_bytes, last_modified, etag).
+     */
+    public long loadParquet(String parquetPath) {
+        String sql = "INSERT INTO objects (key, bucket, size_bytes, last_modified, etag) "
+                + "SELECT key, bucket, size_bytes, last_modified, etag FROM read_parquet('" + parquetPath + "')";
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("DELETE FROM objects");
+            stmt.execute(sql);
+            return count();
+        } catch (SQLException e) {
+            log.error("Failed to load Parquet into objects table: {}", e.getMessage());
+            throw new RuntimeException("Failed to load Parquet: " + e.getMessage());
         }
     }
 
@@ -629,12 +646,12 @@ public class DuckDbRepository {
             params.add(keyFilter);
         }
         if (minSizeKb != null) {
-            sql.append(" AND size_bytes >= ?");
-            params.add(minSizeKb * 1024);
+            sql.append(" AND ROUND(size_bytes / 1024.0, 2) >= ?");
+            params.add(minSizeKb);
         }
         if (maxSizeKb != null) {
-            sql.append(" AND size_bytes <= ?");
-            params.add(maxSizeKb * 1024);
+            sql.append(" AND ROUND(size_bytes / 1024.0, 2) <= ?");
+            params.add(maxSizeKb);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
             String from = dayStartBoundary(dateFrom, zone());

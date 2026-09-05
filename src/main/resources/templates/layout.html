@@ -871,6 +871,7 @@
 <!-- Snapshot context menu fragment (open in file manager / delete) -->
 <th:block th:fragment="snapshotContextMenu">
     <div id="snapshotContextMenu" class="dropdown-menu row-context-menu" role="menu">
+        <button type="button" class="dropdown-item" id="snapCtxLoad" role="menuitem"><i class="bi bi-table me-2" aria-hidden="true"></i><span th:text="#{snapshot.load}">Load into results</span></button>
         <button type="button" class="dropdown-item" id="snapCtxReveal" role="menuitem"><i class="bi bi-folder2-open me-2" aria-hidden="true"></i><span th:text="#{snapshot.reveal}">Open in file manager</span></button>
         <button type="button" class="dropdown-item text-danger" id="snapCtxDelete" role="menuitem"><i class="bi bi-trash me-2" aria-hidden="true"></i><span th:text="#{snapshot.delete}">Delete snapshot</span></button>
     </div>
