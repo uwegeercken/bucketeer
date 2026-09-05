@@ -109,6 +109,10 @@
                         onclick="saveSnapshot()" th:title="#{snapshot.save}" disabled>
                     <i class="bi bi-camera"></i>
                 </button>
+                <button type="button" id="btnClearResults" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="clearResults()" th:title="#{btn.clearResults}">
+                    <i class="bi bi-x-lg"></i>
+                </button>
                 <button type="button" id="toggleMaximize" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="toggleMaximize()" th:title="#{btn.toggleMaximize}">
                     <i class="bi bi-arrows-fullscreen"></i>
@@ -252,6 +256,15 @@
     const labelPrev      = /*[[#{btn.prev}]]*/ '\u2190 Previous';
     const labelNext      = /*[[#{btn.next}]]*/ 'Next \u2192';
     const labelSnapshotSave = /*[[#{snapshot.save}]]*/ 'Save snapshot';
+    const labelSnapshotBadge = /*[[#{snapshot.badge}]]*/ 'Snapshot';
+    const snapshotCreatedAt  = /*[[${snapshotCreatedAt}]]*/ '';
+    const snapshotServer     = /*[[${snapshotServer}]]*/ '';
+    const snapshotBucket     = /*[[${snapshotBucket}]]*/ '';
+    const snapshotPrefix     = /*[[${snapshotPrefix}]]*/ '';
+    const snapshotName       = /*[[${snapshotName}]]*/ '';
+    let snapshotContext = snapshotCreatedAt
+        ? { server: snapshotServer, bucket: snapshotBucket, prefix: snapshotPrefix, createdAt: snapshotCreatedAt, name: snapshotName }
+        : null;
     const labelNoCombo      = /*[[#{msg.noComboEntries}]]*/ 'No entries found';
     const labelClearHistoryConfirm = /*[[#{msg.clearHistoryConfirm}]]*/ 'Clear all search history?';
     const labelClearFilterHistoryConfirm = /*[[#{msg.clearFilterHistoryConfirm}]]*/ 'Clear all filter history?';
@@ -758,6 +771,21 @@
     let queryStartTime = null;
     let queryTimerInterval = null;
 
+    function formatClock(d) {
+        try {
+            const parts = new Intl.DateTimeFormat('en-GB', {
+                timeZone: window.BUCKETEER_TIMEZONE || 'UTC',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hourCycle: 'h23'
+            }).formatToParts(d);
+            const m = {};
+            parts.forEach(function(p) { m[p.type] = p.value; });
+            return m.hour + ':' + m.minute + ':' + m.second;
+        } catch (e) {
+            return d.toTimeString().slice(0, 8);
+        }
+    }
+
     function formatElapsed(ms) {
         const sec = Math.floor(ms / 1000);
         if (sec <= 60) return sec + 's';
@@ -811,16 +839,26 @@
             stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
             statusText.classList.remove('text-warning');
+            const timerEl = document.getElementById('queryTimer');
+            const snapshotActive = typeof snapshotContext !== 'undefined' && snapshotContext !== null;
             if (data.objectsFound === 0) {
                 statusText.textContent = labelNoObj;
             } else {
-                statusText.textContent = data.objectsFound + ' ' + labelObjTotal;
+                if (snapshotActive) {
+                    statusText.textContent = data.objectsFound + ' ' + labelObjTotal;
+                    timerEl.textContent = labelSnapshotBadge + ' \u2022 ' + formatBucketDateTime(snapshotContext.createdAt);
+                } else {
+                    statusText.textContent = data.objectsFound + ' ' + labelObjTotal;
+                }
                 if (data.limitReached) {
                     statusText.classList.add('text-warning');
                     statusText.textContent = data.objectsFound + ' ' + labelObjTotal + ' \u2013 ' + labelLimitReached;
                 }
                 document.getElementById('filterForm').style.display = 'block';
                 loadResults();
+            }
+            if (!snapshotActive && queryStartTime) {
+                timerEl.textContent = '[' + formatClock(new Date()) + '] \u00b7 ' + formatElapsed(Date.now() - queryStartTime);
             }
         } else if (data.status === 'ERROR') {
             clearInterval(pollInterval);
@@ -1111,6 +1149,20 @@
         }
     }
 
+    async function clearResults() {
+        try {
+            await fetch('/api/query/clear', { method: 'POST' });
+        } catch (e) { /* ignore */ }
+        snapshotContext = null;
+        queryStartTime = null;
+        clearInterval(pollInterval);
+        stopTimer();
+        document.getElementById('querySpinner').style.display = 'none';
+        document.getElementById('resultsPanel').style.display = 'none';
+        currentPage = 0;
+        document.getElementById('selectAll').checked = false;
+    }
+
     // --- Snapshots ---
 
     async function saveSnapshot() {
@@ -1209,6 +1261,23 @@
         if (overlay) overlay.remove();
     }
 
+    function applySnapshotPrefill() {
+        if (!snapshotContext) return;
+        const sel = document.getElementById('bucketInput');
+        if (sel && snapshotContext.bucket) {
+            if (sel.querySelector('option[value="' + CSS.escape(snapshotContext.bucket) + '"]')) {
+                sel.value = snapshotContext.bucket;
+            } else {
+                const opt = document.createElement('option');
+                opt.value = snapshotContext.bucket; opt.textContent = snapshotContext.bucket; opt.selected = true;
+                sel.appendChild(opt);
+            }
+        }
+        if (snapshotContext.prefix) document.getElementById('prefixInput').value = snapshotContext.prefix;
+        const serverSel = document.getElementById('headerServerSelect');
+        if (serverSel && snapshotContext.server) serverSel.value = snapshotContext.server;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
             new bootstrap.Popover(el);
@@ -1217,6 +1286,7 @@
 
         loadBuckets(currentBucket).then(() => {
             restoreFormState();
+            applySnapshotPrefill();
             updateResolvedPrefix();
             checkEasterEgg();
             startPolling();

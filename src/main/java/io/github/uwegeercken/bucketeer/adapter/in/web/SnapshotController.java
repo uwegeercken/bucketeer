@@ -100,6 +100,40 @@ public class SnapshotController {
                 .toList();
     }
 
+    @PostMapping("/api/snapshots/{id}/load")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> loadSnapshot(@PathVariable String id, HttpSession session) {
+        SnapshotMeta meta = snapshotRepo.findById(id);
+        if (meta == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Snapshot not found"));
+        }
+
+        Path parquetPath = meta.dataPath(snapshotRepo.getSnapshotsDir());
+        if (!parquetPath.toFile().exists()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Snapshot data file not found"));
+        }
+
+        try {
+            long rowCount = duckDb.loadParquet(parquetPath.toString());
+
+            QueryContext qc = new QueryContext();
+            qc.start();
+            qc.incrementFound(rowCount);
+            qc.done();
+            session.setAttribute(QueryContext.SESSION_KEY, qc);
+            session.setAttribute("bucketeer_query_params",
+                    new QueryParams(meta.serverName(), meta.bucket(), meta.prefix(),
+                            meta.key(), meta.dateFrom(), meta.dateTo(), meta.whereClause()));
+            session.setAttribute("bucketeer_snapshot_context", meta);
+
+            return ResponseEntity.ok(Map.of("ok", true, "rowCount", rowCount));
+        } catch (Exception e) {
+            log.error("Failed to load snapshot {}: {}", id, e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to load snapshot: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/api/snapshots/compare")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> compareSnapshots(

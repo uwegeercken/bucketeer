@@ -109,6 +109,7 @@ public class BucketeerController {
             // store query parameters for snapshot matching
             QueryParams qp = new QueryParams(currentServer, bucket, prefix, key, null, null, null);
             session.setAttribute("bucketeer_query_params", qp);
+            session.removeAttribute("bucketeer_snapshot_context");
 
             duckDb.clear();
             qc.start();
@@ -145,6 +146,15 @@ public class BucketeerController {
             if (qc != null && qc.getStatus() == QueryContext.Status.DONE && duckDb.count() > 0) {
                 model.addAttribute("queryStarted", true);
             }
+            SnapshotMeta snapshotMeta = (SnapshotMeta) session.getAttribute("bucketeer_snapshot_context");
+            if (snapshotMeta != null) {
+                model.addAttribute("snapshotServer",    snapshotMeta.serverName() != null ? snapshotMeta.serverName() : "");
+                model.addAttribute("snapshotBucket",    snapshotMeta.bucket() != null ? snapshotMeta.bucket() : "");
+                model.addAttribute("snapshotPrefix",    snapshotMeta.prefix() != null ? snapshotMeta.prefix() : "");
+                model.addAttribute("snapshotCreatedAt", snapshotMeta.createdAt() != null ? snapshotMeta.createdAt().toString() : "");
+                model.addAttribute("snapshotName",      snapshotMeta.name() != null ? snapshotMeta.name() : "");
+                model.addAttribute("snapshotRowCount",  snapshotMeta.rowCount());
+            }
         }
 
         return "index";
@@ -156,6 +166,7 @@ public class BucketeerController {
         duckDb.clear();
         session.removeAttribute(QueryContext.SESSION_KEY);
         session.removeAttribute("bucketeer_query_params");
+        session.removeAttribute("bucketeer_snapshot_context");
         return "redirect:/";
     }
 
@@ -244,6 +255,16 @@ public class BucketeerController {
                 .map(ft -> Map.<String, Object>of("ext", ft.ext(), "count", ft.count()))
                 .toList());
         return response;
+    }
+
+    @PostMapping(value = "/api/query/clear", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> clearQuery(HttpSession session) {
+        duckDb.clear();
+        session.removeAttribute(QueryContext.SESSION_KEY);
+        session.removeAttribute("bucketeer_query_params");
+        session.removeAttribute("bucketeer_snapshot_context");
+        return Map.of("ok", true);
     }
 
     @PostMapping(value = "/api/upload", produces = MediaType.APPLICATION_JSON_VALUE)

@@ -142,6 +142,20 @@
         }
     }
 
+    async function loadSnapshotIntoResults(id) {
+        try {
+            const res = await fetch('/api/snapshots/' + id + '/load', { method: 'POST' });
+            if (res.ok) {
+                window.location.href = '/';
+            } else {
+                const data = await res.json().catch(() => ({}));
+                alert(data.error || 'Failed to load snapshot');
+            }
+        } catch (e) {
+            alert('Failed to load snapshot: ' + e.message);
+        }
+    }
+
     async function deleteSnapshot(id) {
         if (!confirm(labelSnapshotConfirm)) return;
         await fetch('/api/snapshots/' + id, { method: 'DELETE' });
@@ -296,6 +310,14 @@
             if (!btn) return;
             const rect = btn.getBoundingClientRect();
             openSnapshotMenu(btn.dataset.id, rect.left, rect.bottom + 2);
+        });
+
+        document.getElementById('snapCtxLoad').addEventListener('click', () => {
+            if (!ctxSnapshotId) return;
+            const id = ctxSnapshotId;
+            ctxSnapshotId = null;
+            window.BucketeerContextMenu.close();
+            loadSnapshotIntoResults(id);
         });
 
         document.getElementById('snapCtxReveal').addEventListener('click', () => {

@@ -302,6 +302,23 @@ public class DuckDbRepository {
     }
 
     /**
+     * Replaces the current objects table with the contents of a snapshot Parquet file.
+     * The Parquet columns must match the objects schema (key, bucket, size_bytes, last_modified, etag).
+     */
+    public long loadParquet(String parquetPath) {
+        String sql = "INSERT INTO objects (key, bucket, size_bytes, last_modified, etag) "
+                + "SELECT key, bucket, size_bytes, last_modified, etag FROM read_parquet('" + parquetPath + "')";
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("DELETE FROM objects");
+            stmt.execute(sql);
+            return count();
+        } catch (SQLException e) {
+            log.error("Failed to load Parquet into objects table: {}", e.getMessage());
+            throw new RuntimeException("Failed to load Parquet: " + e.getMessage());
+        }
+    }
+
+    /**
      * Compares the current in-memory objects table with a snapshot parquet file.
      * Returns a DiffResult with added, removed, and changed objects.
      */

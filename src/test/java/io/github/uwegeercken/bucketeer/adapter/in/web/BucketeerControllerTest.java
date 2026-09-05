@@ -144,6 +144,19 @@ class BucketeerControllerTest {
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    @DisplayName("clearQuery empties the cached objects and removes the query session attributes")
+    void clearQueryStartsFresh() {
+        HttpSession session = mock(HttpSession.class);
+
+        Map<String, Object> resp = controller.clearQuery(session);
+
+        assertThat(resp.get("ok")).isEqualTo(true);
+        verify(session).removeAttribute(QueryContext.SESSION_KEY);
+        verify(session).removeAttribute("bucketeer_query_params");
+        verify(session).removeAttribute("bucketeer_snapshot_context");
+    }
+
     private static class RecordingDuckDb extends DuckDbRepository {
         final List<String> deletedKeys = new ArrayList<>();
         boolean failDelete;
