@@ -177,12 +177,12 @@ public class DuckDbRepository {
             params.add(keyFilter);
         }
         if (minSizeKb != null) {
-            sql.append(" AND size_bytes >= ?");
-            params.add(minSizeKb * 1024);
+            sql.append(" AND ROUND(size_bytes / 1024.0, 2) >= ?");
+            params.add(minSizeKb);
         }
         if (maxSizeKb != null) {
-            sql.append(" AND size_bytes <= ?");
-            params.add(maxSizeKb * 1024);
+            sql.append(" AND ROUND(size_bytes / 1024.0, 2) <= ?");
+            params.add(maxSizeKb);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
             String from = dayStartBoundary(dateFrom, zone());
@@ -251,12 +251,12 @@ public class DuckDbRepository {
             params.add(keyFilter);
         }
         if (minSizeKb != null) {
-            where.append(" AND size_bytes >= ?");
-            params.add(minSizeKb * 1024);
+            where.append(" AND ROUND(size_bytes / 1024.0, 2) >= ?");
+            params.add(minSizeKb);
         }
         if (maxSizeKb != null) {
-            where.append(" AND size_bytes <= ?");
-            params.add(maxSizeKb * 1024);
+            where.append(" AND ROUND(size_bytes / 1024.0, 2) <= ?");
+            params.add(maxSizeKb);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
             String from = dayStartBoundary(dateFrom, zone());
@@ -646,12 +646,12 @@ public class DuckDbRepository {
             params.add(keyFilter);
         }
         if (minSizeKb != null) {
-            sql.append(" AND size_bytes >= ?");
-            params.add(minSizeKb * 1024);
+            sql.append(" AND ROUND(size_bytes / 1024.0, 2) >= ?");
+            params.add(minSizeKb);
         }
         if (maxSizeKb != null) {
-            sql.append(" AND size_bytes <= ?");
-            params.add(maxSizeKb * 1024);
+            sql.append(" AND ROUND(size_bytes / 1024.0, 2) <= ?");
+            params.add(maxSizeKb);
         }
         if (dateFrom != null && !dateFrom.isBlank()) {
             String from = dayStartBoundary(dateFrom, zone());
