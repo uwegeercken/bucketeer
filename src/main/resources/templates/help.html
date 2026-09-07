@@ -31,6 +31,13 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.7.7 <small class="text-muted">2026-09-05</small></h6>
+                    <ul>
+                        <li><strong>Key Check</strong>: uploaded files now use two columns per line — a <em>prefix</em> and a <em>key</em>. The prefix may be a literal path or a prefix template (e.g. <code>data/{date(yyyy/MM)}/</code>), resolved with the same template engine as the search; the key is appended to form the full object key (a trailing slash on the prefix is not required). CSV export now includes the prefix column, so a result file can be imported again</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.7.6 <small class="text-muted">2026-09-05</small></h6>
                     <ul>
                         <li><strong>Snapshot query</strong>: load a saved snapshot back into the results table via its row context menu (<em>Load into results</em>). The data is read from the snapshot file (no S3 scan), the search section is prefilled with the snapshot's server/bucket/prefix, and the status line shows the snapshot's save date and time. All results features (filter, sort, pagination, selection, export, save snapshot) keep working on the loaded data</li>

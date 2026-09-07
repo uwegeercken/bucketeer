@@ -1,6 +1,7 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import io.github.uwegeercken.bucketeer.domain.model.HeadObjectResult;
+import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -17,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,13 +34,16 @@ public class KeyCheckController {
     private final S3StoragePort s3StoragePort;
     private final SessionContext sessionContext;
     private final ThreadPoolTaskExecutor executor;
+    private final BucketeerUseCase bucketeerUseCase;
 
     public KeyCheckController(S3StoragePort s3StoragePort,
                               SessionContext sessionContext,
-                              ThreadPoolTaskExecutor executor) {
+                              ThreadPoolTaskExecutor executor,
+                              BucketeerUseCase bucketeerUseCase) {
         this.s3StoragePort = s3StoragePort;
         this.sessionContext = sessionContext;
         this.executor = executor;
+        this.bucketeerUseCase = bucketeerUseCase;
     }
 
     @GetMapping("/keycheck")
@@ -63,37 +68,51 @@ public class KeyCheckController {
 
         char sep = parseDelimiter(delimiter);
 
-        List<String> keys = parseCsvKeys(file, sep, hasHeader);
-        if (keys.isEmpty()) {
+        List<KeyLine> lines = parseKeyLines(file, sep, hasHeader);
+        if (lines.isEmpty()) {
             return Map.of("error", "No keys found in file");
         }
 
-        int total = keys.size();
+        int total = lines.size();
         CopyOnWriteArrayList<Map<String, Object>> results = new CopyOnWriteArrayList<>();
         int[] processed = {0};
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-        for (String key : keys) {
+        for (KeyLine line : lines) {
+            if (line.error() != null) {
+                results.add(errorRow(line.rawLine(), line.prefix(), line.key(), line.error()));
+                synchronized (processed) {
+                    processed[0]++;
+                }
+                continue;
+            }
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                final String fullKey;
+                try {
+                    fullKey = assembleFullKey(line.prefix(), line.key(), bucket);
+                } catch (RuntimeException e) {
+                    log.error("Prefix resolution failed for {}: {}", line.rawLine(), e.getMessage());
+                    results.add(errorRow(line.rawLine(), line.prefix(), line.key(), e.getMessage()));
+                    synchronized (processed) {
+                        processed[0]++;
+                    }
+                    return;
+                }
                 Map<String, Object> row;
                 try {
-                    HeadObjectResult result = s3StoragePort.headObject(serverName, bucket, key);
+                    HeadObjectResult result = s3StoragePort.headObject(serverName, bucket, fullKey);
                     row = new HashMap<>();
-                    row.put("key", key);
+                    row.put("key", fullKey);
+                    row.put("prefix", line.prefix());
+                    row.put("rawKey", line.key());
                     row.put("exists", result.exists());
                     row.put("sizeBytes", result.sizeBytes());
                     row.put("lastModified", result.lastModified() != null ? result.lastModified().toString() : "");
                     row.put("etag", result.eTag() != null ? result.eTag() : "");
                 } catch (Exception e) {
-                    log.error("Key check failed for {}/{}: {}", bucket, key, e.getMessage());
-                    row = new HashMap<>();
-                    row.put("key", key);
-                    row.put("exists", false);
-                    row.put("sizeBytes", null);
-                    row.put("lastModified", "");
-                    row.put("etag", "");
-                    row.put("error", e.getMessage());
+                    log.error("Key check failed for {}/{}: {}", bucket, fullKey, e.getMessage());
+                    row = errorRow(fullKey, line.prefix(), line.key(), e.getMessage());
                 }
                 results.add(row);
                 synchronized (processed) {
@@ -150,13 +169,14 @@ public class KeyCheckController {
 
         StringBuilder sb = new StringBuilder();
         if (hasHeader) {
-            sb.append("key").append(sep).append("exists").append(sep)
-              .append("size_bytes").append(sep).append("last_modified").append(sep)
-              .append("etag").append("\n");
+            sb.append("prefix").append(sep).append("key").append(sep)
+              .append("exists").append(sep).append("size_bytes").append(sep)
+              .append("last_modified").append(sep).append("etag").append("\n");
         }
 
         for (Map<String, Object> row : results) {
-            sb.append(row.get("key")).append(sep)
+            sb.append(row.get("prefix")).append(sep)
+              .append(row.get("rawKey")).append(sep)
               .append(row.get("exists")).append(sep)
               .append(row.get("sizeBytes")).append(sep)
               .append(row.get("lastModified")).append(sep)
@@ -167,17 +187,16 @@ public class KeyCheckController {
         response.getOutputStream().flush();
     }
 
-    private char parseDelimiter(String delimiter) {
-        return switch (delimiter) {
-            case "tab" -> '\t';
-            case "pipe" -> '|';
-            case "semicolon" -> ';';
-            default -> ',';
-        };
+    record KeyLine(String prefix, String key, String rawLine, String error) {
     }
 
-    private List<String> parseCsvKeys(MultipartFile file, char sep, boolean hasHeader) throws IOException {
-        List<String> keys = new ArrayList<>();
+    /**
+     * Parses the uploaded file into two-column lines (prefix, key).
+     * A single-column line or an empty key column is reported as an error row;
+     * blank lines are skipped.
+     */
+    List<KeyLine> parseKeyLines(MultipartFile file, char sep, boolean hasHeader) throws IOException {
+        List<KeyLine> lines = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
@@ -189,14 +208,64 @@ public class KeyCheckController {
                 }
                 first = false;
                 String trimmed = line.trim();
-                if (!trimmed.isEmpty()) {
-                    String[] parts = trimmed.split(Pattern.quote(String.valueOf(sep)), -1);
-                    if (parts.length > 0 && !parts[0].trim().isEmpty()) {
-                        keys.add(parts[0].trim());
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                String[] parts = trimmed.split(Pattern.quote(String.valueOf(sep)), -1);
+                if (parts.length < 2) {
+                    lines.add(new KeyLine("", "", trimmed, "Expected two columns: <prefix>" + sep + "<key>"));
+                } else {
+                    String prefix = parts[0].trim();
+                    String key = String.join(String.valueOf(sep), Arrays.copyOfRange(parts, 1, parts.length)).trim();
+                    if (key.isEmpty()) {
+                        if (prefix.isEmpty()) {
+                            continue;
+                        }
+                        lines.add(new KeyLine(prefix, "", trimmed, "Missing key in second column"));
+                    } else {
+                        lines.add(new KeyLine(prefix, key, trimmed, null));
                     }
                 }
             }
         }
-        return keys;
+        return lines;
+    }
+
+    /**
+     * Builds the full object key from the uploaded prefix and key.
+     * The prefix may be empty (check the key as-is), a literal path, or a prefix template
+     * resolved by the template engine. A missing trailing slash on the resolved prefix is added.
+     */
+    String assembleFullKey(String prefix, String key, String bucket) {
+        if (prefix == null || prefix.isEmpty()) {
+            return key;
+        }
+        String resolved = bucketeerUseCase.resolveTemplate(prefix, key, bucket);
+        String normalized = resolved.isEmpty()
+                ? ""
+                : resolved.endsWith("/") ? resolved : resolved + "/";
+        return normalized + key;
+    }
+
+    private Map<String, Object> errorRow(String key, String prefix, String rawKey, String error) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("key", key);
+        row.put("prefix", prefix);
+        row.put("rawKey", rawKey);
+        row.put("exists", false);
+        row.put("sizeBytes", null);
+        row.put("lastModified", "");
+        row.put("etag", "");
+        row.put("error", error);
+        return row;
+    }
+
+    private char parseDelimiter(String delimiter) {
+        return switch (delimiter) {
+            case "tab" -> '\t';
+            case "pipe" -> '|';
+            case "semicolon" -> ';';
+            default -> ',';
+        };
     }
 }
