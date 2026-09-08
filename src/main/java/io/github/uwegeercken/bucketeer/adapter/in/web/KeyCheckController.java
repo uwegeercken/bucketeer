@@ -18,13 +18,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.regex.Pattern;
 
 @Controller
 public class KeyCheckController {
@@ -193,7 +191,9 @@ public class KeyCheckController {
     /**
      * Parses the uploaded file into two-column lines (prefix, key).
      * A single-column line or an empty key column is reported as an error row;
-     * blank lines are skipped.
+     * blank lines are skipped. The delimiter is only recognized outside of
+     * braces, so commas inside a prefix template (e.g. {everyNth(p4, 0, 2)})
+     * do not split the line.
      */
     List<KeyLine> parseKeyLines(MultipartFile file, char sep, boolean hasHeader) throws IOException {
         List<KeyLine> lines = new ArrayList<>();
@@ -211,12 +211,12 @@ public class KeyCheckController {
                 if (trimmed.isEmpty()) {
                     continue;
                 }
-                String[] parts = trimmed.split(Pattern.quote(String.valueOf(sep)), -1);
-                if (parts.length < 2) {
+                List<String> parts = splitColumnsOutsideBraces(trimmed, sep);
+                if (parts.size() < 2) {
                     lines.add(new KeyLine("", "", trimmed, "Expected two columns: <prefix>" + sep + "<key>"));
                 } else {
-                    String prefix = parts[0].trim();
-                    String key = String.join(String.valueOf(sep), Arrays.copyOfRange(parts, 1, parts.length)).trim();
+                    String prefix = parts.get(0).trim();
+                    String key = String.join(String.valueOf(sep), parts.subList(1, parts.size())).trim();
                     if (key.isEmpty()) {
                         if (prefix.isEmpty()) {
                             continue;
@@ -229,6 +229,29 @@ public class KeyCheckController {
             }
         }
         return lines;
+    }
+
+    /**
+     * Splits a line at the given separator, ignoring separators inside { } braces
+     * (the same rule the template parser applies to '/', see TemplateParser).
+     */
+    private List<String> splitColumnsOutsideBraces(String line, char sep) {
+        List<String> parts = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth = Math.max(0, depth - 1);
+            } else if (c == sep && depth == 0) {
+                parts.add(line.substring(start, i));
+                start = i + 1;
+            }
+        }
+        parts.add(line.substring(start));
+        return parts;
     }
 
     /**

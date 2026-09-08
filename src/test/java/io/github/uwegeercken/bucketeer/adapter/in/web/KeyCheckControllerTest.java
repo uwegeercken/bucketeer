@@ -125,6 +125,27 @@ class KeyCheckControllerTest {
         assertThat(lines.get(0).key()).isEqualTo("a,b.csv");
     }
 
+    @Test
+    void commasInsidePrefixTemplateBracesAreNotSplit() throws Exception {
+        String line = "prd/test123/{everyNth(p4,0,2)}/MTA0MTA2LzcyLzM2LzE,MTA0MTA2LzcyLzM2Lz--10.json";
+        List<KeyCheckController.KeyLine> lines = controller.parseKeyLines(file(line + "\n"), ',', false);
+
+        assertThat(lines).hasSize(1);
+        assertThat(lines.get(0).prefix()).isEqualTo("prd/test123/{everyNth(p4,0,2)}/MTA0MTA2LzcyLzM2LzE");
+        assertThat(lines.get(0).key()).isEqualTo("MTA0MTA2LzcyLzM2Lz--10.json");
+        assertThat(lines.get(0).error()).isNull();
+    }
+
+    @Test
+    void keyWithBracesStillSplitsIntoTwoColumns() throws Exception {
+        List<KeyCheckController.KeyLine> lines = controller.parseKeyLines(
+                file("data/,file-{1}.json\n"), ',', false);
+
+        assertThat(lines).hasSize(1);
+        assertThat(lines.get(0).prefix()).isEqualTo("data/");
+        assertThat(lines.get(0).key()).isEqualTo("file-{1}.json");
+    }
+
     // ---- assembleFullKey ----
 
     @Test
@@ -204,6 +225,17 @@ class KeyCheckControllerTest {
         controller.checkKeys(file("data,file1.parquet\n"), ",", false, "bucket", session);
 
         verify(storage).headObject(eq("serverA"), eq("bucket"), eq("data/file1.parquet"));
+    }
+
+    @Test
+    void templateWithCommaArgumentsReachesHeadWithAssembledKey() throws Exception {
+        when(useCase.resolveTemplate(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(storage.headObject(eq("serverA"), eq("bucket"), any())).thenReturn(HeadObjectResult.notFound());
+
+        controller.checkKeys(file("prd/test123/{everyNth(p4,0,2)}/X,abc.json\n"), ",", false, "bucket", session);
+
+        verify(storage).headObject(eq("serverA"), eq("bucket"),
+                eq("prd/test123/{everyNth(p4,0,2)}/X/abc.json"));
     }
 
     @Test
