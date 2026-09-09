@@ -374,7 +374,8 @@
                     prefixEl.classList.add('is-valid');
                     searchBtn.disabled = false;
                     const bucketVal = document.getElementById('bucketInput').value;
-                    fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(key) + '&bucket=' + encodeURIComponent(bucketVal))
+                    const previewKey = key.endsWith('*') ? key.slice(0, -1) : key;
+                    fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(previewKey) + '&bucket=' + encodeURIComponent(bucketVal))
                         .then(r => r.text())
                         .then(resolved => { setResolvedPopover(resolved); })
                         .catch(() => {});

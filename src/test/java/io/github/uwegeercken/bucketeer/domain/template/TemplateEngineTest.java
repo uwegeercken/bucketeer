@@ -26,7 +26,9 @@ class TemplateEngineTest {
                 new UpperFunction(),
                 new LowerFunction(),
                 new DateFunction(),
-                new RepeatFunction()
+                new RepeatFunction(),
+                new SplitFunction(),
+                new ReplaceFunction()
         );
         TemplateResolver resolver = new TemplateResolver(functions);
         engine = new PrefixTemplateEngine(parser, resolver);
@@ -454,5 +456,198 @@ class TemplateEngineTest {
     @DisplayName("T45: validate recognizes repeat and bucket")
     void t45_validateRepeatAndBucket() {
         assertThat(engine.validate("data/{repeat(p1)}/{upper(bucket)}/")).isEmpty();
+    }
+
+    // --- Category 12: split ---
+
+    @Test
+    @DisplayName("T46: split(key, /, 1) - first part")
+    void t46_splitFirstPart() {
+        assertThat(engine.resolve("data/{split(key, /, 1)}/", "a/b/c", null))
+                .isEqualTo("data/a/");
+    }
+
+    @Test
+    @DisplayName("T47: split(key, /, 2) - second part")
+    void t47_splitSecondPart() {
+        assertThat(engine.resolve("data/{split(key, /, 2)}/", "a/b/c", null))
+                .isEqualTo("data/b/");
+    }
+
+    @Test
+    @DisplayName("T48: split(key, /, 3) - last part")
+    void t48_splitLastPart() {
+        assertThat(engine.resolve("data/{split(key, /, 3)}/", "a/b/c", null))
+                .isEqualTo("data/c/");
+    }
+
+    @Test
+    @DisplayName("T49: split out-of-range index returns empty string")
+    void t49_splitOutOfRange() {
+        assertThat(engine.resolve("data/{split(key, /, 9)}/", "a/b/c", null))
+                .isEqualTo("data//");
+    }
+
+    @Test
+    @DisplayName("T50: split(pN) where pN is literal segment")
+    void t50_splitP3() {
+        assertThat(engine.resolve("data/{split(p3, _, 2)}/a_b_c/", null, null))
+                .isEqualTo("data/b/a_b_c/");
+    }
+
+    @Test
+    @DisplayName("T51: split with dash delimiter")
+    void t51_splitDash() {
+        assertThat(engine.resolve("data/{split(key, -, 1)}/", "ABC-DEF", null))
+                .isEqualTo("data/ABC/");
+    }
+
+    @Test
+    @DisplayName("T52: split with dot delimiter")
+    void t52_splitDot() {
+        assertThat(engine.resolve("data/{split(key, ., 2)}/", "data.json", null))
+                .isEqualTo("data/json/");
+    }
+
+    @Test
+    @DisplayName("T53: split with multi-char delimiter")
+    void t53_splitMultiChar() {
+        assertThat(engine.resolve("data/{split(key, --, 2)}/", "A--B--C", null))
+                .isEqualTo("data/B/");
+    }
+
+    @Test
+    @DisplayName("T54: split keeps empty parts")
+    void t54_splitKeepsEmptyParts() {
+        assertThat(engine.resolve("data/{split(key, /, 2)}/", "a//b", null))
+                .isEqualTo("data//");
+        assertThat(engine.resolve("data/{split(key, /, 3)}/", "a//b", null))
+                .isEqualTo("data/b/");
+    }
+
+    @Test
+    @DisplayName("T55: upper(split(key, -, 2)) - chaining")
+    void t55_upperSplit() {
+        assertThat(engine.resolve("data/{upper(split(key, -, 2))}/", "abc-def", null))
+                .isEqualTo("data/DEF/");
+    }
+
+    @Test
+    @DisplayName("T56: split index 0 → exception")
+    void t56_splitIndexZero() {
+        assertThatThrownBy(() -> engine.resolve("data/{split(key, /, 0)}/", "a/b", null))
+                .isInstanceOf(TemplateFunctionException.class)
+                .hasMessageContaining("index must be >= 1");
+    }
+
+    @Test
+    @DisplayName("T57: split negative index → exception")
+    void t57_splitNegativeIndex() {
+        assertThatThrownBy(() -> engine.resolve("data/{split(key, /, -1)}/", "a/b", null))
+                .isInstanceOf(TemplateFunctionException.class)
+                .hasMessageContaining("index must be >= 1");
+    }
+
+    @Test
+    @DisplayName("T58: split non-numeric index → exception")
+    void t58_splitNonNumericIndex() {
+        assertThatThrownBy(() -> engine.resolve("data/{split(key, /, x)}/", "a/b", null))
+                .isInstanceOf(TemplateFunctionException.class)
+                .hasMessageContaining("expected numeric index");
+    }
+
+    @Test
+    @DisplayName("T59: split empty delimiter → exception")
+    void t59_splitEmptyDelimiter() {
+        assertThatThrownBy(() -> engine.resolve("data/{split(key, , 1)}/", "a/b", null))
+                .isInstanceOf(TemplateFunctionException.class)
+                .hasMessageContaining("delimiter must not be empty");
+    }
+
+    @Test
+    @DisplayName("T60: split empty or null key returns empty string")
+    void t60_splitEmptyKey() {
+        assertThat(engine.resolve("data/{split(key, /, 1)}/", "", null))
+                .isEqualTo("data//");
+        assertThat(engine.resolve("data/{split(key, /, 1)}/", null, null))
+                .isEqualTo("data//");
+    }
+
+    @Test
+    @DisplayName("T61: validate recognizes split")
+    void t61_validateSplit() {
+        assertThat(engine.validate("data/{split(key, /, 2)}/")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T62: replace basic single occurrence")
+    void t62_replaceBasic() {
+        assertThat(engine.resolve("data/{replace(key, -, _)}/", "a-b-c", null))
+                .isEqualTo("data/a_b_c/");
+    }
+
+    @Test
+    @DisplayName("T63: replace multi-char find string")
+    void t63_replaceMultiChar() {
+        assertThat(engine.resolve("data/{replace(key, --, +)}/", "A--B--C", null))
+                .isEqualTo("data/A+B+C/");
+    }
+
+    @Test
+    @DisplayName("T64: replace replaces all occurrences")
+    void t64_replaceAll() {
+        assertThat(engine.resolve("data/{replace(key, aa, x)}/", "baaanaa", null))
+                .isEqualTo("data/bxanx/");
+    }
+
+    @Test
+    @DisplayName("T65: replace with empty replacement deletes find")
+    void t65_replaceDelete() {
+        assertThat(engine.resolve("data/{replace(key, .json, )}/", "report.json", null))
+                .isEqualTo("data/report/");
+    }
+
+    @Test
+    @DisplayName("T66: replace when find not present returns input unchanged")
+    void t66_replaceNotFound() {
+        assertThat(engine.resolve("data/{replace(key, X, Y)}/", "a-b-c", null))
+                .isEqualTo("data/a-b-c/");
+    }
+
+    @Test
+    @DisplayName("T67: replace with empty find → exception")
+    void t67_replaceEmptyFind() {
+        assertThatThrownBy(() -> engine.resolve("data/{replace(key, , x)}/", "a/b", null))
+                .isInstanceOf(TemplateFunctionException.class)
+                .hasMessageContaining("find string must not be empty");
+    }
+
+    @Test
+    @DisplayName("T68: upper(replace(key, -, _)) - chaining")
+    void t68_upperReplace() {
+        assertThat(engine.resolve("data/{upper(replace(key, -, _))}/", "abc-def", null))
+                .isEqualTo("data/ABC_DEF/");
+    }
+
+    @Test
+    @DisplayName("T69: replace with literal segment reference pN")
+    void t69_replacePN() {
+        assertThat(engine.resolve("data/prefix/{replace(p1, data, x)}/", null, null))
+                .isEqualTo("data/prefix/x/");
+    }
+
+    @Test
+    @DisplayName("T70: replace empty or null key returns empty string")
+    void t70_replaceEmptyKey() {
+        assertThat(engine.resolve("data/{replace(key, -, _)}/", "", null))
+                .isEqualTo("data//");
+        assertThat(engine.resolve("data/{replace(key, -, _)}/", null, null))
+                .isEqualTo("data//");
+    }
+
+    @Test
+    @DisplayName("T71: validate recognizes replace")
+    void t71_validateReplace() {
+        assertThat(engine.validate("data/{replace(key, -, _)}/")).isEmpty();
     }
 }

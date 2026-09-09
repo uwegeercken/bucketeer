@@ -146,8 +146,7 @@ public class TemplateParser {
                 start = i + 1;
             }
         }
-        String last = input.substring(start).trim();
-        if (!last.isEmpty()) tokens.add(last);
+        tokens.add(input.substring(start).trim());
         return tokens;
     }
 }

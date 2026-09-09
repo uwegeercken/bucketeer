@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -155,6 +156,97 @@ class BucketeerControllerTest {
         verify(session).removeAttribute(QueryContext.SESSION_KEY);
         verify(session).removeAttribute("bucketeer_query_params");
         verify(session).removeAttribute("bucketeer_snapshot_context");
+    }
+
+    // --- searchTarget: wildcard '*' vs. template prefixes ---
+
+    @Test
+    @DisplayName("searchTarget: template + wildcard lists under derived prefix, star not passed to template")
+    void searchTargetTemplateWildcard() {
+        when(useCase.resolveTemplate("data/{split(key, /, 2)}/", "2024/12/photo", "bucket"))
+                .thenReturn("data/12/");
+
+        BucketeerController.SearchTarget target =
+                controller.searchTarget("data/{split(key, /, 2)}/", "2024/12/photo*", "bucket");
+
+        assertThat(target.s3Prefix()).isEqualTo("data/12/");
+        assertThat(target.keyFilter()).isNull();
+        verify(useCase).resolveTemplate("data/{split(key, /, 2)}/", "2024/12/photo", "bucket");
+    }
+
+    @Test
+    @DisplayName("searchTarget: template without wildcard appends key and matches exactly")
+    void searchTargetTemplateExact() {
+        when(useCase.resolveTemplate("data/{split(key, /, 2)}/", "2024/12/photo", "bucket"))
+                .thenReturn("data/12/");
+
+        BucketeerController.SearchTarget target =
+                controller.searchTarget("data/{split(key, /, 2)}/", "2024/12/photo", "bucket");
+
+        assertThat(target.s3Prefix()).isEqualTo("data/12/2024/12/photo");
+        assertThat(target.keyFilter()).isEqualTo("data/12/2024/12/photo");
+        verify(useCase).resolveTemplate("data/{split(key, /, 2)}/", "2024/12/photo", "bucket");
+    }
+
+    @Test
+    @DisplayName("searchTarget: literal prefix + wildcard appends star-less key")
+    void searchTargetLiteralWildcard() {
+        when(useCase.resolveTemplate("data/", "2024", "bucket")).thenReturn("data/");
+
+        BucketeerController.SearchTarget target =
+                controller.searchTarget("data/", "2024*", "bucket");
+
+        assertThat(target.s3Prefix()).isEqualTo("data/2024");
+        assertThat(target.keyFilter()).isNull();
+    }
+
+    @Test
+    @DisplayName("searchTarget: literal prefix without wildcard matches exactly")
+    void searchTargetLiteralExact() {
+        when(useCase.resolveTemplate("data/", "2024", "bucket")).thenReturn("data/");
+
+        BucketeerController.SearchTarget target =
+                controller.searchTarget("data/", "2024", "bucket");
+
+        assertThat(target.s3Prefix()).isEqualTo("data/2024");
+        assertThat(target.keyFilter()).isEqualTo("data/2024");
+    }
+
+    @Test
+    @DisplayName("searchTarget: empty key browses the normalized resolved prefix")
+    void searchTargetEmptyKey() {
+        when(useCase.resolveTemplate("data/", "", "bucket")).thenReturn("data/");
+
+        BucketeerController.SearchTarget target =
+                controller.searchTarget("data/", "", "bucket");
+
+        assertThat(target.s3Prefix()).isEqualTo("data/");
+        assertThat(target.keyFilter()).isNull();
+    }
+
+    @Test
+    @DisplayName("searchTarget: key of just '*' browses the normalized resolved prefix")
+    void searchTargetJustStar() {
+        when(useCase.resolveTemplate("data/", "", "bucket")).thenReturn("data/");
+
+        BucketeerController.SearchTarget target =
+                controller.searchTarget("data/", "*", "bucket");
+
+        assertThat(target.s3Prefix()).isEqualTo("data/");
+        assertThat(target.keyFilter()).isNull();
+        verify(useCase).resolveTemplate("data/", "", "bucket");
+    }
+
+    @Test
+    @DisplayName("searchTarget: escaped literal braces are not treated as a template")
+    void searchTargetEscapedBracesAreLiteral() {
+        when(useCase.resolveTemplate("data/\\{foo\\}/", "2024", "bucket")).thenReturn("data/\\{foo\\}/");
+
+        BucketeerController.SearchTarget target =
+                controller.searchTarget("data/\\{foo\\}/", "2024*", "bucket");
+
+        assertThat(target.s3Prefix()).isEqualTo("data/\\{foo\\}/2024");
+        assertThat(target.keyFilter()).isNull();
     }
 
     private static class RecordingDuckDb extends DuckDbRepository {

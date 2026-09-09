@@ -25,12 +25,16 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Controller
 public class BucketeerController {
 
     private static final Logger log = LoggerFactory.getLogger(BucketeerController.class);
+
+    /** A literal '{' is only a template marker when it is not escaped with a backslash. */
+    private static final Pattern UNESCAPED_OPEN_BRACE = Pattern.compile("(?<!\\\\)\\{");
 
     private final BucketeerUseCase bucketeerUseCase;
     private final S3StoragePort s3StoragePort;
@@ -80,25 +84,11 @@ public class BucketeerController {
         model.addAttribute("tooltipText", tooltipText);
 
         if (Boolean.TRUE.equals(search) && currentServer != null && StringUtils.hasText(bucket)) {
-            String resolvedPrefix = bucketeerUseCase.resolveTemplate(prefix, key, bucket);
 
-            String normalizedPrefix = StringUtils.hasText(resolvedPrefix) && !resolvedPrefix.endsWith("/")
-                    ? resolvedPrefix + "/" : resolvedPrefix;
+            SearchTarget target = searchTarget(prefix, key, bucket);
 
-            String s3Prefix  = normalizedPrefix;
-            String keyFilter = null;
-
-            if (StringUtils.hasText(key)) {
-                if (key.endsWith("*")) {
-                    s3Prefix = normalizedPrefix + key.substring(0, key.length() - 1);
-                } else {
-                    s3Prefix = normalizedPrefix + key;
-                    keyFilter = s3Prefix;
-                }
-            }
-
-            final String finalS3Prefix  = s3Prefix;
-            final String finalKeyFilter = keyFilter;
+            final String finalS3Prefix  = target.s3Prefix();
+            final String finalKeyFilter = target.keyFilter();
             final String finalServer    = currentServer;
             final String finalBucket    = bucket;
 
@@ -158,6 +148,42 @@ public class BucketeerController {
         }
 
         return "index";
+    }
+
+    /**
+     * Builds the S3 listing prefix and key filter for a search.
+     *
+     * A trailing '*' on the key signals a wildcard (prefix) search. The '*' is stripped before the
+     * prefix template is resolved, so template functions never see a literal asterisk.
+     * When the prefix is a template, the wildcard lists everything under the derived (resolved)
+     * prefix without appending the key; for a literal prefix the star-less key is appended as before.
+     * Without a wildcard the full key is appended and matched exactly.
+     */
+    SearchTarget searchTarget(String prefix, String key, String bucket) {
+        boolean wildcard   = key != null && key.endsWith("*");
+        String effectiveKey = wildcard ? key.substring(0, key.length() - 1) : key;
+
+        String resolvedPrefix = bucketeerUseCase.resolveTemplate(prefix, effectiveKey, bucket);
+        String normalizedPrefix = StringUtils.hasText(resolvedPrefix) && !resolvedPrefix.endsWith("/")
+                ? resolvedPrefix + "/" : resolvedPrefix;
+
+        boolean isTemplate = prefix != null && UNESCAPED_OPEN_BRACE.matcher(prefix).find();
+
+        String s3Prefix  = normalizedPrefix;
+        String keyFilter = null;
+
+        if (StringUtils.hasText(effectiveKey)) {
+            if (!wildcard) {
+                s3Prefix  = normalizedPrefix + effectiveKey;
+                keyFilter = s3Prefix;
+            } else if (!isTemplate) {
+                s3Prefix = normalizedPrefix + effectiveKey;
+            }
+        }
+        return new SearchTarget(s3Prefix, keyFilter);
+    }
+
+    record SearchTarget(String s3Prefix, String keyFilter) {
     }
 
     @PostMapping("/session/server")
