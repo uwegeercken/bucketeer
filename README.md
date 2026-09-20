@@ -26,7 +26,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.7.9.jar
+java -jar target/bucketeer-0.8.0.jar
 ```
 
 Open [http://localhost:8444](http://localhost:8444).
@@ -45,9 +45,22 @@ The full documentation lives in the [GitHub Wiki](https://github.com/uwegeercken
 - [Prefix Template Examples](https://github.com/uwegeercken/bucketeer/wiki/Prefix-Template-Examples) — 12 worked examples
 - [Query & Filtering](https://github.com/uwegeercken/bucketeer/wiki/Query-and-Filtering) — how searches and filters work
 - [Snapshots](https://github.com/uwegeercken/bucketeer/wiki/Snapshots) — save, compare, clean up, and load snapshots back into the results
+- [REST API](https://github.com/uwegeercken/bucketeer/wiki/REST-API) — read-only terminal/scripting API under `/api/v1/`
 - [Key Check](https://github.com/uwegeercken/bucketeer/wiki/Key-Check) — verify keys from a CSV against S3
 - [Text Tools](https://github.com/uwegeercken/bucketeer/wiki/Text-Tools) — encoding, timestamp and hashing utilities
 - [Development](https://github.com/uwegeercken/bucketeer/wiki/Development) — brief notes on extending the app
+
+## REST API for the terminal
+
+Bucketeer exposes a read-only, stateless API under `/api/v1/` for scripting — see the [REST API wiki page](https://github.com/uwegeercken/bucketeer/wiki/REST-API) for all endpoints and examples.
+
+```bash
+curl "http://localhost:8444/api/v1/buckets?server=Minio%20Local"
+curl -o file.txt "http://localhost:8444/api/v1/download?server=Minio%20Local&bucket=my-bucket&key=data/2026/photo.jpg"
+curl -o all.zip "http://localhost:8444/api/v1/download/prefix?server=Minio%20Local&bucket=my-bucket&prefix=testdata/events/"
+```
+
+To require a token on all `/api/v1/**` requests, start with `--bucketeer.api-token=<token>` (or set `BUCKETEER_API_TOKEN`) and send `Authorization: Bearer <token>`. Without a configured token the API stays open, like the rest of the app.
 
 ## License
 
