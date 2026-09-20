@@ -28,6 +28,12 @@
                 </button>
             </div>
         </div>
+        <div class="panel" id="progressPanel" style="display:none;">
+            <div class="d-flex align-items-center gap-2">
+                <div class="spinner-border spinner-border-sm text-primary" id="progressSpinner"></div>
+                <span id="progressText" th:text="#{snapshot.creating}">Creating snapshot...</span>
+            </div>
+        </div>
         <div id="snapshotList">
             <span class="text-muted small fst-italic" th:text="#{snapshot.empty}">No snapshots saved yet.</span>
         </div>
@@ -77,6 +83,8 @@
     const labelSnapshotBucket  = /*[[#{snapshot.bucket}]]*/ 'Bucket';
     const labelSnapshotPrefix  = /*[[#{snapshot.prefix}]]*/ 'Prefix';
     const labelSnapshotMismatch = /*[[#{snapshot.compareMismatch}]]*/ 'Snapshots must have the same server, bucket and prefix.';
+    const labelSnapshotCreating = /*[[#{snapshot.creating}]]*/ 'Creating snapshot...';
+    const labelSnapshotRepeatErr = /*[[#{snapshot.repeat.error}]]*/ 'Failed to repeat snapshot';
     const labelRowMenu          = /*[[#{btn.rowMenu}]]*/ 'Actions';
 
     let diffId1 = null;
@@ -164,6 +172,24 @@
 
     async function revealSnapshot(id) {
         await fetch('/api/snapshots/' + id + '/reveal', { method: 'POST' });
+    }
+
+    async function repeatSnapshot(id) {
+        const progressPanel = document.getElementById('progressPanel');
+        const progressText = document.getElementById('progressText');
+        progressText.textContent = labelSnapshotCreating;
+        progressPanel.style.display = 'block';
+        try {
+            const res = await fetch('/api/snapshots/' + id + '/repeat', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || ('HTTP ' + res.status));
+            }
+            window.location.href = '/snapshots';
+        } catch (e) {
+            progressPanel.style.display = 'none';
+            alert(labelSnapshotRepeatErr + ': ' + e.message);
+        }
     }
 
     function downloadDiff() {
@@ -318,6 +344,14 @@
             ctxSnapshotId = null;
             window.BucketeerContextMenu.close();
             loadSnapshotIntoResults(id);
+        });
+
+        document.getElementById('snapCtxRepeat').addEventListener('click', () => {
+            if (!ctxSnapshotId) return;
+            const id = ctxSnapshotId;
+            ctxSnapshotId = null;
+            window.BucketeerContextMenu.close();
+            repeatSnapshot(id);
         });
 
         document.getElementById('snapCtxReveal').addEventListener('click', () => {

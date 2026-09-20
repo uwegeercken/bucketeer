@@ -31,6 +31,15 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.7.9 <small class="text-muted">2026-09-20</small></h6>
+                    <ul>
+                        <li><strong>Snapshot wiederholen</strong>: neuer Kontextmen&uuml;-Eintrag <em>Snapshot wiederholen</em> auf der Snapshot-Seite erstellt einen neuen Snapshot mit identischen Parametern (Server, Bucket, Prefix, Key) gegen den aktuellen Stand der S3-Objekte &mdash; ideal zum Vergleich mit dem alten Stand (Diff)</li>
+                        <li><strong>Fortschrittsanzeige beim Snapshot-Erstellen</strong>: ein Spinner &bdquo;Snapshot wird erstellt&hellip;&ldquo; zeigt auf der Snapshots-Seite bzw. am Speichern-Button laufende Vorg&auml;nge an</li>
+                        <li>Dokumentation: Snapshots bestehen immer aus der vollen ungefilterten Objektmenge; Filter betreffen nur die aktuelle Ergebnisansicht</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.7.8 <small class="text-muted">2026-09-09</small></h6>
                     <ul>
                         <li><strong>New function <code>replace</code></strong>: <code>{replace(ref, find, replacement)}</code> replaces all literal occurrences of <em>find</em> with <em>replacement</em> (both are searched literally, no regex). An empty replacement deletes the search string, e.g. <code>{replace(key, -, _)}</code> normalizes separators, <code>{replace(key, .json, )}</code> removes a suffix</li>

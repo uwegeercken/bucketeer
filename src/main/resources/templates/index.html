@@ -1167,16 +1167,28 @@
     // --- Snapshots ---
 
     async function saveSnapshot() {
-        const res = await fetch('/api/snapshots', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-        const data = await res.json();
-        if (res.ok) {
-            window.location.href = '/snapshots';
-        } else {
-            alert(data.error || 'Failed to save snapshot');
+        const btn = document.getElementById('btnSaveSnapshot');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        try {
+            const res = await fetch('/api/snapshots', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            if (res.ok) {
+                window.location.href = '/snapshots';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+                alert(data.error || 'Failed to save snapshot');
+            }
+        } catch (e) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            alert('Failed to save snapshot: ' + e.message);
         }
     }
 
