@@ -3,7 +3,7 @@ services:
     build: .
     container_name: bucketeer
     ports:
-      - "8080:8080"
+      - "8080:8444"
     volumes:
       - bucketeer-data:/root/.bucketeer
     depends_on:

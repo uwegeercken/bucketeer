@@ -8,5 +8,5 @@ RUN mvn package -DskipTests -q
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/bucketeer-*.jar app.jar
-EXPOSE 8080
+EXPOSE 8444
 ENTRYPOINT ["java", "-jar", "app.jar"]

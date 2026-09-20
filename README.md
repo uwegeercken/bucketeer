@@ -29,9 +29,9 @@ mvn package
 java -jar target/bucketeer-0.7.8.jar
 ```
 
-Open [http://localhost:8080](http://localhost:8080).
+Open [http://localhost:8444](http://localhost:8444).
 
-Default port is 8080 — change it without recompiling with `--server.port=9000` (or the `SERVER_PORT` environment variable). Use the [Docker/Podman](https://github.com/uwegeercken/bucketeer/wiki/Getting-Started) images for containerized deployments.
+Default port is 8444 — change it without recompiling with `--server.port=9000` (or the `SERVER_PORT` environment variable). Use the [Docker/Podman](https://github.com/uwegeercken/bucketeer/wiki/Getting-Started) images for containerized deployments.
 
 ## Documentation
 
