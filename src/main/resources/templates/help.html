@@ -31,6 +31,14 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.8.0 <small class="text-muted">2026-09-20</small></h6>
+                    <ul>
+                        <li><strong>REST API for the terminal</strong>: new read-only, stateless endpoints under <code>/api/v1/</code> (servers, buckets, resolve, validate, list, download, download/prefix as ZIP). Every call takes the S3 server explicitly, so scripts can use the centrally stored, encrypted server configurations without a browser session &mdash; see the <em>REST-API</em> wiki page</li>
+                        <li><strong>Optional API token</strong>: set <code>--bucketeer.api-token=...</code> (or the <code>BUCKETEER_API_TOKEN</code> environment variable) to require an <code>Authorization: Bearer</code> token on <code>/api/v1/**</code>; without a configured token the API stays open like the rest of the app</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.7.9 <small class="text-muted">2026-09-20</small></h6>
                     <ul>
                         <li><strong>Snapshot wiederholen</strong>: neuer Kontextmen&uuml;-Eintrag <em>Snapshot wiederholen</em> auf der Snapshot-Seite erstellt einen neuen Snapshot mit identischen Parametern (Server, Bucket, Prefix, Key) gegen den aktuellen Stand der S3-Objekte &mdash; ideal zum Vergleich mit dem alten Stand (Diff)</li>
