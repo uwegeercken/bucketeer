@@ -159,7 +159,7 @@ public class BucketeerController {
      * prefix without appending the key; for a literal prefix the star-less key is appended as before.
      * Without a wildcard the full key is appended and matched exactly.
      */
-    SearchTarget searchTarget(String prefix, String key, String bucket) {
+    public SearchTarget searchTarget(String prefix, String key, String bucket) {
         boolean wildcard   = key != null && key.endsWith("*");
         String effectiveKey = wildcard ? key.substring(0, key.length() - 1) : key;
 

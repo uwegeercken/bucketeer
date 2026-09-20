@@ -1,5 +1,7 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
+import io.github.uwegeercken.bucketeer.domain.model.S3Object;
+import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.infrastructure.config.SnapshotRepository;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import jakarta.servlet.http.HttpSession;
@@ -29,10 +31,18 @@ public class SnapshotController {
 
     private final DuckDbRepository duckDb;
     private final SnapshotRepository snapshotRepo;
+    private final SessionContext sessionContext;
+    private final BucketeerUseCase bucketeerUseCase;
+    private final BucketeerController bucketeerController;
 
-    public SnapshotController(DuckDbRepository duckDb, SnapshotRepository snapshotRepo) {
+    public SnapshotController(DuckDbRepository duckDb, SnapshotRepository snapshotRepo,
+                              SessionContext sessionContext, BucketeerUseCase bucketeerUseCase,
+                              BucketeerController bucketeerController) {
         this.duckDb = duckDb;
         this.snapshotRepo = snapshotRepo;
+        this.sessionContext = sessionContext;
+        this.bucketeerUseCase = bucketeerUseCase;
+        this.bucketeerController = bucketeerController;
     }
 
     @GetMapping("/snapshots")
@@ -131,6 +141,82 @@ public class SnapshotController {
             log.error("Failed to load snapshot {}: {}", id, e.getMessage());
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Failed to load snapshot: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/snapshots/{id}/repeat")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> repeatSnapshot(@PathVariable String id, HttpSession session) {
+        SnapshotMeta meta = snapshotRepo.findById(id);
+        if (meta == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Snapshot not found"));
+        }
+
+        String server = meta.serverName();
+        String bucket = meta.bucket();
+        if (server == null || server.isBlank() || bucket == null || bucket.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Snapshot is missing server or bucket"));
+        }
+
+        sessionContext.setSelectedServer(server);
+
+        QueryContext qc = new QueryContext();
+        session.setAttribute(QueryContext.SESSION_KEY, qc);
+        session.setAttribute("bucketeer_query_params",
+                new QueryParams(server, bucket, meta.prefix(), meta.key(),
+                        meta.dateFrom(), meta.dateTo(), meta.whereClause()));
+        session.removeAttribute("bucketeer_snapshot_context");
+
+        duckDb.clear();
+        qc.start();
+
+        try {
+            BucketeerController.SearchTarget target = bucketeerController.searchTarget(meta.prefix(), meta.key(), bucket);
+            final String finalS3Prefix  = target.s3Prefix();
+            final String finalKeyFilter = target.keyFilter();
+
+            bucketeerUseCase.fetchAllObjects(
+                    server, bucket, finalS3Prefix, 0,
+                    page -> {
+                        List<S3Object> filtered = page.objects().stream()
+                                .filter(obj -> !obj.key().endsWith("/"))
+                                .filter(obj -> finalKeyFilter == null ||
+                                        obj.key().equals(finalKeyFilter))
+                                .toList();
+                        duckDb.insertBatch(filtered);
+                        qc.incrementFound(filtered.size());
+                    });
+            qc.done();
+        } catch (Exception e) {
+            qc.error(e.getMessage());
+            log.error("Failed to repeat snapshot {}: {}", id, e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to repeat snapshot: " + e.getMessage()));
+        }
+
+        long rowCount = duckDb.count();
+        if (rowCount == 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No data to snapshot"));
+        }
+
+        try {
+            String name = autoName(new QueryParams(server, bucket, meta.prefix(), meta.key(),
+                    meta.dateFrom(), meta.dateTo(), meta.whereClause()));
+            SnapshotMeta newMeta = uniqueSnapshotMeta(
+                    name, server, bucket, meta.prefix(), meta.key(),
+                    meta.dateFrom(), meta.dateTo(), meta.whereClause(),
+                    rowCount);
+            Path parquetPath = newMeta.dataPath(snapshotRepo.getSnapshotsDir());
+            duckDb.exportAllToParquet(parquetPath.toString());
+            snapshotRepo.save(newMeta);
+            return ResponseEntity.ok(Map.of(
+                    "id", newMeta.id(),
+                    "name", newMeta.name(),
+                    "rowCount", newMeta.rowCount()));
+        } catch (IOException e) {
+            log.error("Failed to save repeated snapshot {}: {}", id, e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to save repeated snapshot: " + e.getMessage()));
         }
     }
 
