@@ -1,6 +1,7 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
+import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
@@ -23,6 +24,7 @@ import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -192,5 +194,55 @@ class ApiV1ControllerTest {
             }
         }
         assertThat(entries).containsExactlyInAnyOrder("data/a.txt", "data/b.txt");
+    }
+
+    @Test
+    @DisplayName("prefixes returns the scanned prefixes with paging metadata")
+    void prefixes() {
+        when(useCase.scanPrefixes("serverA", "bucket", "data/", 50, "tok"))
+                .thenReturn(new PrefixScan(List.of("data/2024/", "data/2025/"), "next-tok", true));
+
+        ResponseEntity<?> resp = controller.prefixes("serverA", "bucket", "data/", 50, "tok");
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> body = (Map<?, ?>) resp.getBody();
+        assertThat(body.get("prefixes")).isEqualTo(List.of("data/2024/", "data/2025/"));
+        assertThat(body.get("has_more")).isEqualTo(true);
+        assertThat(body.get("continuation_token")).isEqualTo("next-tok");
+    }
+
+    @Test
+    @DisplayName("prefixes passes a zero limit to let the service select the default")
+    void prefixesDefaultLimit() {
+        when(useCase.scanPrefixes("serverA", "bucket", null, 0, null))
+                .thenReturn(new PrefixScan(List.of(), null, false));
+
+        ResponseEntity<?> resp = controller.prefixes("serverA", "bucket", null, 0, null);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("prefixes rejects an unknown server and a missing bucket")
+    void prefixesValidates() {
+        ResponseEntity<?> unknown = controller.prefixes("nope", "bucket", "", 0, null);
+        assertThat(unknown.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(((Map<?, ?>) unknown.getBody()).get("error")).isEqualTo("Unknown server: nope");
+
+        ResponseEntity<?> noBucket = controller.prefixes("serverA", null, "", 0, null);
+        assertThat(noBucket.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(((Map<?, ?>) noBucket.getBody()).get("error")).isEqualTo("Bucket is required");
+    }
+
+    @Test
+    @DisplayName("prefixes reports scan failures as a 500 with an error message")
+    void prefixesReportsFailure() {
+        when(useCase.scanPrefixes(eq("serverA"), eq("bucket"), any(), anyLong(), any()))
+                .thenThrow(new RuntimeException("Scan depth exceeds configured maximum of 10 levels"));
+
+        ResponseEntity<?> resp = controller.prefixes("serverA", "bucket", "a/b/c/d/e/f/g/h/i/j/k/", 0, null);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat((String) ((Map<?, ?>) resp.getBody()).get("error")).contains("maximum of 10");
     }
 }

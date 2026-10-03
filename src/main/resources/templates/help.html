@@ -31,6 +31,18 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.8.1 <small class="text-muted">2026-10-03</small></h6>
+                    <ul>
+                        <li><strong>Scan bucket (prefix explorer)</strong>: a folder icon next to the bucket selector opens a scan dialog that browses the common prefixes of a bucket level by level (ListObjectsV2 with delimiter). A clickable breadcrumb with the sub-prefix totals per segment, a <em>load more</em> pagination, a client-side filter field, and a <em>current prefix</em> row (with copy icon) let you inspect any folder structure &mdash; and adopt any prefix into the search field</li>
+                        <li><strong>Scan settings</strong>: the settings page now offers <em>Max prefixes per scan</em> (10&ndash;5000) and <em>Max scan depth</em> (1&ndash;50), stored per browser and capped server-side via <code>bucketeer.scan.max-prefixes</code> / <code>bucketeer.scan.max-depth</code></li>
+                        <li><strong>Prefix counts</strong>: each breadcrumb segment shows the number of contained sub-prefixes in parentheses (internally capped at 1000, shown as <code>n+</code>)</li>
+                        <li><strong>Bug fix</strong>: the scan endpoint now returns <code>ok</code> on success &mdash; previously every successful scan was rendered as &bdquo;No prefixes found&ldquo;</li>
+                        <li><strong>Security</strong>: the embedded Tomcat was upgraded to 11.0.25 (via a <code>tomcat.version</code> override), fixing the August 2026 CVE wave incl. CVE-2026-65905, CVE-2026-65182 and CVE-2026-68525</li>
+                        <li><strong>Cache-busting</strong>: static resources (CSS) now use content-based versioning so style changes are picked up from browser caches reliably</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.8.0 <small class="text-muted">2026-09-20</small></h6>
                     <ul>
                         <li><strong>REST API for the terminal</strong>: new read-only, stateless endpoints under <code>/api/v1/</code> (servers, buckets, resolve, validate, list, download, download/prefix as ZIP). Every call takes the S3 server explicitly, so scripts can use the centrally stored, encrypted server configurations without a browser session &mdash; see the <em>REST-API</em> wiki page</li>

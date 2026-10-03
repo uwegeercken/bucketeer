@@ -1,6 +1,7 @@
 package io.github.uwegeercken.bucketeer.domain.port.in;
 
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
+import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,22 @@ public interface BucketeerUseCase {
     List<String> validateTemplate(String template);
 
     ObjectListing listObjects(String serverName, String bucket, String resolvedPrefix, String continuationToken);
+
+    /**
+     * Scans the next level of common prefixes below the given prefix (S3 delimiter listing).
+     *
+     * @param maxPrefixes  maximum number of prefixes per scan; 0 or negative selects the configured default
+     * @param continuationToken token to continue a previously truncated scan, or null
+     */
+    PrefixScan scanPrefixes(String serverName, String bucket, String prefix,
+                            long maxPrefixes, String continuationToken);
+
+    /**
+     * Counts the sub-prefixes below each given prefix and returns a display string
+     * aligned with the input list (e.g. "12" or "999+" when the count was capped at
+     * the internal limit). An entry is "" when the count could not be determined.
+     */
+    List<String> countPrefixes(String serverName, String bucket, List<String> prefixes);
 
     /**
      * Fetches ALL objects for the given prefix, paginating through all S3 pages.

@@ -9,11 +9,21 @@ spring:
     multipart:
       max-file-size: 2GB
       max-request-size: 2GB
+  web:
+    resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /css/**, /js/**
 
 server:
   port: 8444
 
 bucketeer:
-  version: "0.8.0"
-  release-date: "2026-09-20"
+  version: "0.8.1"
+  release-date: "2026-10-03"
   api-token: ""
+  scan:
+    max-prefixes: 200
+    max-depth: 10

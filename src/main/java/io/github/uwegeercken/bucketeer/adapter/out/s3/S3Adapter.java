@@ -2,6 +2,8 @@ package io.github.uwegeercken.bucketeer.adapter.out.s3;
 
 import io.github.uwegeercken.bucketeer.domain.model.HeadObjectResult;
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
+import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
+import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import org.slf4j.Logger;
@@ -21,6 +23,8 @@ import java.util.Map;
 public class S3Adapter implements S3StoragePort {
 
     private static final Logger log = LoggerFactory.getLogger(S3Adapter.class);
+
+    private static final int MAX_SUBPREFIX_COUNT = 1000;
 
     private final S3ClientRegistry registry;
 
@@ -57,7 +61,53 @@ public class S3Adapter implements S3StoragePort {
                 .map(obj -> new S3Object(obj.key(), bucket, obj.size(), obj.lastModified(), obj.eTag()))
                 .toList();
 
-        return new ObjectListing(objects, response.nextContinuationToken(), response.isTruncated());
+        return new ObjectListing(objects, response.nextContinuationToken(), Boolean.TRUE.equals(response.isTruncated()));
+    }
+
+    @Override
+    public PrefixScan scanCommonPrefixes(String serverName, String bucket, String prefix,
+                                         String continuationToken, long maxKeys) {
+        S3Client client = registry.clientFor(serverName);
+
+        ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder()
+                .bucket(bucket)
+                .prefix(prefix != null ? prefix : "")
+                .delimiter("/");
+        if (continuationToken != null && !continuationToken.isBlank()) {
+            builder.continuationToken(continuationToken);
+        }
+        if (maxKeys > 0) {
+            builder.maxKeys((int) Math.min(maxKeys, 1000));
+        }
+
+        ListObjectsV2Response response = client.listObjectsV2(builder.build());
+        List<String> prefixes = response.commonPrefixes().stream().map(p -> p.prefix()).toList();
+
+        return new PrefixScan(prefixes, response.nextContinuationToken(), Boolean.TRUE.equals(response.isTruncated()));
+    }
+
+    @Override
+    public PrefixCount countCommonPrefixes(String serverName, String bucket, String prefix) {
+        S3Client client = registry.clientFor(serverName);
+        int total = 0;
+        String continuationToken = null;
+        boolean truncated = true;
+        while (truncated && total < MAX_SUBPREFIX_COUNT) {
+            ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder()
+                    .bucket(bucket)
+                    .prefix(prefix != null ? prefix : "")
+                    .delimiter("/")
+                    .maxKeys(1000);
+            if (continuationToken != null && !continuationToken.isBlank()) {
+                builder.continuationToken(continuationToken);
+            }
+            ListObjectsV2Response response = client.listObjectsV2(builder.build());
+            total += response.commonPrefixes().size();
+            continuationToken = response.nextContinuationToken();
+            truncated = Boolean.TRUE.equals(response.isTruncated())
+                    && continuationToken != null && !continuationToken.isBlank();
+        }
+        return new PrefixCount(total, truncated && total >= MAX_SUBPREFIX_COUNT);
     }
 
     @Override

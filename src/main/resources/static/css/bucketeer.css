@@ -265,3 +265,48 @@ footer {
     78%  { opacity: 1; transform: scale(1); }
     100% { opacity: 0; transform: scale(0.95); }
 }
+
+/* Bucket scan modal */
+.scan-modal {
+    width: 720px;
+    max-width: calc(100vw - 2rem);
+    margin: 1rem auto;
+}
+.scan-modal .modal-content {
+    height: 600px;
+    max-height: calc(100vh - 3.5rem);
+    display: flex;
+    flex-direction: column;
+}
+.scan-modal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.scan-modal .modal-body .scan-toolbar,
+.scan-modal .modal-body #scanStatus,
+.scan-modal .modal-body .scan-current-prefix,
+.scan-modal .modal-body .scan-filter {
+    flex-shrink: 0;
+}
+.scan-modal .modal-body .scan-current-prefix {
+    border-top: 1px solid var(--bs-border-color);
+    padding-top: 0.5rem;
+}
+.scan-modal .modal-body #scanPath {
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.scan-modal .modal-body #scanPath .scan-path-count {
+    color: var(--bs-secondary-color);
+}
+.scan-modal .modal-body #scanList {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+}
+.scan-modal .modal-body #scanMoreBtn {
+    align-self: flex-start;
+}

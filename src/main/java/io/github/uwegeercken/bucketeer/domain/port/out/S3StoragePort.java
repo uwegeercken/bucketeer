@@ -1,6 +1,8 @@
 package io.github.uwegeercken.bucketeer.domain.port.out;
 
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
+import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
+import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 
 import java.io.InputStream;
 import java.util.List;
@@ -13,6 +15,22 @@ public interface S3StoragePort {
     List<String> listBuckets(String serverName);
 
     ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken, long maxKeys);
+
+    /**
+     * Scans the next level of common prefixes below the given prefix
+     * (ListObjectsV2 with delimiter "/").
+     *
+     * @param prefix the current path prefix ("" or null scans the top level)
+     */
+    PrefixScan scanCommonPrefixes(String serverName, String bucket, String prefix,
+                                  String continuationToken, long maxKeys);
+
+    /**
+     * Counts all common prefixes below the given prefix by paginating through the
+     * delimiter listing. Counting stops at an internal limit; {@link PrefixCount#capped()}
+     * reports whether that limit was reached.
+     */
+    PrefixCount countCommonPrefixes(String serverName, String bucket, String prefix);
 
     InputStream downloadObject(String serverName, String bucket, String key);
 

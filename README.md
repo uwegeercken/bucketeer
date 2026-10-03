@@ -8,6 +8,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 - **Browse &amp; search** — paginated results, client-side filtering by name (regular expressions), size and last-modified date, sortable columns
 - **Prefix templates** — build S3 prefixes dynamically with functions and date placeholders; functions can be nested and combined with literal suffixes
+- **Bucket prefix scan** — explore the common prefixes of any bucket level by level (breadcrumb with sub-prefix counts, load-more pagination), filter the list client-side, and adopt any prefix into the search field; limits configurable on the Settings page
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
 - **Selection &amp; bulk download** — collect objects across queries as batches and download them all as a ZIP
 - **Move &amp; delete objects** — single and batch operations (copy + delete); existing targets are skipped and reported
@@ -26,7 +27,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.8.0.jar
+java -jar target/bucketeer-0.8.1.jar
 ```
 
 Open [http://localhost:8444](http://localhost:8444).

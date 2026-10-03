@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -393,6 +394,53 @@ public class BucketeerController {
         List<String> unknown = bucketeerUseCase.validateTemplate(prefix);
         if (unknown.isEmpty()) return Map.of("valid", true, "error", "");
         return Map.of("valid", false, "error", "Unknown function(s): " + String.join(", ", unknown));
+    }
+
+    @GetMapping(value = "/api/scan-prefixes", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> scanPrefixes(
+            @RequestParam(required = false) String bucket,
+            @RequestParam(required = false) String prefix,
+            @RequestParam(required = false) String maxPrefixes,
+            @RequestParam(required = false) String continuationToken) {
+        if (!StringUtils.hasText(bucket)) {
+            return Map.of("ok", false, "error", "Bucket is required");
+        }
+        String server = sessionContext.getSelectedServer();
+        if (server == null) {
+            return Map.of("ok", false, "error", "No server selected");
+        }
+        try {
+            long limit = 0;
+            if (StringUtils.hasText(maxPrefixes)) {
+                limit = Long.parseLong(maxPrefixes);
+            }
+            String token = StringUtils.hasText(continuationToken) ? continuationToken : null;
+            var scan = bucketeerUseCase.scanPrefixes(server, bucket, prefix, Math.max(0, limit), token);
+            List<String> pathCounts = List.of();
+            if (StringUtils.hasText(prefix)) {
+                String agg = "";
+                List<String> segments = new ArrayList<>();
+                for (String segment : prefix.split("/")) {
+                    if (!segment.isBlank()) {
+                        agg += segment + "/";
+                        segments.add(agg);
+                    }
+                }
+                pathCounts = bucketeerUseCase.countPrefixes(server, bucket, segments);
+            }
+            return Map.of(
+                    "ok", true,
+                    "prefixes", scan.prefixes(),
+                    "pathCounts", pathCounts,
+                    "hasMore", scan.truncated(),
+                    "nextToken", scan.nextContinuationToken() != null ? scan.nextContinuationToken() : "");
+        } catch (IllegalArgumentException e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        } catch (Exception e) {
+            log.error("Failed to scan prefixes {}/{} '{}': {}", server, bucket, prefix, e.getMessage());
+            return Map.of("ok", false, "error", e.getMessage());
+        }
     }
 
     @GetMapping("/download")

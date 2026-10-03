@@ -46,10 +46,18 @@
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold" th:text="#{label.bucket}">Bucket</label>
-                    <select name="bucket" id="bucketInput"
-                            class="form-select form-select-sm font-monospace">
-                        <option value="">--</option>
-                    </select>
+                    <div class="d-flex gap-2 align-items-center">
+                        <select name="bucket" id="bucketInput"
+                                class="form-select form-select-sm font-monospace">
+                            <option value="">--</option>
+                        </select>
+                        <button type="button" id="scanBucketBtn"
+                                class="btn btn-sm btn-outline-secondary btn-icon flex-shrink-0"
+                                th:title="#{scan.scanBucket}" th:aria-label="#{scan.scanBucket}"
+                                onclick="openScanModal()">
+                            <i class="bi bi-folder2-open"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="col-md-5">
                     <label class="form-label small fw-semibold">
@@ -229,6 +237,67 @@
 
     <th:block th:replace="~{layout :: uploadModal}"></th:block>
 
+    <!-- Bucket Scan Modal -->
+    <div class="modal fade" id="scanModal" tabindex="-1" aria-labelledby="scanModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg scan-modal">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="scanModalLabel">
+                        <i class="bi bi-folder2-open me-1"></i><span th:text="#{scan.scanBucket}">Scan bucket</span>
+                    </h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex align-items-center gap-2 mb-2 scan-toolbar">
+                        <span class="badge bg-secondary font-monospace" id="scanBucketBadge">--</span>
+                        <span class="text-muted small font-monospace flex-grow-1" id="scanPath"
+                              style="display:none;"></span>
+                        <button type="button" id="scanUpBtn" class="btn btn-sm btn-outline-secondary btn-icon"
+                                th:title="#{scan.up}" onClick="scanLevel(scanParent(scanState.path))">
+                            <i class="bi bi-arrow-up-short"></i>
+                        </button>
+                    </div>
+                    <div class="scan-current-prefix d-flex align-items-center gap-2 mb-2"
+                         id="scanCurrentPrefixRow" style="display:none;">
+                        <span class="text-muted small flex-shrink-0" th:text="#{scan.currentPrefix}">Current prefix</span>
+                        <code class="font-monospace small text-body flex-grow-1 text-truncate" id="scanCurrentPrefix"></code>
+                        <button type="button" id="scanCopyPrefixBtn"
+                                class="btn btn-sm btn-outline-secondary btn-icon flex-shrink-0"
+                                th:title="#{scan.usePrefix}" th:aria-label="#{scan.usePrefix}"
+                                onclick="adoptScanPrefix(scanState.path)">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                    </div>
+                    <div class="scan-filter d-flex align-items-center gap-2 mb-2" id="scanFilterRow">
+                        <div class="position-relative flex-grow-1">
+                            <i class="bi bi-filter text-muted position-absolute start-0 top-50 translate-middle-y ms-2"></i>
+                            <input type="text" id="scanFilterInput"
+                                   class="form-control form-control-sm ps-5"
+                                   th:placeholder="#{scan.filter}"
+                                   oninput="applyScanFilter()"/>
+                        </div>
+                        <button type="button" id="scanFilterClearBtn"
+                                class="btn btn-sm btn-outline-secondary btn-icon flex-shrink-0"
+                                th:title="#{scan.clearFilter}" th:aria-label="#{scan.clearFilter}"
+                                onclick="clearScanFilter()" style="display:none;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <span class="text-muted small" id="scanStatus"></span>
+                    <div id="scanList" class="mt-1"></div>
+                    <button type="button" id="scanMoreBtn"
+                            class="btn btn-sm btn-outline-secondary"
+                            th:text="#{scan.loadMore}"
+                            onclick="scanMore()" style="display:none;">Load more</button>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.close}">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <th:block th:replace="~{layout :: tagsModal}"></th:block>
 
     <th:block th:replace="~{layout :: deleteModal}"></th:block>
@@ -388,6 +457,215 @@
                     setResolvedPopover('');
                 }
             }).catch(() => {});
+    }
+
+    // --- Bucket scan (common prefixes) ---
+
+    const SCAN_MAX_PREFIXES = settingsValue('scanMaxPrefixes', 200, 5000);
+    const SCAN_MAX_DEPTH = settingsValue('scanMaxDepth', 10, 50);
+
+    const scanState = { path: '', token: '', listing: [], pathCounts: [], filter: '', hasMore: false };
+
+    function setScanStatus(text) {
+        const el = document.getElementById('scanStatus');
+        if (el) el.textContent = text || '';
+    }
+
+    function resetScanState() {
+        scanState.path = '';
+        scanState.token = '';
+        scanState.listing = [];
+        scanState.pathCounts = [];
+        scanState.filter = '';
+        scanState.hasMore = false;
+        const listEl = document.getElementById('scanList');
+        const pathEl = document.getElementById('scanPath');
+        const moreBtn = document.getElementById('scanMoreBtn');
+        const currentRow = document.getElementById('scanCurrentPrefixRow');
+        const filterInput = document.getElementById('scanFilterInput');
+        const filterClearBtn = document.getElementById('scanFilterClearBtn');
+        if (listEl) listEl.innerHTML = '';
+        if (pathEl) pathEl.style.display = 'none';
+        if (moreBtn) moreBtn.style.display = 'none';
+        if (currentRow) currentRow.style.display = 'none';
+        if (filterInput) filterInput.value = '';
+        if (filterClearBtn) filterClearBtn.style.display = 'none';
+        setScanStatus('');
+    }
+
+    function openScanModal() {
+        const modalEl = document.getElementById('scanModal');
+        if (!modalEl) return;
+        const badge = document.getElementById('scanBucketBadge');
+        if (badge) badge.textContent = document.getElementById('bucketInput').value || '--';
+        resetScanState();
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        scanLevel('');
+    }
+
+    function scanDisplayName(prefix, path) {
+        return path ? prefix.substring(path.length) : prefix;
+    }
+
+    function scanParent(path) {
+        const segs = (path || '').split('/').filter(Boolean);
+        segs.pop();
+        return segs.length ? segs.join('/') + '/' : '';
+    }
+
+    function createScanPathBreadcrumb(path, pathCounts) {
+        const pathEl = document.getElementById('scanPath');
+        if (!pathEl) return;
+        pathEl.style.display = 'inline';
+        pathEl.innerHTML = '';
+        const addSegment = (text, target, title, count) => {
+            const seg = document.createElement('span');
+            seg.style.cursor = 'pointer';
+            seg.style.whiteSpace = 'nowrap';
+            seg.className = 'border-end border-secondary pe-2 me-2';
+            seg.title = title || text;
+            seg.innerHTML = escHtml(text) + (count ? ' <span class="scan-path-count">(' + escHtml(count) + ')</span>' : '');
+            seg.addEventListener('click', () => scanLevel(target));
+            pathEl.appendChild(seg);
+        };
+        addSegment('/', '', '/', '');
+        const segs = (path || '').split('/').filter(Boolean);
+        let agg = '';
+        segs.forEach((s, i) => {
+            agg += s + '/';
+            addSegment(s, agg, '/' + agg, pathCounts ? pathCounts[i] : '');
+        });
+    }
+
+    function scanLevel(path) {
+        const bucket = document.getElementById('bucketInput').value;
+        if (!bucket) {
+            setScanStatus(/*[[#{scan.selectBucket}]]*/ 'Select a bucket first');
+            return;
+        }
+        scanState.path = path;
+        scanState.token = '';
+        setScanStatus(/*[[#{scan.scanning}]]*/ 'Scanning...');
+        const params = new URLSearchParams();
+        params.set('bucket', bucket);
+        if (path) params.set('prefix', path);
+        params.set('maxPrefixes', SCAN_MAX_PREFIXES);
+        fetch('/api/scan-prefixes?' + params.toString())
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok === false) {
+                    renderScanLevel(path, [], false, data.error || '');
+                    return;
+                }
+                scanState.token = data.nextToken || '';
+                scanState.pathCounts = data.pathCounts || [];
+                renderScanLevel(path, data.prefixes || [], !!data.hasMore, '');
+            })
+            .catch(() => renderScanLevel(path, [], false, 'Scan failed'));
+    }
+
+    function scanMore() {
+        if (!scanState.token) return;
+        const bucket = document.getElementById('bucketInput').value;
+        const params = new URLSearchParams();
+        params.set('bucket', bucket);
+        if (scanState.path) params.set('prefix', scanState.path);
+        params.set('maxPrefixes', SCAN_MAX_PREFIXES);
+        params.set('continuationToken', scanState.token);
+        fetch('/api/scan-prefixes?' + params.toString())
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok === false) { setScanStatus(data.error || 'Scan failed'); return; }
+                scanState.token = data.nextToken || '';
+                renderScanLevel(scanState.path,
+                    scanState.listing.concat(data.prefixes || []),
+                    !!data.hasMore, '');
+            })
+            .catch(() => setScanStatus('Scan failed'));
+    }
+
+    function adoptScanPrefix(prefix) {
+        const input = document.getElementById('prefixInput');
+        if (!input) return;
+        input.value = prefix;
+        updateResolvedPrefix();
+    }
+
+    function filteredListing() {
+        const needle = scanState.filter.toLowerCase();
+        if (!needle) return scanState.listing;
+        return scanState.listing.filter(p => p.toLowerCase().includes(needle));
+    }
+
+    function applyScanFilter() {
+        const input = document.getElementById('scanFilterInput');
+        const clearBtn = document.getElementById('scanFilterClearBtn');
+        scanState.filter = input ? input.value.trim() : '';
+        if (clearBtn) clearBtn.style.display = scanState.filter ? 'inline-block' : 'none';
+        renderScanList('');
+    }
+
+    function clearScanFilter() {
+        const input = document.getElementById('scanFilterInput');
+        if (input) input.value = '';
+        scanState.filter = '';
+        const clearBtn = document.getElementById('scanFilterClearBtn');
+        if (clearBtn) clearBtn.style.display = 'none';
+        renderScanList('');
+    }
+
+    function renderScanList(errorText) {
+        const listEl = document.getElementById('scanList');
+        const moreBtn = document.getElementById('scanMoreBtn');
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        const shown = filteredListing();
+        if (errorText || shown.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'text-muted small py-1';
+            empty.textContent = errorText
+                || (scanState.filter ? /*[[#{scan.noFilterMatch}]]*/ 'No matches'
+                    : /*[[#{scan.noPrefixes}]]*/ 'No prefixes found');
+            listEl.appendChild(empty);
+        } else {
+            const list = document.createElement('ul');
+            list.className = 'list-group list-group-flush font-monospace small mb-2';
+            shown.forEach(p => {
+                const item = document.createElement('li');
+                item.className = 'list-group-item d-flex align-items-center justify-content-between gap-2 px-2 py-1';
+                item.style.cursor = 'pointer';
+                const label = document.createElement('span');
+                label.innerHTML = '<i class="bi bi-folder me-1"></i>' + escHtml(scanDisplayName(p, scanState.path));
+                label.addEventListener('click', () => scanLevel(p));
+                const use = document.createElement('button');
+                use.type = 'button';
+                use.className = 'btn btn-sm btn-outline-secondary btn-icon';
+                use.title = /*[[#{scan.usePrefix}]]*/ 'Use prefix';
+                use.innerHTML = '<i class="bi bi-copy"></i>';
+                use.addEventListener('click', () => adoptScanPrefix(p));
+                item.appendChild(label);
+                item.appendChild(use);
+                list.appendChild(item);
+            });
+            listEl.appendChild(list);
+        }
+        moreBtn.style.display = (scanState.hasMore && !scanState.filter) ? 'inline-block' : 'none';
+    }
+
+    function renderScanLevel(path, prefixes, hasMore, errorText) {
+        scanState.listing = prefixes;
+        scanState.hasMore = hasMore;
+        const currentRow = document.getElementById('scanCurrentPrefixRow');
+        const currentLabel = document.getElementById('scanCurrentPrefix');
+
+        createScanPathBreadcrumb(path, scanState.pathCounts);
+        setScanStatus(errorText);
+        if (currentRow && currentLabel) {
+            currentLabel.textContent = path || '';
+            currentRow.style.display = path ? 'flex' : 'none';
+        }
+
+        renderScanList(errorText);
     }
 
     // --- Favorites & History ---
@@ -1309,6 +1587,13 @@
         const bucketInput = document.getElementById('bucketInput');
         bucketInput.addEventListener('mousedown', refreshBucketList);
         bucketInput.addEventListener('focus', refreshBucketList);
+        bucketInput.addEventListener('change', () => {
+            resetScanState();
+            const modalEl = document.getElementById('scanModal');
+            if (modalEl && modalEl.classList.contains('show')) {
+                openScanModal();
+            }
+        });
 
         // Combobox logic
         const comboInput = document.getElementById('favComboInput');

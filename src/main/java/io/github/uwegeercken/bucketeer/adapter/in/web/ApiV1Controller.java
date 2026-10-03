@@ -129,6 +129,35 @@ public class ApiV1Controller {
         }
     }
 
+    @GetMapping(value = "/prefixes", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> prefixes(
+            @RequestParam(required = false) String server,
+            @RequestParam(required = false) String bucket,
+            @RequestParam(required = false) String prefix,
+            @RequestParam(defaultValue = "0") long maxPrefixes,
+            @RequestParam(required = false) String continuationToken) {
+        if (server == null || server.isBlank()) {
+            return error(400, "Server is required");
+        }
+        if (!serverExists(server)) {
+            return error(400, "Unknown server: " + server);
+        }
+        if (!StringUtils.hasText(bucket)) {
+            return error(400, "Bucket is required");
+        }
+        try {
+            var scan = bucketeerUseCase.scanPrefixes(server, bucket, prefix, Math.max(0, maxPrefixes), continuationToken);
+            Map<String, Object> result = new HashMap<>();
+            result.put("prefixes", scan.prefixes());
+            result.put("has_more", scan.truncated());
+            result.put("continuation_token", scan.nextContinuationToken());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Failed to scan prefixes {}/{} '{}': {}", server, bucket, prefix, e.getMessage());
+            return error(500, e.getMessage());
+        }
+    }
+
     @GetMapping("/download")
     public void download(@RequestParam(required = false) String server,
                          @RequestParam(required = false) String bucket,
