@@ -6,7 +6,6 @@ import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
-import io.github.uwegeercken.bucketeer.domain.template.PrefixTemplateEngine;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
