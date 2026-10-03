@@ -4,10 +4,10 @@ import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,22 +37,13 @@ public class SettingsController {
         this.appSettings = appSettings;
     }
 
-    @GetMapping("/settings")
-    public String settings(Model model) {
-        model.addAttribute("backUrl", "/");
-        model.addAttribute("snapshotRetentionDays", appSettings.getSnapshotRetentionDays());
-        model.addAttribute("timeZoneId", appSettings.getTimeZoneId());
-        model.addAttribute("systemTimeZoneId", ZoneId.systemDefault().getId());
-        model.addAttribute("timeZoneOptions", COMMON_ZONES);
-        model.addAttribute("maxFileSizeMb", appSettings.getMaxFileSizeMb());
-        model.addAttribute("maxRequestSizeMb", appSettings.getMaxRequestSizeMb());
-        return "settings";
-    }
-
     @GetMapping(value = "/api/settings", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public Map<String, Object> getSettings() {
-        return appSettings.toMap();
+        Map<String, Object> body = new LinkedHashMap<>(appSettings.toMap());
+        body.put("systemTimeZoneId", ZoneId.systemDefault().getId());
+        body.put("timeZoneOptions", COMMON_ZONES);
+        return body;
     }
 
     @PostMapping(value = "/api/settings", produces = MediaType.APPLICATION_JSON_VALUE)

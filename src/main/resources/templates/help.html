@@ -31,6 +31,14 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.8.3 <small class="text-muted">2026-10-03</small></h6>
+                    <ul>
+                        <li><strong>Settings as a dialog</strong>: the configuration moved from a standalone page into a modal dialog that opens from the gear icon on any page. The options are grouped into visually separated blocks by topic (Query, History, Snapshots, Timezone, Upload, Scan) with a scrollable body; saving keeps the usual per-browser storage for query/history/scan settings and the server-side settings for snapshots, timezone and uploads</li>
+                        <li><strong>Removed</strong>: the separate <code>/settings</code> page no longer exists &mdash; the same options are now only one click away from the header on every page</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.8.2 <small class="text-muted">2026-10-03</small></h6>
                     <ul>
                         <li><strong>Fast search &amp; downloads</strong>: searches, ZIP downloads, snapshots and the <code>/api/v1/list</code> endpoint now decide automatically between two modes: after a cheap common-prefix scan (delimiter <code>/</code>), a flat bucket is listed sequentially exactly as before, while a bucket with more than one top-level prefix is listed in parallel &mdash; the depth level is walked by one producer, its prefixes are consumed by up to <code>bucketeer.query.parallelism</code> worker threads, and the result pages are merged on a single thread (identical result set, only faster)</li>

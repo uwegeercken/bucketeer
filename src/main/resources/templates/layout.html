@@ -119,9 +119,8 @@
             <div class="vr mx-2"></div>
 
             <div class="d-flex gap-2">
-                <a class="btn btn-sm btn-outline-light" href="/settings"
-                   onclick="if(typeof saveFormState==='function') saveFormState()"
-                   th:title="#{nav.config}"><i class="bi bi-gear"></i></a>
+                <button class="btn btn-sm btn-outline-light" type="button" onclick="openSettingsModal()"
+                        th:title="#{nav.config}"><i class="bi bi-gear"></i></button>
                 <a class="btn btn-sm btn-outline-light" href="/config"
                    onclick="if(typeof saveFormState==='function') saveFormState()"
                    th:title="#{nav.servers}"><i class="bi bi-server"></i></a>
@@ -203,6 +202,310 @@
             </div>
         </div>
     </div>
+
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg settings-modal">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="settingsModalLabel">
+                        <i class="bi bi-gear me-1"></i><span th:text="#{settings.dialog.title}">Settings</span>
+                    </h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+
+                    <div class="settings-group">
+                        <div class="panel-title" th:text="#{settings.section.query}">Query</div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small" th:text="#{settings.pageSize.label}">Results per page</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="pageSizeInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="10" max="1000" step="10"/>
+                                <span class="text-muted small" th:text="#{settings.pageSize.hint}">Min: 10, Max: 1000 (Default: 100)</span>
+                            </div>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold small" th:text="#{settings.maxObjects.label}">Max objects per query</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="maxObjectsInput" class="form-control form-control-sm"
+                                       style="width: 130px;" min="0" max="10000000" step="1000"/>
+                                <span class="text-muted small" th:text="#{settings.maxObjects.hint}">Stop fetching after this many objects. 0 = unlimited.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="panel-title" th:text="#{settings.section.history}">History</div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small" th:text="#{settings.historyMax.label}">History size (entries)</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="historyMaxInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="0" max="500" step="10"/>
+                                <span class="text-muted small" th:text="#{settings.historyMax.hint}">Max entries in search history. 0 = disabled.</span>
+                            </div>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold small" th:text="#{settings.filterHistoryMax.label}">Filter history size (entries)</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="filterHistoryMaxInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="0" max="500" step="10"/>
+                                <span class="text-muted small" th:text="#{settings.filterHistoryMax.hint}">Max entries in filter history. 0 = disabled.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="panel-title" th:text="#{settings.section.snapshots}">Snapshots</div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold small" th:text="#{settings.retentionDays.label}">Snapshot retention (days)</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="retentionDaysInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="1" max="365" step="1"/>
+                                <span class="text-muted small" th:text="#{settings.retentionDays.hint}">Snapshots older than this are automatically deleted. 0 = never delete.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="panel-title" th:text="#{settings.section.timezone}">Timezone</div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold small" th:text="#{settings.timeZone.label}">Timezone</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <select id="timeZoneSelect" class="form-select form-select-sm" style="max-width: 300px;"></select>
+                                <span class="text-muted small" th:text="#{settings.timeZone.hint}">Used for displaying timestamps and for interpreting the date filters.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="panel-title" th:text="#{settings.section.upload}">Upload</div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small" th:text="#{settings.maxFileSize.label}">Max file size (MB)</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="maxFileSizeInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="1" max="2048" step="1"/>
+                                <span class="text-muted small" th:text="#{settings.maxFileSize.hint}">Maximum size of a single uploaded file.</span>
+                            </div>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold small" th:text="#{settings.maxRequestSize.label}">Max request size (MB)</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="maxRequestSizeInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="1" max="2048" step="1"/>
+                                <span class="text-muted small" th:text="#{settings.maxRequestSize.hint}">Maximum total size of an upload request.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group mb-0">
+                        <div class="panel-title" th:text="#{settings.section.scan}">Scan</div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small" th:text="#{settings.scanMaxPrefixes.label}">Max prefixes per scan</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="scanMaxPrefixesInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="10" max="5000" step="10"/>
+                                <span class="text-muted small" th:text="#{settings.scanMaxPrefixes.hint}">Min: 10, Max: 5000 (Default: 200)</span>
+                            </div>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold small" th:text="#{settings.scanMaxDepth.label}">Max scan depth (levels)</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="scanMaxDepthInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="1" max="50" step="1"/>
+                                <span class="text-muted small" th:text="#{settings.scanMaxDepth.hint}">Min: 1, Max: 50 (Default: 10)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer py-2">
+                    <span id="settingsSaveMsg" class="text-success small me-auto" style="display:none;"
+                          th:text="#{settings.saved}">Settings saved.</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetSettings()"
+                            th:text="#{settings.reset}">Reset to defaults</button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.close}">Close</button>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="saveSettings()"
+                            th:text="#{settings.save}">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal Script -->
+    <script th:inline="javascript">
+        (function() {
+            var SETTINGS_KEY = 'bucketeer_settings';
+            var DEFAULTS = {
+                pageSize: 100,
+                maxObjects: 0,
+                retentionDays: 30,
+                historyMax: 50,
+                filterHistoryMax: 20,
+                maxFileSize: 100,
+                maxRequestSize: 500,
+                scanMaxPrefixes: 200,
+                scanMaxDepth: 10
+            };
+
+            function loadSettings() {
+                try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); }
+                catch (e) { return {}; }
+            }
+
+            function fillLocalStorageFields() {
+                var settings = loadSettings();
+                document.getElementById('pageSizeInput').value = settings.pageSize || DEFAULTS.pageSize;
+                document.getElementById('maxObjectsInput').value = settings.maxObjects !== undefined ? settings.maxObjects : DEFAULTS.maxObjects;
+                document.getElementById('historyMaxInput').value = settings.historyMax !== undefined ? settings.historyMax : DEFAULTS.historyMax;
+                document.getElementById('filterHistoryMaxInput').value = settings.filterHistoryMax !== undefined ? settings.filterHistoryMax : DEFAULTS.filterHistoryMax;
+                document.getElementById('scanMaxPrefixesInput').value = settings.scanMaxPrefixes !== undefined ? settings.scanMaxPrefixes : DEFAULTS.scanMaxPrefixes;
+                document.getElementById('scanMaxDepthInput').value = settings.scanMaxDepth !== undefined ? settings.scanMaxDepth : DEFAULTS.scanMaxDepth;
+            }
+
+            function fillServerFields(data) {
+                document.getElementById('retentionDaysInput').value =
+                    (data && data.snapshotRetentionDays) || DEFAULTS.retentionDays;
+                document.getElementById('maxFileSizeInput').value = (data && data.maxFileSizeMb) || DEFAULTS.maxFileSize;
+                document.getElementById('maxRequestSizeInput').value = (data && data.maxRequestSizeMb) || DEFAULTS.maxRequestSize;
+                var tzSelect = document.getElementById('timeZoneSelect');
+                tzSelect.innerHTML = '';
+                var options = (data && data.timeZoneOptions) || [];
+                var systemId = (data && data.systemTimeZoneId) || '';
+                if (systemId && options.indexOf(systemId) < 0) options = options.concat([systemId]);
+                var current = (data && data.timeZoneId) || systemId || DEFAULTS.retentionDays;
+                var sysOpt = document.createElement('option');
+                sysOpt.value = systemId;
+                sysOpt.textContent = 'System default (' + systemId + ')';
+                sysOpt.selected = (current === systemId);
+                tzSelect.appendChild(sysOpt);
+                options.forEach(function(z) {
+                    var opt = document.createElement('option');
+                    opt.value = z;
+                    opt.textContent = z;
+                    opt.selected = (current === z);
+                    tzSelect.appendChild(opt);
+                });
+            }
+
+            function clearInvalid() {
+                var ids = ['pageSizeInput', 'maxObjectsInput', 'retentionDaysInput', 'historyMaxInput',
+                           'filterHistoryMaxInput', 'maxFileSizeInput', 'maxRequestSizeInput',
+                           'scanMaxPrefixesInput', 'scanMaxDepthInput'];
+                ids.forEach(function(id) {
+                    document.getElementById(id).classList.remove('is-invalid');
+                });
+            }
+
+            window.openSettingsModal = function() {
+                fillLocalStorageFields();
+                clearInvalid();
+                var msg = document.getElementById('settingsSaveMsg');
+                msg.style.display = 'none';
+                new bootstrap.Modal(document.getElementById('settingsModal')).show();
+                fetch('/api/settings')
+                    .then(function(r) { return r.json(); })
+                    .then(fillServerFields)
+                    .catch(function() {
+                        var fallback = {
+                            snapshotRetentionDays: DEFAULTS.retentionDays,
+                            maxFileSizeMb: DEFAULTS.maxFileSize,
+                            maxRequestSizeMb: DEFAULTS.maxRequestSize
+                        };
+                        fillServerFields(fallback);
+                    });
+            };
+
+            window.saveSettings = function() {
+                var fields = {
+                    pageSizeInput: { min: 10, max: 1000 },
+                    maxObjectsInput: { min: 0, max: 10000000 },
+                    retentionDaysInput: { min: 0, max: 365 },
+                    historyMaxInput: { min: 0, max: 500 },
+                    filterHistoryMaxInput: { min: 0, max: 500 },
+                    maxFileSizeInput: { min: 1, max: 2048 },
+                    maxRequestSizeInput: { min: 1, max: 2048 },
+                    scanMaxPrefixesInput: { min: 10, max: 5000 },
+                    scanMaxDepthInput: { min: 1, max: 50 }
+                };
+                var values = {};
+                var valid = true;
+                Object.keys(fields).forEach(function(id) {
+                    var v = parseInt(document.getElementById(id).value, 10);
+                    var el = document.getElementById(id);
+                    if (isNaN(v) || v < fields[id].min || v > fields[id].max) {
+                        el.classList.add('is-invalid');
+                        valid = false;
+                    } else {
+                        el.classList.remove('is-invalid');
+                    }
+                    values[id] = v;
+                });
+                if (!valid) return;
+
+                var settings = loadSettings();
+                settings.pageSize = values.pageSizeInput;
+                settings.maxObjects = values.maxObjectsInput;
+                settings.historyMax = values.historyMaxInput;
+                settings.filterHistoryMax = values.filterHistoryMaxInput;
+                settings.scanMaxPrefixes = values.scanMaxPrefixesInput;
+                settings.scanMaxDepth = values.scanMaxDepthInput;
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+
+                fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        snapshotRetentionDays: values.retentionDaysInput,
+                        timeZoneId: document.getElementById('timeZoneSelect').value,
+                        maxFileSizeMb: values.maxFileSizeInput,
+                        maxRequestSizeMb: values.maxRequestSizeInput
+                    })
+                });
+
+                var msg = document.getElementById('settingsSaveMsg');
+                msg.style.display = 'block';
+                clearTimeout(window.__settingsSaveTimer);
+                window.__settingsSaveTimer = setTimeout(function() { msg.style.display = 'none'; }, 2000);
+            };
+
+            window.resetSettings = function() {
+                Object.keys(DEFAULTS).forEach(function(key) {
+                    if (key === 'retentionDays') return;
+                    var el = document.getElementById({
+                        pageSize: 'pageSizeInput',
+                        maxObjects: 'maxObjectsInput',
+                        historyMax: 'historyMaxInput',
+                        filterHistoryMax: 'filterHistoryMaxInput',
+                        maxFileSize: 'maxFileSizeInput',
+                        maxRequestSize: 'maxRequestSizeInput',
+                        scanMaxPrefixes: 'scanMaxPrefixesInput',
+                        scanMaxDepth: 'scanMaxDepthInput'
+                    }[key]);
+                    el.value = DEFAULTS[key];
+                    el.classList.remove('is-invalid');
+                });
+                var tzSelect = document.getElementById('timeZoneSelect');
+                if (tzSelect.options.length > 0) tzSelect.value = tzSelect.options[0].value;
+
+                fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        snapshotRetentionDays: DEFAULTS.retentionDays,
+                        timeZoneId: tzSelect.value,
+                        maxFileSizeMb: DEFAULTS.maxFileSize,
+                        maxRequestSizeMb: DEFAULTS.maxRequestSize
+                    })
+                });
+                var msg = document.getElementById('settingsSaveMsg');
+                msg.style.display = 'block';
+                clearTimeout(window.__settingsSaveTimer);
+                window.__settingsSaveTimer = setTimeout(function() { msg.style.display = 'none'; }, 2000);
+            };
+        })();
+    </script>
 
     <!-- Tools Modal Script -->
     <script th:inline="javascript">

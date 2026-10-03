@@ -21,7 +21,7 @@ server:
   port: 8444
 
 bucketeer:
-  version: "0.8.2"
+  version: "0.8.3"
   release-date: "2026-10-03"
   api-token: ""
   query:

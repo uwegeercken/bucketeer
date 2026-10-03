@@ -266,6 +266,39 @@ footer {
     100% { opacity: 0; transform: scale(0.95); }
 }
 
+/* Settings modal */
+.settings-modal {
+    width: 640px;
+    max-width: calc(100vw - 2rem);
+    margin: 1rem auto;
+}
+.settings-modal .modal-content {
+    max-height: calc(100vh - 3.5rem);
+    display: flex;
+    flex-direction: column;
+}
+.settings-modal .modal-header,
+.settings-modal .modal-footer {
+    flex-shrink: 0;
+}
+.settings-modal .modal-body {
+    overflow-y: auto;
+    min-height: 0;
+}
+.settings-group {
+    background: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.9rem;
+}
+.settings-group:last-child {
+    margin-bottom: 0;
+}
+.settings-group .panel-title {
+    margin-bottom: 0.5rem;
+}
+
 /* Bucket scan modal */
 .scan-modal {
     width: 720px;
