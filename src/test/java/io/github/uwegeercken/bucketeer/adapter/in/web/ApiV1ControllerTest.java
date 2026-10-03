@@ -128,6 +128,28 @@ class ApiV1ControllerTest {
     }
 
     @Test
+    @DisplayName("list returns the collected objects sorted by key")
+    void listSortsByKey() {
+        when(bucketeerController.searchTarget(any(), any(), any()))
+                .thenReturn(target("data/", null));
+        when(useCase.fetchAllObjects(eq("serverA"), eq("bucket"), eq("data/"), eq(0L), any()))
+                .thenAnswer(inv -> {
+                    var cb = inv.<java.util.function.Consumer<ObjectListing>>getArgument(4);
+                    cb.accept(new ObjectListing(List.of(
+                            new S3Object("data/z.txt", "bucket", 1, Instant.parse("2026-01-01T00:00:00Z"), "a")), null, false));
+                    cb.accept(new ObjectListing(List.of(
+                            new S3Object("data/a.txt", "bucket", 2, Instant.parse("2026-01-01T00:00:00Z"), "b"),
+                            new S3Object("data/m.txt", "bucket", 3, Instant.parse("2026-01-01T00:00:00Z"), "c")), null, false));
+                    return false;
+                });
+
+        ResponseEntity<?> resp = controller.list("serverA", "bucket", "data/", null, 0);
+        List<?> body = (List<?>) resp.getBody();
+        assertThat(body.stream().map(r -> (String) ((Map<?, ?>) r).get("key")))
+                .containsExactly("data/a.txt", "data/m.txt", "data/z.txt");
+    }
+
+    @Test
     @DisplayName("list rejects an unknown server and a missing bucket")
     void listValidates() {
         ResponseEntity<?> unknown = controller.list("nope", "bucket", "data/", null, 0);

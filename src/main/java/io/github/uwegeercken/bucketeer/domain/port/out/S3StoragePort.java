@@ -1,5 +1,6 @@
 package io.github.uwegeercken.bucketeer.domain.port.out;
 
+import io.github.uwegeercken.bucketeer.domain.model.LevelListing;
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
@@ -15,6 +16,14 @@ public interface S3StoragePort {
     List<String> listBuckets(String serverName);
 
     ObjectListing listObjects(String serverName, String bucket, String prefix, String continuationToken, long maxKeys);
+
+    /**
+     * Lists one level of the key space (ListObjectsV2 with delimiter "/"): the objects
+     * directly at this level and the common prefixes (folders) one level deeper.
+     * Used to decide whether a listing can be split across parallel workers.
+     */
+    LevelListing listObjectsWithLevel(String serverName, String bucket, String prefix,
+                                      String continuationToken, long maxKeys);
 
     /**
      * Scans the next level of common prefixes below the given prefix

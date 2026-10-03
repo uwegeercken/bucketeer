@@ -122,6 +122,7 @@ public class ApiV1Controller {
                             .filter(obj -> !obj.key().endsWith("/"))
                             .filter(obj -> target.keyFilter() == null || obj.key().equals(target.keyFilter()))
                             .forEach(obj -> objects.add(toObject(obj))));
+            objects.sort(java.util.Comparator.comparing(o -> (String) o.get("key")));
             return ResponseEntity.ok(objects);
         } catch (Exception e) {
             log.error("Failed to list {}/{} prefix '{}': {}", server, bucket, target.s3Prefix(), e.getMessage());

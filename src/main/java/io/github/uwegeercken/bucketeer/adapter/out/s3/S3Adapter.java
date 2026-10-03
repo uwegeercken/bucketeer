@@ -1,6 +1,7 @@
 package io.github.uwegeercken.bucketeer.adapter.out.s3;
 
 import io.github.uwegeercken.bucketeer.domain.model.HeadObjectResult;
+import io.github.uwegeercken.bucketeer.domain.model.LevelListing;
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
@@ -62,6 +63,31 @@ public class S3Adapter implements S3StoragePort {
                 .toList();
 
         return new ObjectListing(objects, response.nextContinuationToken(), Boolean.TRUE.equals(response.isTruncated()));
+    }
+
+    @Override
+    public LevelListing listObjectsWithLevel(String serverName, String bucket, String prefix,
+                                             String continuationToken, long maxKeys) {
+        S3Client client = registry.clientFor(serverName);
+
+        ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder()
+                .bucket(bucket)
+                .prefix(prefix != null ? prefix : "")
+                .delimiter("/");
+        if (continuationToken != null && !continuationToken.isBlank()) {
+            builder.continuationToken(continuationToken);
+        }
+        if (maxKeys > 0) {
+            builder.maxKeys((int) Math.min(maxKeys, 1000));
+        }
+
+        ListObjectsV2Response response = client.listObjectsV2(builder.build());
+        List<S3Object> objects = response.contents().stream()
+                .map(obj -> new S3Object(obj.key(), bucket, obj.size(), obj.lastModified(), obj.eTag()))
+                .toList();
+        List<String> prefixes = response.commonPrefixes().stream().map(p -> p.prefix()).toList();
+
+        return new LevelListing(objects, prefixes, response.nextContinuationToken(), Boolean.TRUE.equals(response.isTruncated()));
     }
 
     @Override

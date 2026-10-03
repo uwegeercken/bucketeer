@@ -21,9 +21,11 @@ server:
   port: 8444
 
 bucketeer:
-  version: "0.8.1"
+  version: "0.8.2"
   release-date: "2026-10-03"
   api-token: ""
+  query:
+    parallelism: 4
   scan:
     max-prefixes: 200
     max-depth: 10

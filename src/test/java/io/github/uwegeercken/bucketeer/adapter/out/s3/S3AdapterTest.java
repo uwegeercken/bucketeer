@@ -1,8 +1,10 @@
 package io.github.uwegeercken.bucketeer.adapter.out.s3;
 
 import io.github.uwegeercken.bucketeer.domain.model.HeadObjectResult;
+import io.github.uwegeercken.bucketeer.domain.model.LevelListing;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
+import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -238,6 +240,59 @@ class S3AdapterTest {
         };
 
         adapter.scanCommonPrefixes("server", "bucket", "", null, 5000);
+    }
+
+    @Test
+    @DisplayName("listObjectsWithLevel maps objects at the level and their common prefixes")
+    void levelListingMapsObjectsAndPrefixes() {
+        handler = (proxy, method, args) -> {
+            if (method.getName().equals("listObjectsV2")) {
+                ListObjectsV2Request req = (ListObjectsV2Request) args[0];
+                assertThat(req.bucket()).isEqualTo("bucket");
+                assertThat(req.prefix()).isEqualTo("data/");
+                assertThat(req.delimiter()).isEqualTo("/");
+                assertThat(req.maxKeys()).isEqualTo(1000);
+                return ListObjectsV2Response.builder()
+                        .contents(
+                                software.amazon.awssdk.services.s3.model.S3Object.builder()
+                                        .key("data/a.txt").size(12L).build(),
+                                software.amazon.awssdk.services.s3.model.S3Object.builder()
+                                        .key("data/b.txt").size(34L).build())
+                        .commonPrefixes(
+                                CommonPrefix.builder().prefix("data/2024/").build())
+                        .isTruncated(true)
+                        .nextContinuationToken("later")
+                        .build();
+            }
+            return method.getDefaultValue();
+        };
+
+        LevelListing listing = adapter.listObjectsWithLevel("server", "bucket", "data/", "tok", 5000);
+
+        assertThat(listing.objects().stream().map(S3Object::key))
+                .containsExactly("data/a.txt", "data/b.txt");
+        assertThat(listing.commonPrefixes()).containsExactly("data/2024/");
+        assertThat(listing.nextContinuationToken()).isEqualTo("later");
+        assertThat(listing.truncated()).isTrue();
+    }
+
+    @Test
+    @DisplayName("listObjectsWithLevel passes the continuation token through")
+    void levelListingPassesContinuationToken() {
+        handler = (proxy, method, args) -> {
+            if (method.getName().equals("listObjectsV2")) {
+                ListObjectsV2Request req = (ListObjectsV2Request) args[0];
+                assertThat(req.continuationToken()).isEqualTo("next-token");
+                return ListObjectsV2Response.builder().build();
+            }
+            return method.getDefaultValue();
+        };
+
+        LevelListing listing = adapter.listObjectsWithLevel("server", "bucket", "", "next-token", 10);
+
+        assertThat(listing.objects()).isEmpty();
+        assertThat(listing.commonPrefixes()).isEmpty();
+        assertThat(listing.truncated()).isFalse();
     }
 
     @Test

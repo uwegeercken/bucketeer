@@ -6,8 +6,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record S3Properties(
         String version,
         String releaseDate,
+        Query query,
         Scan scan
 ) {
+    /**
+     * Parallel listing settings. parallelism = maximum number of concurrent
+     * prefix listings used by a search; 0 disables parallel listing.
+     */
+    public record Query(int parallelism) {
+    }
+
     public record Scan(int maxPrefixes, int maxDepth) {
     }
 }

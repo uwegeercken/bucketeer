@@ -31,6 +31,15 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.8.2 <small class="text-muted">2026-10-03</small></h6>
+                    <ul>
+                        <li><strong>Fast search &amp; downloads</strong>: searches, ZIP downloads, snapshots and the <code>/api/v1/list</code> endpoint now decide automatically between two modes: after a cheap common-prefix scan (delimiter <code>/</code>), a flat bucket is listed sequentially exactly as before, while a bucket with more than one top-level prefix is listed in parallel &mdash; the depth level is walked by one producer, its prefixes are consumed by up to <code>bucketeer.query.parallelism</code> worker threads, and the result pages are merged on a single thread (identical result set, only faster)</li>
+                        <li><strong>Config</strong>: new <code>bucketeer.query.parallelism</code> setting (default 4) controls the worker threads for parallel listing; set it to 1 or 0 to force sequential listing for every bucket</li>
+                        <li><strong>Deterministic API output</strong>: <code>/api/v1/list</code> now returns the objects sorted by key regardless of the listing mode</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.8.1 <small class="text-muted">2026-10-03</small></h6>
                     <ul>
                         <li><strong>Scan bucket (prefix explorer)</strong>: a folder icon next to the bucket selector opens a scan dialog that browses the common prefixes of a bucket level by level (ListObjectsV2 with delimiter). A clickable breadcrumb with the sub-prefix totals per segment, a <em>load more</em> pagination, a client-side filter field, and a <em>current prefix</em> row (with copy icon) let you inspect any folder structure &mdash; and adopt any prefix into the search field</li>
