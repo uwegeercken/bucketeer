@@ -589,6 +589,8 @@
         if (!input) return;
         input.value = prefix;
         updateResolvedPrefix();
+        const modalEl = document.getElementById('scanModal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
     }
 
     function filteredListing() {
