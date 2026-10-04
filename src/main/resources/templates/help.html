@@ -31,6 +31,15 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.8.4 <small class="text-muted">2026-10-04</small></h6>
+                    <ul>
+                        <li><strong>DuckDB-Quack remote access</strong>: an optional Quack server exposes Bucketeer&rsquo;s in-memory result cache to a second DuckDB process (e.g. the DuckDB CLI) &mdash; query the objects of the last search over localhost without an export. Enable it in the Settings dialog (section <em>DuckDB</em>); the server binds only localhost, authenticates callers with a token and logs the connection URI, the token and ready-made <code>ATTACH</code> / query samples at start. Port and a fixed token can be set via <code>bucketeer.duckdb.quack.port</code> / <code>bucketeer.duckdb.quack.token</code>; an empty token is generated randomly on every start</li>
+                        <li><strong>Self-healing object cache</strong>: if the in-memory <code>objects</code> table is dropped (e.g. by a Quack client), Bucketeer detects it on the next access, logs an error and recreates the empty table automatically &mdash; the cache refills with the next search. Corrupt snapshot meta files no longer break the snapshot list</li>
+                        <li><strong>Snapshot retention</strong>: expired snapshots are cleaned up when the snapshot list is loaded (the number of deleted files is logged); orphaned meta/data files that do not form a snapshot pair are swept and leftovers are reported with a warning, keeping the snapshots folder tidy</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.8.3 <small class="text-muted">2026-10-03</small></h6>
                     <ul>
                         <li><strong>Settings as a dialog</strong>: the configuration moved from a standalone page into a modal dialog that opens from the gear icon on any page. The options are grouped into visually separated blocks by topic (Query, History, Snapshots, Timezone, Upload, Scan) with a scrollable body; saving keeps the usual per-browser storage for query/history/scan settings and the server-side settings for snapshots, timezone and uploads</li>

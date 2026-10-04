@@ -25,7 +25,7 @@ import static org.mockito.Mockito.*;
 class BucketeerServiceTest {
 
     private static final S3Properties PROPERTIES =
-            new S3Properties("0.8.3", "2026-10-03",
+            new S3Properties("0.8.4", "2026-10-04",
                     new S3Properties.Query(4), new S3Properties.Scan(10, 3));
 
     private S3StoragePort s3StoragePort;
@@ -302,7 +302,7 @@ class BucketeerServiceTest {
     @DisplayName("fetchAllObjects uses a sequential listing when parallelism is disabled")
     void fetchSequentialWhenParallelismDisabled() {
         S3Properties noParallel =
-                new S3Properties("0.8.3", "2026-10-03", new S3Properties.Query(0), new S3Properties.Scan(10, 3));
+                new S3Properties("0.8.4", "2026-10-04", new S3Properties.Query(0), new S3Properties.Scan(10, 3));
         BucketeerService seqService = new BucketeerService(s3StoragePort, null, noParallel, executor);
         when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
                 .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
@@ -317,7 +317,7 @@ class BucketeerServiceTest {
 
         BucketeerService singleWorker =
                 new BucketeerService(s3StoragePort, null,
-                        new S3Properties("0.8.3", "2026-10-03", new S3Properties.Query(1), new S3Properties.Scan(10, 3)),
+                        new S3Properties("0.8.4", "2026-10-04", new S3Properties.Query(1), new S3Properties.Scan(10, 3)),
                         executor);
         collected.clear();
         boolean oneLimit = singleWorker.fetchAllObjects("server", "bucket", "data/", 0,

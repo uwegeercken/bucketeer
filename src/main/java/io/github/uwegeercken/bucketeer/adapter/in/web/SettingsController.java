@@ -1,6 +1,7 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
+import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -33,8 +34,11 @@ public class SettingsController {
 
     private final AppSettings appSettings;
 
-    public SettingsController(AppSettings appSettings) {
+    private final DuckDbRepository duckDbRepository;
+
+    public SettingsController(AppSettings appSettings, DuckDbRepository duckDbRepository) {
         this.appSettings = appSettings;
+        this.duckDbRepository = duckDbRepository;
     }
 
     @GetMapping(value = "/api/settings", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -71,6 +75,13 @@ public class SettingsController {
             Object val = body.get("maxRequestSizeMb");
             if (val instanceof Number n) {
                 appSettings.setMaxRequestSizeMb(n.intValue());
+            }
+        }
+        if (body.containsKey("duckdbQuackEnabled")) {
+            Object val = body.get("duckdbQuackEnabled");
+            if (val instanceof Boolean b) {
+                appSettings.setDuckdbQuackEnabled(b);
+                duckDbRepository.updateQuackServer();
             }
         }
         return ResponseEntity.ok(appSettings.toMap());

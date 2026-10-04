@@ -29,7 +29,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.8.3.jar
+java -jar target/bucketeer-0.8.4.jar
 ```
 
 Open [http://localhost:8444](http://localhost:8444).
@@ -64,6 +64,24 @@ curl -o all.zip "http://localhost:8444/api/v1/download/prefix?server=Minio%20Loc
 ```
 
 To require a token on all `/api/v1/**` requests, start with `--bucketeer.api-token=<token>` (or set `BUCKETEER_API_TOKEN`) and send `Authorization: Bearer <token>`. Without a configured token the API stays open, like the rest of the app.
+
+## DuckDB-Quack (remote SQL access)
+
+Optional: let a **second DuckDB process** (e.g. the DuckDB CLI in a terminal) query the in-memory cache of the last search over the [Quack](https://duckdb.org/docs/stable/quack/overview) protocol — no export needed.
+
+```bash
+# 1. Enable it in the Settings dialog → section "DuckDB" (stored in ~/.bucketeer/settings.json).
+# 2. Restart or toggle the setting; the server log prints the connection URI and token, e.g.:
+#    DuckDB Quack server listening on quack:localhost:9494 (token: 64a2...).
+# 3. Connect from any other DuckDB process:
+duckdb <<'EOF'
+LOAD quack;
+ATTACH 'quack:localhost:9494' AS bucketeer (TOKEN '64a2...');
+SELECT count(*) FROM bucketeer.objects;
+EOF
+```
+
+The server only ever binds **localhost** (`allow_other_hostname` is never set) and requires the token from the log — use the exact host string `quack:localhost:<port>` on both sides. Port (default `9494`) and a fixed token can be set via `bucketeer.duckdb.quack.port` / `bucketeer.duckdb.quack.token` in `application.yml`; an empty token is generated randomly at start. Quack is a **beta** protocol — Bucketeer pins the DuckDB JDBC version in `pom.xml` to absorb API changes. If a Quack client drops the in-memory `objects` table, Bucketeer detects it on the next access, logs an error and recreates the empty table — the cache refills with the next search.
 
 ## License
 

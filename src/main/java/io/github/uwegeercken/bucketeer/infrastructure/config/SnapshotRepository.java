@@ -3,6 +3,7 @@ package io.github.uwegeercken.bucketeer.infrastructure.config;
 import io.github.uwegeercken.bucketeer.adapter.in.web.SnapshotMeta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.io.IOException;
@@ -34,6 +35,7 @@ public class SnapshotRepository {
     private final Path snapshotsDir;
     private final AppSettings appSettings;
 
+    @Autowired
     public SnapshotRepository(AppSettings appSettings) {
         this(Path.of(System.getProperty("user.home"), ".bucketeer", "snapshots"), appSettings);
     }

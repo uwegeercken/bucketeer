@@ -21,11 +21,16 @@ server:
   port: 8444
 
 bucketeer:
-  version: "0.8.3"
-  release-date: "2026-10-03"
+  version: "0.8.4"
+  release-date: "2026-10-04"
   api-token: ""
   query:
     parallelism: 4
+  duckdb:
+    quack:
+      # Enabled/disabled via the Settings modal (stored in ~/.bucketeer/settings.json).
+      port: 9494
+      token: ""
   scan:
     max-prefixes: 200
     max-depth: 10

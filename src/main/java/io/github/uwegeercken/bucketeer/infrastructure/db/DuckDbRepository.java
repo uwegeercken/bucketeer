@@ -1,10 +1,14 @@
 package io.github.uwegeercken.bucketeer.infrastructure.db;
 
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
+import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.sql.*;
@@ -33,13 +37,36 @@ public class DuckDbRepository {
     public record SizeRange(long min, long max) {}
     public record FileTypeCount(String ext, long count) {}
 
-    private final Connection connection;
+    final Connection connection;
 
     private TimeZoneProvider timeZoneProvider;
+
+    private AppSettings appSettings;
+
+    private int quackPort = 9494;
+
+    private String quackToken = "";
+
+    private volatile QuackServer quackServer;
 
     @Autowired
     public void setTimeZoneProvider(TimeZoneProvider timeZoneProvider) {
         this.timeZoneProvider = timeZoneProvider;
+    }
+
+    @Autowired
+    public void setAppSettings(AppSettings appSettings) {
+        this.appSettings = appSettings;
+    }
+
+    @Value("${bucketeer.duckdb.quack.port:9494}")
+    public void setQuackPort(int quackPort) {
+        this.quackPort = quackPort;
+    }
+
+    @Value("${bucketeer.duckdb.quack.token:}")
+    public void setQuackToken(String quackToken) {
+        this.quackToken = quackToken;
     }
 
     private ZoneId zone() {
@@ -98,11 +125,65 @@ public class DuckDbRepository {
         }
     }
 
+    /**
+     * Checks whether a failed SQL statement hit the missing {@code objects} table (dropped
+     * by e.g. a DuckDB Quack client) and recreates it. Returns true when the table was
+     * missing and has been recreated.
+     */
+    private boolean handleObjectsTableIssue(SQLException e) {
+        if (e.getMessage() == null || !e.getMessage().contains("does not exist")) {
+            return false;
+        }
+        log.error("The in-memory 'objects' table is missing - dropped by a DuckDB Quack client? "
+                + "Recreating the table; run a new search to refill the cache.");
+        try {
+            initSchema();
+        } catch (SQLException ex) {
+            log.error("Failed to recreate objects table: {}", ex.getMessage());
+        }
+        return true;
+    }
+
+    /** Starts the Quack remote server at boot when the setting is enabled. */
+    @PostConstruct
+    public synchronized void startQuackServerIfEnabled() {
+        if (appSettings != null && appSettings.isDuckdbQuackEnabled()) {
+            updateQuackServer();
+        }
+    }
+
+    /**
+     * Reconciles the Quack server with the current setting. Called after the setting is
+     * changed from the Settings modal; start/stop are idempotent.
+     */
+    public synchronized void updateQuackServer() {
+        boolean enabled = appSettings != null && appSettings.isDuckdbQuackEnabled();
+        if (enabled) {
+            if (quackServer == null) {
+                QuackServer server = new QuackServer(connection, quackPort, quackToken);
+                if (server.start()) {
+                    quackServer = server;
+                }
+            }
+        } else {
+            stopQuackServer();
+        }
+    }
+
+    @PreDestroy
+    public synchronized void stopQuackServer() {
+        if (quackServer != null) {
+            quackServer.stop();
+            quackServer = null;
+        }
+    }
+
     /** Clears all cached objects. Called before a new query. */
     public void clear() {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("DELETE FROM objects");
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return;
             log.error("Failed to clear objects table: {}", e.getMessage());
         }
     }
@@ -115,27 +196,35 @@ public class DuckDbRepository {
             ps.setString(2, key);
             return ps.executeUpdate();
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return 0;
             log.error("Failed to delete object from cache {}: {}", key, e.getMessage());
             return 0;
         }
     }
 
-    /** Inserts a batch of S3 objects into the cache. */
+    /** Inserts a batch of S3 objects into the cache. Retries once when the table was missing (e.g. dropped by a Quack client). */
     public void insertBatch(List<S3Object> objects) {
         String sql = "INSERT INTO objects (key, bucket, size_bytes, last_modified, etag) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            for (S3Object obj : objects) {
-                ps.setString(1, obj.key());
-                ps.setString(2, obj.bucket());
-                ps.setLong(3, obj.sizeBytes());
-                ps.setTimestamp(4, obj.lastModified() != null
-                        ? Timestamp.from(obj.lastModified()) : null);
-                ps.setString(5, obj.etag());
-                ps.addBatch();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                for (S3Object obj : objects) {
+                    ps.setString(1, obj.key());
+                    ps.setString(2, obj.bucket());
+                    ps.setLong(3, obj.sizeBytes());
+                    ps.setTimestamp(4, obj.lastModified() != null
+                            ? Timestamp.from(obj.lastModified()) : null);
+                    ps.setString(5, obj.etag());
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+                return;
+            } catch (SQLException e) {
+                if (attempt == 0 && handleObjectsTableIssue(e)) {
+                    continue; // table recreated - the batch is retried
+                }
+                log.error("Failed to insert objects batch: {}", e.getMessage());
+                return;
             }
-            ps.executeBatch();
-        } catch (SQLException e) {
-            log.error("Failed to insert objects batch: {}", e.getMessage());
         }
     }
 
@@ -145,6 +234,7 @@ public class DuckDbRepository {
              ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM objects")) {
             return rs.next() ? rs.getLong(1) : 0;
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return 0;
             log.error("Failed to count objects: {}", e.getMessage());
             return 0;
         }
@@ -224,6 +314,7 @@ public class DuckDbRepository {
                 }
             }
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return results;
             log.error("Failed to query objects: {}", e.getMessage());
         }
         return results;
@@ -284,6 +375,7 @@ public class DuckDbRepository {
             ps.execute();
             return queryCount(keyFilter, minSizeKb, maxSizeKb, dateFrom, dateTo);
         } catch (SQLException e) {
+            handleObjectsTableIssue(e);
             log.error("Failed to export to Parquet: {}", e.getMessage());
             throw new RuntimeException("Parquet export failed: " + e.getMessage());
         }
@@ -296,6 +388,7 @@ public class DuckDbRepository {
             stmt.execute(sql);
             return count();
         } catch (SQLException e) {
+            handleObjectsTableIssue(e);
             log.error("Failed to export all to Parquet: {}", e.getMessage());
             throw new RuntimeException("Parquet export failed: " + e.getMessage());
         }
@@ -313,6 +406,7 @@ public class DuckDbRepository {
             stmt.execute(sql);
             return count();
         } catch (SQLException e) {
+            handleObjectsTableIssue(e);
             log.error("Failed to load Parquet into objects table: {}", e.getMessage());
             throw new RuntimeException("Failed to load Parquet: " + e.getMessage());
         }
@@ -353,6 +447,7 @@ public class DuckDbRepository {
 
             return new DiffResult(added, removed, changed);
         } catch (SQLException e) {
+            handleObjectsTableIssue(e);
             log.error("Failed to compare with snapshot: {}", e.getMessage());
             throw new RuntimeException("Snapshot comparison failed: " + e.getMessage());
         }
@@ -398,6 +493,7 @@ public class DuckDbRepository {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
         } catch (SQLException e) {
+            handleObjectsTableIssue(e);
             log.error("Failed to export diff to CSV: {}", e.getMessage());
             throw new RuntimeException("Diff export failed: " + e.getMessage());
         }
@@ -437,6 +533,7 @@ public class DuckDbRepository {
 
             return new DiffResult(added, removed, changed);
         } catch (SQLException e) {
+            handleObjectsTableIssue(e);
             log.error("Failed to compare snapshots: {}", e.getMessage());
             throw new RuntimeException("Snapshot comparison failed: " + e.getMessage());
         }
@@ -464,6 +561,7 @@ public class DuckDbRepository {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
         } catch (SQLException e) {
+            handleObjectsTableIssue(e);
             log.error("Failed to export diff to CSV: {}", e.getMessage());
             throw new RuntimeException("Diff export failed: " + e.getMessage());
         }
@@ -490,6 +588,7 @@ public class DuckDbRepository {
                 return rs.next() ? rs.getLong(1) : 0;
             }
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return 0;
             log.error("Failed to count filtered objects: {}", e.getMessage());
             return 0;
         }
@@ -512,6 +611,7 @@ public class DuckDbRepository {
                 return rs.next() ? rs.getLong(1) : 0;
             }
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return 0;
             log.error("Failed to count filtered objects: {}", e.getMessage());
             return 0;
         }
@@ -533,6 +633,7 @@ public class DuckDbRepository {
                 return rs.next() ? rs.getLong(1) : 0;
             }
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return 0;
             log.error("Failed to sum filtered object sizes: {}", e.getMessage());
             return 0;
         }
@@ -555,6 +656,7 @@ public class DuckDbRepository {
                 return rs.next() ? rs.getLong(1) : 0;
             }
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return 0;
             log.error("Failed to sum filtered object sizes: {}", e.getMessage());
             return 0;
         }
@@ -577,6 +679,7 @@ public class DuckDbRepository {
                 }
             }
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return new DateRange(null, null);
             log.error("Failed to query date range: {}", e.getMessage());
         }
         return new DateRange(null, null);
@@ -595,6 +698,7 @@ public class DuckDbRepository {
                 }
             }
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return new SizeRange(0, 0);
             log.error("Failed to query size range: {}", e.getMessage());
         }
         return new SizeRange(0, 0);
@@ -618,6 +722,7 @@ public class DuckDbRepository {
                 return result;
             }
         } catch (SQLException e) {
+            if (handleObjectsTableIssue(e)) return List.of();
             log.error("Failed to query file type distribution: {}", e.getMessage());
         }
         return List.of();

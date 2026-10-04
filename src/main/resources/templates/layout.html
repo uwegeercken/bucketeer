@@ -299,6 +299,21 @@
                         </div>
                     </div>
 
+                    <div class="settings-group">
+                        <div class="panel-title" th:text="#{settings.section.duckdb}">DuckDB</div>
+                        <div class="mb-0">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="duckdbQuackEnabled"/>
+                                <label class="form-check-label fw-semibold small" for="duckdbQuackEnabled"
+                                       th:text="#{settings.quack.label}">Enable DuckDB Quack remote SQL access</label>
+                            </div>
+                            <div class="text-muted small" th:text="#{settings.quack.hint}">
+                                Lets another DuckDB process (e.g. the CLI in a terminal) query the cached results
+                                over localhost. Connection URI and token are written to the server log at startup.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="settings-group mb-0">
                         <div class="panel-title" th:text="#{settings.section.scan}">Scan</div>
                         <div class="mb-3">
@@ -369,6 +384,7 @@
                     (data && data.snapshotRetentionDays) || DEFAULTS.retentionDays;
                 document.getElementById('maxFileSizeInput').value = (data && data.maxFileSizeMb) || DEFAULTS.maxFileSize;
                 document.getElementById('maxRequestSizeInput').value = (data && data.maxRequestSizeMb) || DEFAULTS.maxRequestSize;
+                document.getElementById('duckdbQuackEnabled').checked = !!(data && data.duckdbQuackEnabled);
                 var tzSelect = document.getElementById('timeZoneSelect');
                 tzSelect.innerHTML = '';
                 var options = (data && data.timeZoneOptions) || [];
@@ -460,7 +476,8 @@
                         snapshotRetentionDays: values.retentionDaysInput,
                         timeZoneId: document.getElementById('timeZoneSelect').value,
                         maxFileSizeMb: values.maxFileSizeInput,
-                        maxRequestSizeMb: values.maxRequestSizeInput
+                        maxRequestSizeMb: values.maxRequestSizeInput,
+                        duckdbQuackEnabled: document.getElementById('duckdbQuackEnabled').checked
                     })
                 });
 
@@ -488,6 +505,7 @@
                 });
                 var tzSelect = document.getElementById('timeZoneSelect');
                 if (tzSelect.options.length > 0) tzSelect.value = tzSelect.options[0].value;
+                document.getElementById('duckdbQuackEnabled').checked = false;
 
                 fetch('/api/settings', {
                     method: 'POST',
@@ -496,7 +514,8 @@
                         snapshotRetentionDays: DEFAULTS.retentionDays,
                         timeZoneId: tzSelect.value,
                         maxFileSizeMb: DEFAULTS.maxFileSize,
-                        maxRequestSizeMb: DEFAULTS.maxRequestSize
+                        maxRequestSizeMb: DEFAULTS.maxRequestSize,
+                        duckdbQuackEnabled: false
                     })
                 });
                 var msg = document.getElementById('settingsSaveMsg');

@@ -27,6 +27,7 @@ public class AppSettings {
     private volatile String timeZoneId = ZoneId.systemDefault().getId();
     private volatile int maxFileSizeMb = 100;
     private volatile int maxRequestSizeMb = 500;
+    private volatile boolean duckdbQuackEnabled = false;
 
     public AppSettings() {
         this(Path.of(System.getProperty("user.home"), ".bucketeer", "settings.json"));
@@ -71,6 +72,16 @@ public class AppSettings {
         save();
     }
 
+    public boolean isDuckdbQuackEnabled() {
+        return duckdbQuackEnabled;
+    }
+
+    /** Enables/disables the DuckDB Quack remote SQL access (off by default). */
+    public void setDuckdbQuackEnabled(boolean enabled) {
+        this.duckdbQuackEnabled = enabled;
+        save();
+    }
+
     /** Sets the time zone id; invalid or blank values fall back to the system default. */
     public void setTimeZoneId(String timeZoneId) {
         this.timeZoneId = timeZoneId != null && isValidZoneId(timeZoneId)
@@ -83,7 +94,8 @@ public class AppSettings {
                 "snapshotRetentionDays", snapshotRetentionDays,
                 "timeZoneId", timeZoneId,
                 "maxFileSizeMb", maxFileSizeMb,
-                "maxRequestSizeMb", maxRequestSizeMb);
+                "maxRequestSizeMb", maxRequestSizeMb,
+                "duckdbQuackEnabled", duckdbQuackEnabled);
     }
 
     private static boolean isValidZoneId(String id) {
@@ -115,6 +127,8 @@ public class AppSettings {
             if (mfs instanceof Number n) maxFileSizeMb = clipMb(n.intValue());
             Object mrs = data.get("maxRequestSizeMb");
             if (mrs instanceof Number n) maxRequestSizeMb = clipMb(n.intValue());
+            Object quack = data.get("duckdbQuackEnabled");
+            if (quack instanceof Boolean b) duckdbQuackEnabled = b;
         } catch (tools.jackson.core.JacksonException e) {
             log.error("Failed to load settings from {}: {}", settingsPath, e.getMessage());
         }
@@ -128,6 +142,7 @@ public class AppSettings {
             data.put("timeZoneId", timeZoneId);
             data.put("maxFileSizeMb", maxFileSizeMb);
             data.put("maxRequestSizeMb", maxRequestSizeMb);
+            data.put("duckdbQuackEnabled", duckdbQuackEnabled);
             mapper.writeValue(settingsPath.toFile(), data);
         } catch (IOException e) {
             log.error("Failed to save settings: {}", e.getMessage());        }

@@ -1,6 +1,7 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
+import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -16,7 +17,8 @@ import static org.mockito.Mockito.when;
 class SettingsControllerTest {
 
     private final AppSettings appSettings = mock(AppSettings.class);
-    private final SettingsController controller = new SettingsController(appSettings);
+    private final DuckDbRepository duckDbRepository = mock(DuckDbRepository.class);
+    private final SettingsController controller = new SettingsController(appSettings, duckDbRepository);
 
     @Test
     @DisplayName("getSettings exposes server settings plus timezone options and the system timezone")
@@ -71,10 +73,29 @@ class SettingsControllerTest {
         verifyNoSettersCalled();
     }
 
+    @Test
+    @DisplayName("saveSettings toggling duckdbQuackEnabled persists the flag and reconciles the Quack server")
+    void saveSettingsTogglesQuackServer() {
+        when(appSettings.toMap()).thenReturn(Map.of(
+                "snapshotRetentionDays", 30,
+                "timeZoneId", "UTC",
+                "maxFileSizeMb", 100,
+                "maxRequestSizeMb", 500,
+                "duckdbQuackEnabled", true));
+
+        ResponseEntity<Map<String, Object>> resp = controller.saveSettings(Map.of("duckdbQuackEnabled", true));
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(appSettings).setDuckdbQuackEnabled(true);
+        verify(duckDbRepository).updateQuackServer();
+    }
+
     private void verifyNoSettersCalled() {
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setSnapshotRetentionDays(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setTimeZoneId(org.mockito.Mockito.anyString());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setMaxFileSizeMb(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setMaxRequestSizeMb(org.mockito.Mockito.anyInt());
+        org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setDuckdbQuackEnabled(org.mockito.Mockito.anyBoolean());
+        org.mockito.Mockito.verify(duckDbRepository, org.mockito.Mockito.never()).updateQuackServer();
     }
 }
