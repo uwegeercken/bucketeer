@@ -18,7 +18,8 @@ import java.util.Map;
 public class AppSettings {
 
     private static final Logger log = LoggerFactory.getLogger(AppSettings.class);
-    private static final Path SETTINGS_PATH = Path.of(System.getProperty("user.home"), ".bucketeer", "settings.json");
+
+    private final Path settingsPath;
 
     private final ObjectMapper mapper = JsonMapper.builder()
             .enable(SerializationFeature.INDENT_OUTPUT).build();
@@ -28,6 +29,12 @@ public class AppSettings {
     private volatile int maxRequestSizeMb = 500;
 
     public AppSettings() {
+        this(Path.of(System.getProperty("user.home"), ".bucketeer", "settings.json"));
+    }
+
+    /** Package-private: settings file location injectable for tests. */
+    AppSettings(Path settingsPath) {
+        this.settingsPath = settingsPath;
         load();
     }
 
@@ -94,9 +101,9 @@ public class AppSettings {
     }
 
     private void load() {
-        if (!Files.exists(SETTINGS_PATH)) return;
+        if (!Files.exists(settingsPath)) return;
         try {
-            Map<String, Object> data = mapper.readValue(SETTINGS_PATH.toFile(),
+            Map<String, Object> data = mapper.readValue(settingsPath.toFile(),
                     new tools.jackson.core.type.TypeReference<>() {});
             Object val = data.get("snapshotRetentionDays");
             if (val instanceof Number n) snapshotRetentionDays = n.intValue();
@@ -109,19 +116,19 @@ public class AppSettings {
             Object mrs = data.get("maxRequestSizeMb");
             if (mrs instanceof Number n) maxRequestSizeMb = clipMb(n.intValue());
         } catch (tools.jackson.core.JacksonException e) {
-            log.error("Failed to load settings from {}: {}", SETTINGS_PATH, e.getMessage());
+            log.error("Failed to load settings from {}: {}", settingsPath, e.getMessage());
         }
     }
 
     private void save() {
         try {
-            Files.createDirectories(SETTINGS_PATH.getParent());
+            Files.createDirectories(settingsPath.getParent());
             Map<String, Object> data = new HashMap<>();
             data.put("snapshotRetentionDays", snapshotRetentionDays);
             data.put("timeZoneId", timeZoneId);
             data.put("maxFileSizeMb", maxFileSizeMb);
             data.put("maxRequestSizeMb", maxRequestSizeMb);
-            mapper.writeValue(SETTINGS_PATH.toFile(), data);
+            mapper.writeValue(settingsPath.toFile(), data);
         } catch (IOException e) {
             log.error("Failed to save settings: {}", e.getMessage());        }
     }
