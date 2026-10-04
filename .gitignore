@@ -15,3 +15,6 @@ target/
 *.class
 hs_err_pid*
 replay_pid*
+/.opencode/commands/bump.md
+/.opencode/plugins/git-guard.ts
+/AGENTS.md

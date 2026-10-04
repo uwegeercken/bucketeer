@@ -858,7 +858,9 @@
     }
 
     function getComboItems(filterText) {
-        const favs = loadFavorites();
+        // Favorites alphabetisch (case-insensitive); History neueste zuerst (MRU).
+        const favs = loadFavorites().slice().sort((a, b) =>
+            String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }));
         const hist = loadHistory();
         const text = (filterText || '').toLowerCase();
         const seen = new Set();

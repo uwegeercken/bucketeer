@@ -71,7 +71,7 @@ public class S3ClientRegistry {
 
     public List<String> listBuckets(String serverName) {
         return clientFor(serverName).listBuckets().buckets()
-                .stream().map(Bucket::name).toList();
+                .stream().map(Bucket::name).sorted().toList();
     }
 
     private S3Client buildClient(ServerConfig server) {
