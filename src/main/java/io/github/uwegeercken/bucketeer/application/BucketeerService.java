@@ -101,7 +101,7 @@ public class BucketeerService implements BucketeerUseCase {
         }
 
         PrefixScan scan = s3StoragePort.scanCommonPrefixes(serverName, bucket, normalizedPrefix, continuationToken, limit);
-        log.info("Scan {}/{} '{}': found {} prefix(es){}", serverName, bucket,
+        log.debug("Scan {}/{} '{}': found {} prefix(es){}", serverName, bucket,
                 normalizedPrefix,
                 scan != null ? scan.prefixes().size() : 0,
                 scan != null && scan.truncated() ? " (truncated, more available)" : "");
@@ -163,7 +163,7 @@ public class BucketeerService implements BucketeerUseCase {
             return fetchAllObjectsSequential(serverName, bucket, resolvedPrefix, maxObjects, pageCallback);
         }
 
-        log.info("Parallel listing {}/{} '{}': {} top-level prefix(es), parallelism {}",
+        log.debug("Parallel listing {}/{} '{}': {} top-level prefix(es), parallelism {}",
                 serverName, bucket, resolvedPrefix, first.commonPrefixes().size(), parallelism);
         return fetchAllObjectsParallel(serverName, bucket, resolvedPrefix, maxObjects, pageCallback, first, parallelism);
     }
@@ -286,7 +286,7 @@ public class BucketeerService implements BucketeerUseCase {
             throw new RuntimeException(
                     "Parallel object listing failed: " + failure.get().getMessage(), failure.get());
         }
-        log.info("Parallel listing {}/{} '{}' completed: {} object(s){}",
+        log.debug("Parallel listing {}/{} '{}' completed: {} object(s){}",
                 serverName, bucket, resolvedPrefix, found, limitReached ? " (limit reached)" : "");
         return limitReached;
     }
