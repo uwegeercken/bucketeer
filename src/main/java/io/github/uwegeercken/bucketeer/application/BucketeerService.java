@@ -7,6 +7,7 @@ import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import io.github.uwegeercken.bucketeer.domain.template.PrefixTemplateEngine;
+import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,13 +42,16 @@ public class BucketeerService implements BucketeerUseCase {
     private final PrefixTemplateEngine templateEngine;
     private final S3Properties s3Properties;
     private final ThreadPoolTaskExecutor executor;
+    private final AppSettings appSettings;
 
     public BucketeerService(S3StoragePort s3StoragePort, PrefixTemplateEngine templateEngine,
-                            S3Properties s3Properties, ThreadPoolTaskExecutor executor) {
+                            S3Properties s3Properties, ThreadPoolTaskExecutor executor,
+                            AppSettings appSettings) {
         this.s3StoragePort = s3StoragePort;
         this.templateEngine = templateEngine;
         this.s3Properties = s3Properties;
         this.executor = executor;
+        this.appSettings = appSettings;
     }
 
     @Override
@@ -145,7 +149,7 @@ public class BucketeerService implements BucketeerUseCase {
     @Override
     public boolean fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
                                   long maxObjects, Consumer<ObjectListing> pageCallback) {
-        int parallelism = s3Properties.query() != null ? s3Properties.query().parallelism() : 0;
+        int parallelism = appSettings.getQueryParallelism();
         if (parallelism < 2) {
             return fetchAllObjectsSequential(serverName, bucket, resolvedPrefix, maxObjects, pageCallback);
         }

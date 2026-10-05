@@ -84,6 +84,12 @@ public class SettingsController {
                 duckDbRepository.updateQuackServer();
             }
         }
+        if (body.containsKey("queryParallelism")) {
+            Object val = body.get("queryParallelism");
+            if (val instanceof Number n) {
+                appSettings.setQueryParallelism(n.intValue());
+            }
+        }
         return ResponseEntity.ok(appSettings.toMap());
     }
 }

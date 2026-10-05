@@ -27,7 +27,8 @@ class SettingsControllerTest {
                 "snapshotRetentionDays", 30,
                 "timeZoneId", "Europe/Berlin",
                 "maxFileSizeMb", 100,
-                "maxRequestSizeMb", 500));
+                "maxRequestSizeMb", 500,
+                "queryParallelism", 8));
 
         Map<String, Object> body = controller.getSettings();
 
@@ -35,6 +36,7 @@ class SettingsControllerTest {
         assertThat(body.get("timeZoneId")).isEqualTo("Europe/Berlin");
         assertThat(body.get("maxFileSizeMb")).isEqualTo(100);
         assertThat(body.get("maxRequestSizeMb")).isEqualTo(500);
+        assertThat(body.get("queryParallelism")).isEqualTo(8);
         assertThat(body.get("systemTimeZoneId")).isEqualTo(java.time.ZoneId.systemDefault().getId());
         assertThat(body.get("timeZoneOptions")).asList().contains("UTC", "Europe/Berlin");
     }
@@ -90,12 +92,34 @@ class SettingsControllerTest {
         verify(duckDbRepository).updateQuackServer();
     }
 
+    @Test
+    @DisplayName("saveSettings applies the parallel listing worker count")
+    void saveSettingsAppliesQueryParallelism() {
+        when(appSettings.toMap()).thenReturn(Map.of("queryParallelism", 12));
+
+        ResponseEntity<Map<String, Object>> resp = controller.saveSettings(Map.of("queryParallelism", 12));
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(appSettings).setQueryParallelism(12);
+    }
+
+    @Test
+    @DisplayName("saveSettings accepts a negative parallel listing worker count to fall back to the yml default")
+    void saveSettingsAcceptsNegativeQueryParallelism() {
+        when(appSettings.toMap()).thenReturn(Map.of("queryParallelism", 4));
+
+        controller.saveSettings(Map.of("queryParallelism", -1));
+
+        verify(appSettings).setQueryParallelism(-1);
+    }
+
     private void verifyNoSettersCalled() {
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setSnapshotRetentionDays(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setTimeZoneId(org.mockito.Mockito.anyString());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setMaxFileSizeMb(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setMaxRequestSizeMb(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setDuckdbQuackEnabled(org.mockito.Mockito.anyBoolean());
+        org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setQueryParallelism(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(duckDbRepository, org.mockito.Mockito.never()).updateQuackServer();
     }
 }

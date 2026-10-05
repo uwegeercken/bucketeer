@@ -6,6 +6,7 @@ import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,17 +30,26 @@ class BucketeerServiceTest {
                     new S3Properties.Query(4), new S3Properties.Scan(10, 3));
 
     private S3StoragePort s3StoragePort;
+    private AppSettings appSettings;
     private BucketeerService service;
     private ThreadPoolTaskExecutor executor;
+
+    /** AppSettings stub that reports the given effective parallelism. */
+    private static AppSettings appSettingsWith(int parallelism) {
+        AppSettings settings = mock(AppSettings.class);
+        when(settings.getQueryParallelism()).thenReturn(parallelism);
+        return settings;
+    }
 
     @BeforeEach
     void setUp() {
         s3StoragePort = mock(S3StoragePort.class);
+        appSettings = appSettingsWith(4);
         executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
         executor.setMaxPoolSize(4);
         executor.initialize();
-        service = new BucketeerService(s3StoragePort, null, PROPERTIES, executor);
+        service = new BucketeerService(s3StoragePort, null, PROPERTIES, executor, appSettings);
     }
 
     @AfterEach
@@ -301,9 +311,8 @@ class BucketeerServiceTest {
     @Test
     @DisplayName("fetchAllObjects uses a sequential listing when parallelism is disabled")
     void fetchSequentialWhenParallelismDisabled() {
-        S3Properties noParallel =
-                new S3Properties("0.8.4", "2026-10-04", new S3Properties.Query(0), new S3Properties.Scan(10, 3));
-        BucketeerService seqService = new BucketeerService(s3StoragePort, null, noParallel, executor);
+        BucketeerService seqService =
+                new BucketeerService(s3StoragePort, null, PROPERTIES, executor, appSettingsWith(0));
         when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
                 .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
 
@@ -316,9 +325,7 @@ class BucketeerServiceTest {
         verify(s3StoragePort, never()).listObjectsWithLevel(anyString(), anyString(), anyString(), any(), anyLong());
 
         BucketeerService singleWorker =
-                new BucketeerService(s3StoragePort, null,
-                        new S3Properties("0.8.4", "2026-10-04", new S3Properties.Query(1), new S3Properties.Scan(10, 3)),
-                        executor);
+                new BucketeerService(s3StoragePort, null, PROPERTIES, executor, appSettingsWith(1));
         collected.clear();
         boolean oneLimit = singleWorker.fetchAllObjects("server", "bucket", "data/", 0,
                 page -> collected.addAll(page.objects()));
@@ -326,6 +333,23 @@ class BucketeerServiceTest {
         assertThat(oneLimit).isFalse();
         assertThat(collected.stream().map(S3Object::key)).containsExactly("data/a");
         verify(s3StoragePort, times(2)).listObjects(anyString(), anyString(), anyString(), isNull(), anyLong());
+        verify(s3StoragePort, never()).listObjectsWithLevel(anyString(), anyString(), anyString(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects prefers the runtime parallelism setting over the application.yml default")
+    void fetchUsesRuntimeParallelismOverYml() {
+        // PROPERTIES declares parallelism 4 (application.yml), the stored setting 1 must win
+        BucketeerService seqService =
+                new BucketeerService(s3StoragePort, null, PROPERTIES, executor, appSettingsWith(1));
+        when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
+                .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
+
+        List<S3Object> collected = new ArrayList<>();
+        seqService.fetchAllObjects("server", "bucket", "data/", 0,
+                page -> collected.addAll(page.objects()));
+
+        assertThat(collected).hasSize(1);
         verify(s3StoragePort, never()).listObjectsWithLevel(anyString(), anyString(), anyString(), any(), anyLong());
     }
 

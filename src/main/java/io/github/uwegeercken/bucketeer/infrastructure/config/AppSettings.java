@@ -5,6 +5,7 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -19,7 +20,16 @@ public class AppSettings {
 
     private static final Logger log = LoggerFactory.getLogger(AppSettings.class);
 
+    /** Upper bound for the parallel listing workers; matches BucketeerService's hard cap. */
+    public static final int MAX_QUERY_PARALLELISM = 32;
+
+    /** Stored value meaning "not set in the dialog - use the application.yml default". */
+    private static final int QUERY_PARALLELISM_UNSET = -1;
+
     private final Path settingsPath;
+
+    /** Default from {@code bucketeer.query.parallelism}, used while no dialog value is stored. */
+    private final int configuredQueryParallelism;
 
     private final ObjectMapper mapper = JsonMapper.builder()
             .enable(SerializationFeature.INDENT_OUTPUT).build();
@@ -28,14 +38,24 @@ public class AppSettings {
     private volatile int maxFileSizeMb = 100;
     private volatile int maxRequestSizeMb = 500;
     private volatile boolean duckdbQuackEnabled = false;
+    private volatile int queryParallelism = QUERY_PARALLELISM_UNSET;
 
-    public AppSettings() {
-        this(Path.of(System.getProperty("user.home"), ".bucketeer", "settings.json"));
+    @Autowired
+    public AppSettings(S3Properties s3Properties) {
+        this(Path.of(System.getProperty("user.home"), ".bucketeer", "settings.json"),
+                s3Properties != null && s3Properties.query() != null
+                        ? s3Properties.query().parallelism() : 0);
     }
 
     /** Package-private: settings file location injectable for tests. */
     AppSettings(Path settingsPath) {
+        this(settingsPath, 0);
+    }
+
+    /** Package-private: settings file location and yml default injectable for tests. */
+    AppSettings(Path settingsPath, int configuredQueryParallelism) {
         this.settingsPath = settingsPath;
+        this.configuredQueryParallelism = configuredQueryParallelism;
         load();
     }
 
@@ -89,13 +109,34 @@ public class AppSettings {
         save();
     }
 
+    /**
+     * Effective number of parallel listing workers. Returns the value stored from the
+     * settings dialog, or the {@code bucketeer.query.parallelism} default while unset.
+     * 0 and 1 both mean "always sequential".
+     */
+    public int getQueryParallelism() {
+        return queryParallelism >= 0 ? queryParallelism : configuredQueryParallelism;
+    }
+
+    /**
+     * Stores the parallel listing worker count (0..32). A negative value resets the
+     * setting to "not set", which makes the application.yml default apply again.
+     */
+    public void setQueryParallelism(int value) {
+        this.queryParallelism = value < 0
+                ? QUERY_PARALLELISM_UNSET
+                : Math.min(value, MAX_QUERY_PARALLELISM);
+        save();
+    }
+
     public Map<String, Object> toMap() {
         return Map.of(
                 "snapshotRetentionDays", snapshotRetentionDays,
                 "timeZoneId", timeZoneId,
                 "maxFileSizeMb", maxFileSizeMb,
                 "maxRequestSizeMb", maxRequestSizeMb,
-                "duckdbQuackEnabled", duckdbQuackEnabled);
+                "duckdbQuackEnabled", duckdbQuackEnabled,
+                "queryParallelism", getQueryParallelism());
     }
 
     private static boolean isValidZoneId(String id) {
@@ -129,6 +170,11 @@ public class AppSettings {
             if (mrs instanceof Number n) maxRequestSizeMb = clipMb(n.intValue());
             Object quack = data.get("duckdbQuackEnabled");
             if (quack instanceof Boolean b) duckdbQuackEnabled = b;
+            Object par = data.get("queryParallelism");
+            if (par instanceof Number n) {
+                int v = n.intValue();
+                queryParallelism = v < 0 ? QUERY_PARALLELISM_UNSET : Math.min(v, MAX_QUERY_PARALLELISM);
+            }
         } catch (tools.jackson.core.JacksonException e) {
             log.error("Failed to load settings from {}: {}", settingsPath, e.getMessage());
         }
@@ -143,6 +189,8 @@ public class AppSettings {
             data.put("maxFileSizeMb", maxFileSizeMb);
             data.put("maxRequestSizeMb", maxRequestSizeMb);
             data.put("duckdbQuackEnabled", duckdbQuackEnabled);
+            // raw value: -1 keeps the link to the application.yml default
+            data.put("queryParallelism", queryParallelism);
             mapper.writeValue(settingsPath.toFile(), data);
         } catch (IOException e) {
             log.error("Failed to save settings: {}", e.getMessage());        }

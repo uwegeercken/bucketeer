@@ -25,6 +25,9 @@ bucketeer:
   release-date: "2026-10-04"
   api-token: ""
   query:
+    # Default for the parallel listing workers; editable per instance in the Settings modal
+    # ("Parallel listing threads"). The stored value wins, until it is reset to this default.
+    # 0 or 1 forces sequential listing; max 32.
     parallelism: 4
   duckdb:
     quack:
