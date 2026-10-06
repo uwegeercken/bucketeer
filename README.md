@@ -34,13 +34,14 @@ java -jar target/bucketeer-0.8.4.jar
 
 Open [http://localhost:8444](http://localhost:8444).
 
-Default port is 8444 — change it without recompiling with `--server.port=9000` (or the `SERVER_PORT` environment variable). Use the [Docker/Podman](https://github.com/uwegeercken/bucketeer/wiki/Getting-Started) images for containerized deployments.
+Default port is 8444 — change it without recompiling with `--server.port=9000` (or the `SERVER_PORT` environment variable). Every property of `application.yml` can be set the same way; the complete list is in [Environment Variables](https://github.com/uwegeercken/bucketeer/wiki/Environment-Variables). Use the [Docker/Podman](https://github.com/uwegeercken/bucketeer/wiki/Getting-Started) images for containerized deployments.
 
 ## Documentation
 
 The full documentation lives in the [GitHub Wiki](https://github.com/uwegeercken/bucketeer/wiki).
 
 - [Getting Started](https://github.com/uwegeercken/bucketeer/wiki/Getting-Started) — run the app (jar, Docker/Podman), custom port, test data, encryption key
+- [Environment Variables](https://github.com/uwegeercken/bucketeer/wiki/Environment-Variables) — variables for the jar and the container image, with defaults and precedence
 - [Configuration](https://github.com/uwegeercken/bucketeer/wiki/Configuration) — application settings
 - [S3 Server Configuration](https://github.com/uwegeercken/bucketeer/wiki/S3-Server-Configuration) — add, edit and test S3 servers
 - [UI & Features](https://github.com/uwegeercken/bucketeer/wiki/UI-and-Features) — dark mode, upload, favorites & history, selection, move & delete, object tags, action history
