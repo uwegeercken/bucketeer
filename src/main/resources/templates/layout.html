@@ -1481,3 +1481,139 @@
         }
     </script>
 </th:block>
+<!-- Listing report modal fragment -->
+<th:block th:fragment="listingReportModal">
+    <div class="modal fade" id="listingReportModal" tabindex="-1" aria-labelledby="listingReportModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="listingReportModalLabel">
+                        <i class="bi bi-info-circle me-1"></i><span th:text="#{report.title}">Listing report</span>
+                    </h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="small">
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted" th:text="#{report.server}">Server</div>
+                            <div class="col-8 font-monospace" id="lrServer">--</div>
+                        </div>
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted" th:text="#{report.bucket}">Bucket</div>
+                            <div class="col-8 font-monospace" id="lrBucket">--</div>
+                        </div>
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted" th:text="#{report.prefix}">Prefix</div>
+                            <div class="col-8 font-monospace text-truncate" id="lrPrefix">--</div>
+                        </div>
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted" th:text="#{report.searchedAt}">Searched at</div>
+                            <div class="col-8" id="lrSearchedAt">--</div>
+                        </div>
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted" th:text="#{report.workers}">Threads</div>
+                            <div class="col-8" id="lrWorkers">--</div>
+                        </div>
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted" th:text="#{report.tactic}">Tactic</div>
+                            <div class="col-8">
+                                <span class="badge" id="lrTacticBadge">--</span>
+                                <span class="text-muted small" id="lrDecision"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-2"/>
+
+                    <div id="lrAnalysis" style="display:none;">
+                        <div class="panel-title" th:text="#{report.analysis}">Analysis</div>
+                        <div class="small mt-1">
+                            <div class="row mb-1">
+                                <div class="col-4 text-muted" th:text="#{report.median}">Median objects per prefix</div>
+                                <div class="col-8" id="lrMedian">--</div>
+                            </div>
+                            <div class="row mb-1">
+                                <div class="col-4 text-muted" th:text="#{report.samples}">Samples drawn</div>
+                                <div class="col-8" id="lrSamples">--</div>
+                            </div>
+                            <div class="row mb-1">
+                                <div class="col-4 text-muted" th:text="#{report.levelPrefixes}">Top-level prefixes</div>
+                                <div class="col-8" id="lrLevelPrefixes">--</div>
+                            </div>
+                            <div class="row mb-1">
+                                <div class="col-4 text-muted" th:text="#{report.cached}">Analysis reused from cache</div>
+                                <div class="col-8" id="lrCached">--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.close}">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const lrLabels = {
+            parallel:   /*[[#{report.tactic.parallel}]]*/ 'Parallel',
+            sequential: /*[[#{report.tactic.sequential}]]*/ 'Sequential',
+            decision: {
+                parallel:   /*[[#{report.decision.parallel}]]*/ 'Parallel (prefix analysis)',
+                balanced:   /*[[#{report.decision.balanced}]]*/ 'Sequential (prefix analysis)',
+                noSplit:    /*[[#{report.decision.noSplit}]]*/ 'Sequential (single top-level prefix)',
+                parallelism:/*[[#{report.decision.parallelism}]]*/ 'Sequential (parallelism disabled)',
+                fallback:   /*[[#{report.decision.fallback}]]*/ 'Sequential (fallback after failed analysis)'
+            },
+            cachedYes: /*[[#{report.cached.yes}]]*/ 'Yes',
+            cachedNo:  /*[[#{report.cached.no}]]*/ 'No'
+        };
+        let listingReport = null;
+
+        function updateListingReportButton() {
+            const btn = document.getElementById('btnListingReport');
+            if (btn) btn.style.display = listingReport ? '' : 'none';
+        }
+
+        function openListingReport() {
+            if (!listingReport) return;
+            document.getElementById('lrServer').textContent = listingReport.serverName || '';
+            document.getElementById('lrBucket').textContent = listingReport.bucket || '';
+            document.getElementById('lrPrefix').textContent = listingReport.prefix || '';
+            document.getElementById('lrSearchedAt').textContent =
+                formatBucketDateTime(listingReport.searchedAt) || listingReport.searchedAt || '';
+            document.getElementById('lrWorkers').textContent = String(listingReport.workers);
+            const badge = document.getElementById('lrTacticBadge');
+            const parallel = listingReport.decision === 'PARALLEL';
+            badge.textContent = parallel ? lrLabels.parallel : lrLabels.sequential;
+            badge.classList.remove('bg-success', 'bg-secondary');
+            badge.classList.add(parallel ? 'bg-success' : 'bg-secondary');
+            document.getElementById('lrDecision').textContent =
+                lrLabels.decision[decisionKey(listingReport.decision)] || '';
+
+            const hasAnalysis = listingReport.medianObjects != null;
+            document.getElementById('lrAnalysis').style.display = hasAnalysis ? '' : 'none';
+            if (hasAnalysis) {
+                document.getElementById('lrMedian').textContent = String(listingReport.medianObjects);
+                document.getElementById('lrSamples').textContent = String(listingReport.sampleCount);
+                document.getElementById('lrLevelPrefixes').textContent = String(listingReport.levelPrefixes);
+                document.getElementById('lrCached').textContent =
+                    listingReport.analysisCached ? lrLabels.cachedYes : lrLabels.cachedNo;
+            }
+
+            const modalEl = document.getElementById('listingReportModal');
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function decisionKey(decision) {
+            switch (decision) {
+                case 'PARALLEL':            return 'parallel';
+                case 'SEQUENTIAL_BALANCED': return 'balanced';
+                case 'SEQUENTIAL_NO_SPLIT': return 'noSplit';
+                case 'SEQUENTIAL_PARALLELISM': return 'parallelism';
+                default:                    return 'fallback';
+            }
+        }
+    </script>
+</th:block>

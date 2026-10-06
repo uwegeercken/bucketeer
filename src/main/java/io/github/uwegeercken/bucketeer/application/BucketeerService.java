@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -151,11 +152,19 @@ public class BucketeerService implements BucketeerUseCase {
 
     @Override
     public boolean fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
-                                  long maxObjects, Consumer<ObjectListing> pageCallback) {
+                                  long maxObjects, Consumer<ObjectListing> pageCallback,
+                                  Consumer<ListingReport> reportConsumer) {
+        Instant startedAt = Instant.now();
         int parallelism = appSettings.getQueryParallelism();
         if (parallelism < 2) {
+            log.debug("Listing tactic for {}/{} '{}': sequential (parallelism disabled)",
+                    serverName, bucket, resolvedPrefix);
+            reportConsumer.accept(new ListingReport(serverName, bucket, resolvedPrefix, startedAt,
+                    1, ListingReport.Decision.SEQUENTIAL_PARALLELISM, null, null, null, null));
             return fetchAllObjectsSequential(serverName, bucket, resolvedPrefix, maxObjects, pageCallback);
         }
+
+        int workers = Math.max(1, Math.min(parallelism, MAX_PARALLEL_WORKERS));
 
         LevelListing first;
         try {
@@ -163,14 +172,20 @@ public class BucketeerService implements BucketeerUseCase {
         } catch (RuntimeException e) {
             log.warn("Level scan for {}/{} '{}' failed ({}); using a sequential listing",
                     serverName, bucket, resolvedPrefix, e.getMessage());
+            reportConsumer.accept(new ListingReport(serverName, bucket, resolvedPrefix, startedAt,
+                    workers, ListingReport.Decision.SEQUENTIAL_FALLBACK, null, null, null, null));
             return fetchAllObjectsSequential(serverName, bucket, resolvedPrefix, maxObjects, pageCallback);
         }
 
         if (first.commonPrefixes() == null || first.commonPrefixes().size() <= 1) {
+            log.debug("Listing tactic for {}/{} '{}': sequential ({} top-level prefix(es), no split possible)",
+                    serverName, bucket, resolvedPrefix,
+                    first.commonPrefixes() == null ? 0 : first.commonPrefixes().size());
+            reportConsumer.accept(new ListingReport(serverName, bucket, resolvedPrefix, startedAt,
+                    workers, ListingReport.Decision.SEQUENTIAL_NO_SPLIT, null, null, null, null));
             return fetchAllObjectsSequential(serverName, bucket, resolvedPrefix, maxObjects, pageCallback);
         }
 
-        int workers = Math.max(1, Math.min(parallelism, MAX_PARALLEL_WORKERS));
         boolean parallel;
         try {
             PrefixProfile profile = prefixAnalyzer.profileFor(serverName, bucket, resolvedPrefix,
@@ -180,10 +195,16 @@ public class BucketeerService implements BucketeerUseCase {
                             + "{} sample(s), {} top-level prefix(es), {} worker(s))",
                     serverName, bucket, resolvedPrefix, parallel ? "parallel" : "sequential",
                     profile.medianObjects(), profile.sampleCount(), profile.levelPrefixes(), workers);
+            reportConsumer.accept(new ListingReport(serverName, bucket, resolvedPrefix, startedAt,
+                    workers, parallel ? ListingReport.Decision.PARALLEL : ListingReport.Decision.SEQUENTIAL_BALANCED,
+                    profile.medianObjects(), profile.sampleCount(), profile.levelPrefixes(),
+                    profile.cached()));
         } catch (RuntimeException e) {
             log.warn("Prefix analysis for {}/{} '{}' failed ({}); using a sequential listing",
                     serverName, bucket, resolvedPrefix, e.getMessage());
             parallel = false;
+            reportConsumer.accept(new ListingReport(serverName, bucket, resolvedPrefix, startedAt,
+                    workers, ListingReport.Decision.SEQUENTIAL_FALLBACK, null, null, null, null));
         }
         if (!parallel) {
             return fetchAllObjectsSequential(serverName, bucket, resolvedPrefix, maxObjects, pageCallback);

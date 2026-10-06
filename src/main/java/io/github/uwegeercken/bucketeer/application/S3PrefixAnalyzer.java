@@ -71,7 +71,7 @@ public class S3PrefixAnalyzer implements PrefixAnalyzer {
                 && !cached.cachedAt().plus(TTL).isBefore(clock.get())) {
             log.debug("Prefix analysis cache hit for {}/{} '{}' ({} sample(s))",
                     serverName, bucket, prefix, cached.profile().sampleCount());
-            return cached.profile();
+            return cached.profile().asCached();
         }
         PrefixProfile profile = sample(serverName, bucket, levelPrefixes, wanted, parallelism);
         cache.put(key, new CachedProfile(profile, clock.get()));

@@ -1,5 +1,6 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
+import io.github.uwegeercken.bucketeer.application.ListingReport;
 import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -302,6 +304,35 @@ class BucketeerControllerTest {
 
         assertThat(resp.get("ok")).isEqualTo(false);
         assertThat(resp.get("error").toString()).contains("maximum of 10");
+    }
+
+    @Test
+    @DisplayName("queryStatus includes the listing report of the finished query")
+    void queryStatusIncludesListingReport() {
+        QueryContext qc = new QueryContext();
+        qc.setListingReport(new ListingReport("server", "bucket", "data/",
+                Instant.parse("2026-10-06T09:30:00Z"), 4,
+                ListingReport.Decision.PARALLEL, 1000, 2, 2, false));
+        qc.done();
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute(QueryContext.SESSION_KEY)).thenReturn(qc);
+
+        Map<String, Object> resp = controller.queryStatus(session);
+
+        assertThat(resp.get("status")).isEqualTo("DONE");
+        assertThat(resp.get("report")).isSameAs(qc.getListingReport());
+    }
+
+    @Test
+    @DisplayName("queryStatus reports a null listing report without a query context")
+    void queryStatusWithoutContextHasNullReport() {
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute(QueryContext.SESSION_KEY)).thenReturn(null);
+
+        Map<String, Object> resp = controller.queryStatus(session);
+
+        assertThat(resp.get("status")).isEqualTo("IDLE");
+        assertThat(resp.get("report")).isNull();
     }
 
     private static class RecordingDuckDb extends DuckDbRepository {

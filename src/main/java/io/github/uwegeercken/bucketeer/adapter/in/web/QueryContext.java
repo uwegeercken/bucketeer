@@ -1,5 +1,7 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
+import io.github.uwegeercken.bucketeer.application.ListingReport;
+
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -17,12 +19,14 @@ public class QueryContext implements Serializable {
     private final AtomicLong objectsFound = new AtomicLong(0);
     private volatile boolean limitReached = false;
     private volatile String errorMessage;
+    private volatile ListingReport listingReport;
 
     public void start() {
         status = Status.RUNNING;
         objectsFound.set(0);
         limitReached = false;
         errorMessage = null;
+        listingReport = null;
     }
 
     public void incrementFound(long count) { objectsFound.addAndGet(count); }
@@ -31,8 +35,11 @@ public class QueryContext implements Serializable {
 
     public void limitReached()             { limitReached = true; }
 
+    public void setListingReport(ListingReport listingReport) { this.listingReport = listingReport; }
+
     public Status getStatus()       { return status; }
     public long getObjectsFound()   { return objectsFound.get(); }
     public boolean isLimitReached() { return limitReached; }
     public String getErrorMessage() { return errorMessage; }
+    public ListingReport getListingReport() { return listingReport; }
 }

@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -421,6 +422,140 @@ class BucketeerServiceTest {
         assertThat(collected.stream().map(S3Object::key)).containsExactly("root/1.txt");
         verify(s3StoragePort, never())
                 .listObjects(eq("server"), eq("bucket"), eq("a/"), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects captures a parallel report with analysis details")
+    void reportCapturesParallelAnalysis() {
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("root/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(obj("a/root.txt")), List.of("a/", "b/"), null, false));
+        when(s3StoragePort.listObjects(eq("server"), eq("bucket"), anyString(), any(), anyLong()))
+                .thenReturn(new ObjectListing(List.of(), null, false));
+        // the default profile in setUp prefers parallel (multi-page sub prefixes)
+
+        AtomicReference<ListingReport> reportRef = new AtomicReference<>();
+        service.fetchAllObjects("server", "bucket", "root/", 0,
+                page -> { }, reportRef::set);
+
+        ListingReport report = reportRef.get();
+        assertThat(report).isNotNull();
+        assertThat(report.serverName()).isEqualTo("server");
+        assertThat(report.bucket()).isEqualTo("bucket");
+        assertThat(report.prefix()).isEqualTo("root/");
+        assertThat(report.workers()).isEqualTo(4);
+        assertThat(report.decision()).isEqualTo(ListingReport.Decision.PARALLEL);
+        assertThat(report.parallel()).isTrue();
+        assertThat(report.medianObjects()).isEqualTo(BucketeerService.LISTING_PAGE);
+        assertThat(report.sampleCount()).isEqualTo(2);
+        assertThat(report.levelPrefixes()).isEqualTo(2);
+        assertThat(report.analysisCached()).isFalse();
+        assertThat(report.searchedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects captures a sequential report when the analysis prefers it")
+    void reportCapturesBalancedSequential() {
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("root/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(), List.of("a/", "b/"), null, false));
+        when(s3StoragePort.listObjects("server", "bucket", "root/", null, 0))
+                .thenReturn(new ObjectListing(List.of(obj("root/1.txt")), null, false));
+        // tiny sub prefixes in a wide scope: one flat stream wins
+        when(prefixAnalyzer.profileFor(anyString(), anyString(), anyString(), anyList(), anyInt(), anyInt()))
+                .thenReturn(PrefixProfile.of(1000, List.of(
+                        new PrefixProfile.Sample("a/", 3, false, 1),
+                        new PrefixProfile.Sample("b/", 3, false, 1)), Instant.now()));
+
+        AtomicReference<ListingReport> reportRef = new AtomicReference<>();
+        service.fetchAllObjects("server", "bucket", "root/", 0,
+                page -> { }, reportRef::set);
+
+        ListingReport report = reportRef.get();
+        assertThat(report.decision()).isEqualTo(ListingReport.Decision.SEQUENTIAL_BALANCED);
+        assertThat(report.parallel()).isFalse();
+        assertThat(report.workers()).isEqualTo(4);
+        assertThat(report.medianObjects()).isEqualTo(3);
+        assertThat(report.hasAnalysis()).isTrue();
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects captures a no-split report for a single top-level prefix")
+    void reportCapturesNoSplit() {
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("data/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(obj("data/a")), List.of("data/"), null, false));
+        when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
+                .thenReturn(new ObjectListing(List.of(), null, false));
+
+        AtomicReference<ListingReport> reportRef = new AtomicReference<>();
+        service.fetchAllObjects("server", "bucket", "data/", 0,
+                page -> { }, reportRef::set);
+
+        ListingReport report = reportRef.get();
+        assertThat(report.decision()).isEqualTo(ListingReport.Decision.SEQUENTIAL_NO_SPLIT);
+        assertThat(report.workers()).isEqualTo(4);
+        assertThat(report.hasAnalysis()).isFalse();
+        verify(prefixAnalyzer, never())
+                .profileFor(anyString(), anyString(), anyString(), anyList(), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects captures a parallelism-disabled report")
+    void reportCapturesParallelismDisabled() {
+        BucketeerService seqService =
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
+        when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
+                .thenReturn(new ObjectListing(List.of(), null, false));
+
+        AtomicReference<ListingReport> reportRef = new AtomicReference<>();
+        seqService.fetchAllObjects("server", "bucket", "data/", 0,
+                page -> { }, reportRef::set);
+
+        ListingReport report = reportRef.get();
+        assertThat(report.decision()).isEqualTo(ListingReport.Decision.SEQUENTIAL_PARALLELISM);
+        assertThat(report.workers()).isEqualTo(1);
+        assertThat(report.hasAnalysis()).isFalse();
+        verify(prefixAnalyzer, never())
+                .profileFor(anyString(), anyString(), anyString(), anyList(), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects captures a fallback report when the analysis fails")
+    void reportCapturesAnalysisFallback() {
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("root/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(), List.of("a/", "b/"), null, false));
+        when(s3StoragePort.listObjects("server", "bucket", "root/", null, 0))
+                .thenReturn(new ObjectListing(List.of(obj("root/1.txt")), null, false));
+        when(prefixAnalyzer.profileFor(anyString(), anyString(), anyString(), anyList(), anyInt(), anyInt()))
+                .thenThrow(new RuntimeException("sampling down"));
+
+        AtomicReference<ListingReport> reportRef = new AtomicReference<>();
+        service.fetchAllObjects("server", "bucket", "root/", 0,
+                page -> { }, reportRef::set);
+
+        ListingReport report = reportRef.get();
+        assertThat(report.decision()).isEqualTo(ListingReport.Decision.SEQUENTIAL_FALLBACK);
+        assertThat(report.workers()).isEqualTo(4);
+        assertThat(report.hasAnalysis()).isFalse();
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects reports a cached analysis as a cache hit")
+    void reportMarksCachedAnalysis() {
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("root/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(), List.of("a/", "b/"), null, false));
+        when(s3StoragePort.listObjects(eq("server"), eq("bucket"), anyString(), any(), anyLong()))
+                .thenReturn(new ObjectListing(List.of(), null, false));
+        when(prefixAnalyzer.profileFor(anyString(), anyString(), anyString(), anyList(), anyInt(), anyInt()))
+                .thenReturn(PrefixProfile.of(2, List.of(
+                        new PrefixProfile.Sample("a/", BucketeerService.LISTING_PAGE, false, 1),
+                        new PrefixProfile.Sample("b/", BucketeerService.LISTING_PAGE, false, 1)),
+                        Instant.now()).asCached());
+
+        AtomicReference<ListingReport> reportRef = new AtomicReference<>();
+        service.fetchAllObjects("server", "bucket", "root/", 0,
+                page -> { }, reportRef::set);
+
+        assertThat(reportRef.get().decision()).isEqualTo(ListingReport.Decision.PARALLEL);
+        assertThat(reportRef.get().analysisCached()).isTrue();
     }
 
     @Test

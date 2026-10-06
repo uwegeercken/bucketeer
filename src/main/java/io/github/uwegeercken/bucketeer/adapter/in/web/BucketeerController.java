@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -118,7 +119,8 @@ public class BucketeerController {
                                         .toList();
                                 duckDb.insertBatch(filtered);
                                 qc.incrementFound(filtered.size());
-                            });
+                            },
+                            qc::setListingReport);
                     if (limitReached) {
                         qc.limitReached();
                         log.info("Query limit of {} objects reached for {}/{}",
@@ -226,14 +228,21 @@ public class BucketeerController {
     public Map<String, Object> queryStatus(HttpSession session) {
         QueryContext qc = (QueryContext) session.getAttribute(QueryContext.SESSION_KEY);
         if (qc == null) {
-            return Map.of("status", "IDLE", "objectsFound", 0L, "error", "", "limitReached", false);
+            Map<String, Object> idle = new HashMap<>();
+            idle.put("status", "IDLE");
+            idle.put("objectsFound", 0L);
+            idle.put("error", "");
+            idle.put("limitReached", false);
+            idle.put("report", null);
+            return idle;
         }
-        return Map.of(
-                "status",       qc.getStatus().name(),
-                "objectsFound", qc.getObjectsFound(),
-                "limitReached", qc.isLimitReached(),
-                "error",        qc.getErrorMessage() != null ? qc.getErrorMessage() : ""
-        );
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", qc.getStatus().name());
+        result.put("objectsFound", qc.getObjectsFound());
+        result.put("limitReached", qc.isLimitReached());
+        result.put("error", qc.getErrorMessage() != null ? qc.getErrorMessage() : "");
+        result.put("report", qc.getListingReport());
+        return result;
     }
 
     @GetMapping(value = "/api/query/results", produces = MediaType.APPLICATION_JSON_VALUE)

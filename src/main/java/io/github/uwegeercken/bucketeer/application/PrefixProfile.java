@@ -28,6 +28,8 @@ import java.util.List;
  * @param maxObjects    most objects seen in a sample (page-capped)
  * @param measuredAt    when the samples were taken (cache freshness)
  * @param samples       the raw samples, kept for diagnostics and the future report
+ * @param cached        whether this profile was served from the analyzer cache instead of
+ *                      fresh samples (false for freshly measured profiles)
  */
 public record PrefixProfile(
         int levelPrefixes,
@@ -36,7 +38,8 @@ public record PrefixProfile(
         int minObjects,
         int maxObjects,
         Instant measuredAt,
-        List<Sample> samples
+        List<Sample> samples,
+        boolean cached
 ) {
     /** One sampled sub prefix: objects of its first page, page duration, truncation flag. */
     public record Sample(String prefix, int objects, boolean truncated, long durationMs) {
@@ -44,6 +47,11 @@ public record PrefixProfile(
 
     /** Builds a profile from raw samples; the median takes the lower middle value. */
     public static PrefixProfile of(int levelPrefixes, List<Sample> samples, Instant measuredAt) {
+        return of(levelPrefixes, samples, measuredAt, false);
+    }
+
+    /** Builds a profile from raw samples; the median takes the lower middle value. */
+    public static PrefixProfile of(int levelPrefixes, List<Sample> samples, Instant measuredAt, boolean cached) {
         List<Integer> counts = new ArrayList<>(samples.size());
         for (Sample sample : samples) {
             counts.add(sample.objects());
@@ -53,7 +61,13 @@ public record PrefixProfile(
         return new PrefixProfile(levelPrefixes, samples.size(), median,
                 counts.isEmpty() ? 0 : counts.getFirst(),
                 counts.isEmpty() ? 0 : counts.getLast(),
-                measuredAt, List.copyOf(samples));
+                measuredAt, List.copyOf(samples), cached);
+    }
+
+    /** Copy of this profile with the cache-hit flag set. */
+    public PrefixProfile asCached() {
+        return new PrefixProfile(levelPrefixes, sampleCount, medianObjects, minObjects,
+                maxObjects, measuredAt, samples, true);
     }
 
     /**

@@ -117,6 +117,10 @@
                         onclick="saveSnapshot()" th:title="#{snapshot.save}" disabled>
                     <i class="bi bi-camera"></i>
                 </button>
+                <button type="button" id="btnListingReport" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="openListingReport()" th:title="#{report.title}" style="display:none;">
+                    <i class="bi bi-info-circle"></i>
+                </button>
                 <button type="button" id="btnClearResults" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="clearResults()" th:title="#{btn.clearResults}">
                     <i class="bi bi-x-lg"></i>
@@ -303,6 +307,8 @@
     <th:block th:replace="~{layout :: deleteModal}"></th:block>
 
     <th:block th:replace="~{layout :: moveModal}"></th:block>
+
+    <th:block th:replace="~{layout :: listingReportModal}"></th:block>
 
     <th:block th:replace="~{layout :: rowContextMenu}"></th:block>
 
@@ -1122,6 +1128,8 @@
             stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
             statusText.classList.remove('text-warning');
+            listingReport = data.report || null;
+            updateListingReportButton();
             const timerEl = document.getElementById('queryTimer');
             const snapshotActive = typeof snapshotContext !== 'undefined' && snapshotContext !== null;
             if (data.objectsFound === 0) {
@@ -1148,6 +1156,8 @@
             stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
             statusText.classList.add('text-danger');
+            listingReport = data.report || null;
+            updateListingReportButton();
             statusText.textContent = labelQryErr + ' ' + data.error;
         }
     }
@@ -1498,6 +1508,8 @@
         sessionStorage.removeItem('bkt_sort_dir');
         sortBy = 'key';
         sortDir = 'asc';
+        listingReport = null;
+        updateListingReportButton();
         return true;
     }
 
