@@ -117,10 +117,6 @@
                         onclick="saveSnapshot()" th:title="#{snapshot.save}" disabled>
                     <i class="bi bi-camera"></i>
                 </button>
-                <button type="button" id="btnListingReport" class="btn btn-sm btn-outline-secondary btn-icon"
-                        onclick="openListingReport()" th:title="#{report.title}" style="display:none;">
-                    <i class="bi bi-info-circle"></i>
-                </button>
                 <button type="button" id="btnClearResults" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="clearResults()" th:title="#{btn.clearResults}">
                     <i class="bi bi-x-lg"></i>
@@ -138,6 +134,10 @@
                 <div class="spinner-border spinner-border-sm text-primary" id="querySpinner"></div>
                 <span class="text-muted small" id="queryStatusText" th:text="#{msg.queryRunning}">Loading...</span>
                 <span class="text-muted small" id="queryTimer" style="display:none;"></span>
+                <button type="button" id="btnListingReport" class="btn btn-sm btn-outline-secondary btn-icon"
+                        onclick="openListingReport()" th:title="#{report.title}" style="display:none;">
+                    <i class="bi bi-info-circle"></i>
+                </button>
             </div>
         </div>
 
@@ -371,11 +371,11 @@
 
     const FILTER_HISTORY_MAX = settingsValue('filterHistoryMax', 20, 500);
     const HISTORY_MAX  = settingsValue('historyMax', 50, 500);
-    const MAX_OBJECTS  = settingsValue('maxObjects', 0, 10000000);
-
     function setMaxObjectsInput() {
+        // read live from localStorage so a settings-dialog change applies to the very
+        // next search (a page-load const would stay stale until a reload)
         const el = document.getElementById('maxObjectsInput');
-        if (el) el.value = MAX_OBJECTS;
+        if (el) el.value = settingsValue('maxObjects', 0, 10000000);
     }
 
     // --- Bucket dropdown ---
