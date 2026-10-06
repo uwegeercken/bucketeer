@@ -234,12 +234,20 @@
                                 <span class="text-muted small" th:text="#{settings.maxObjects.hint}">Stop fetching after this many objects. 0 = unlimited.</span>
                             </div>
                         </div>
-                        <div class="mb-0">
+                        <div class="mb-3">
                             <label class="form-label fw-semibold small" th:text="#{settings.parallelism.label}">Parallel listing threads</label>
                             <div class="d-flex align-items-center gap-3">
                                 <input type="number" id="parallelismInput" class="form-control form-control-sm"
                                        style="width: 100px;" min="0" max="32" step="1"/>
                                 <span class="text-muted small" th:text="#{settings.parallelism.hint}">Worker threads for parallel listing (server-side, all browsers). 0 or 1 = always sequential.</span>
+                            </div>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold small" th:text="#{settings.samples.label}">Prefix analysis samples</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="number" id="sampleSizeInput" class="form-control form-control-sm"
+                                       style="width: 100px;" min="1" max="64" step="1"/>
+                                <span class="text-muted small" th:text="#{settings.samples.hint}">Samples used to analyse the prefix distribution before a query picks its listing tactic (server-side, all browsers).</span>
                             </div>
                         </div>
                     </div>
@@ -370,7 +378,8 @@
                 maxRequestSize: 500,
                 scanMaxPrefixes: 200,
                 scanMaxDepth: 10,
-                parallelism: 4
+                parallelism: 4,
+                samples: 8
             };
 
             function loadSettings() {
@@ -401,6 +410,9 @@
                 document.getElementById('parallelismInput').value =
                     (data && data.queryParallelism !== undefined && data.queryParallelism !== null)
                         ? data.queryParallelism : DEFAULTS.parallelism;
+                document.getElementById('sampleSizeInput').value =
+                    (data && data.querySampleSize !== undefined && data.querySampleSize !== null)
+                        ? data.querySampleSize : DEFAULTS.samples;
                 var duckdbQuackEl = document.getElementById('duckdbQuackEnabled');
                 if (duckdbQuackEl) duckdbQuackEl.checked = !!(data && data.duckdbQuackEnabled);
                 var tzSelect = document.getElementById('timeZoneSelect');
@@ -426,7 +438,7 @@
             function clearInvalid() {
                 var ids = ['pageSizeInput', 'maxObjectsInput', 'retentionDaysInput', 'historyMaxInput',
                            'filterHistoryMaxInput', 'maxFileSizeInput', 'maxRequestSizeInput',
-                           'scanMaxPrefixesInput', 'scanMaxDepthInput', 'parallelismInput'];
+                           'scanMaxPrefixesInput', 'scanMaxDepthInput', 'parallelismInput', 'sampleSizeInput'];
                 ids.forEach(function(id) {
                     document.getElementById(id).classList.remove('is-invalid');
                 });
@@ -450,6 +462,7 @@
                             maxFileSizeMb: DEFAULTS.maxFileSize,
                             maxRequestSizeMb: DEFAULTS.maxRequestSize,
                             queryParallelism: DEFAULTS.parallelism,
+                            querySampleSize: DEFAULTS.samples,
                             timeZoneOptions: detectedTz ? [detectedTz] : [],
                             systemTimeZoneId: detectedTz,
                             timeZoneId: detectedTz
@@ -469,7 +482,8 @@
                     maxRequestSizeInput: { min: 1, max: 2048 },
                     scanMaxPrefixesInput: { min: 10, max: 5000 },
                     scanMaxDepthInput: { min: 1, max: 50 },
-                    parallelismInput: { min: 0, max: 32 }
+                    parallelismInput: { min: 0, max: 32 },
+                    sampleSizeInput: { min: 1, max: 64 }
                 };
                 var values = {};
                 var valid = true;
@@ -504,7 +518,8 @@
                         maxFileSizeMb: values.maxFileSizeInput,
                         maxRequestSizeMb: values.maxRequestSizeInput,
                         duckdbQuackEnabled: duckdbQuackChecked(),
-                        queryParallelism: values.parallelismInput
+                        queryParallelism: values.parallelismInput,
+                        querySampleSize: values.sampleSizeInput
                     })
                 });
 
@@ -526,7 +541,8 @@
                         maxRequestSize: 'maxRequestSizeInput',
                         scanMaxPrefixes: 'scanMaxPrefixesInput',
                         scanMaxDepth: 'scanMaxDepthInput',
-                        parallelism: 'parallelismInput'
+                        parallelism: 'parallelismInput',
+                        samples: 'sampleSizeInput'
                     }[key]);
                     el.value = DEFAULTS[key];
                     el.classList.remove('is-invalid');
@@ -545,7 +561,8 @@
                         maxFileSizeMb: DEFAULTS.maxFileSize,
                         maxRequestSizeMb: DEFAULTS.maxRequestSize,
                         duckdbQuackEnabled: false,
-                        queryParallelism: DEFAULTS.parallelism
+                        queryParallelism: DEFAULTS.parallelism,
+                        querySampleSize: DEFAULTS.samples
                     })
                 });
                 var msg = document.getElementById('settingsSaveMsg');

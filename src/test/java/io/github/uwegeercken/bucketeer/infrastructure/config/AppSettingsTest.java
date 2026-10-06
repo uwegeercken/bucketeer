@@ -84,6 +84,68 @@ class AppSettingsTest {
                 .isZero();
     }
 
+    @Test
+    @DisplayName("querySampleSize defaults to 8 while nothing is stored")
+    void sampleSizeDefaultsToEight() {
+        AppSettings settings = new AppSettings(tempPath(), 4);
+
+        assertThat(settings.getQuerySampleSize())
+                .isEqualTo(AppSettings.DEFAULT_QUERY_SAMPLE_SIZE);
+        assertThat(settings.toMap()).containsEntry("querySampleSize", 8);
+    }
+
+    @Test
+    @DisplayName("querySampleSize stores a value from the settings dialog")
+    void sampleSizeStoresDialogValue() {
+        AppSettings settings = new AppSettings(tempPath(), 4);
+
+        settings.setQuerySampleSize(24);
+
+        assertThat(settings.getQuerySampleSize()).isEqualTo(24);
+    }
+
+    @Test
+    @DisplayName("querySampleSize is clamped to 1..64")
+    void sampleSizeIsClamped() {
+        AppSettings settings = new AppSettings(tempPath(), 4);
+
+        settings.setQuerySampleSize(500);
+        assertThat(settings.getQuerySampleSize())
+                .isEqualTo(AppSettings.MAX_QUERY_SAMPLE_SIZE);
+
+        settings.setQuerySampleSize(0);
+        assertThat(settings.getQuerySampleSize())
+                .as("0 is outside the supported range and becomes the minimum")
+                .isOne();
+    }
+
+    @Test
+    @DisplayName("a negative querySampleSize restores the default")
+    void negativeSampleSizeRestoresDefault() {
+        AppSettings settings = new AppSettings(tempPath(), 4);
+        settings.setQuerySampleSize(32);
+
+        settings.setQuerySampleSize(-1);
+
+        assertThat(settings.getQuerySampleSize())
+                .isEqualTo(AppSettings.DEFAULT_QUERY_SAMPLE_SIZE);
+    }
+
+    @Test
+    @DisplayName("querySampleSize survives a restart and keeps the reset marker")
+    void sampleSizeIsPersisted(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("settings.json");
+        AppSettings first = new AppSettings(file, 4);
+
+        first.setQuerySampleSize(16);
+        assertThat(new AppSettings(file, 4).getQuerySampleSize()).isEqualTo(16);
+
+        // unset must not be frozen into the file as a plain value
+        new AppSettings(file, 4).setQuerySampleSize(-1);
+        assertThat(new AppSettings(file, 4).getQuerySampleSize())
+                .isEqualTo(AppSettings.DEFAULT_QUERY_SAMPLE_SIZE);
+    }
+
     private static Path tempPath() {
         return Path.of(System.getProperty("java.io.tmpdir"),
                 "bucketeer-appsettings-" + System.nanoTime() + ".json");

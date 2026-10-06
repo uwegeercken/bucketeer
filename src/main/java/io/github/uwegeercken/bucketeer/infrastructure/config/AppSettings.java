@@ -23,8 +23,17 @@ public class AppSettings {
     /** Upper bound for the parallel listing workers; matches BucketeerService's hard cap. */
     public static final int MAX_QUERY_PARALLELISM = 32;
 
-    /** Stored value meaning "not set in the dialog - use the application.yml default". */
+    /** Upper bound for the prefix-analysis samples drawn per listing scope. */
+    public static final int MAX_QUERY_SAMPLE_SIZE = 64;
+
+    /** Sample count used while nothing is stored in the settings dialog. */
+    public static final int DEFAULT_QUERY_SAMPLE_SIZE = 8;
+
+    /** Stored value meaning "not set in the dialog - use the default". */
     private static final int QUERY_PARALLELISM_UNSET = -1;
+
+    /** Stored value meaning "not set in the dialog - use {@link #DEFAULT_QUERY_SAMPLE_SIZE}". */
+    private static final int QUERY_SAMPLE_SIZE_UNSET = -1;
 
     private final Path settingsPath;
 
@@ -39,6 +48,7 @@ public class AppSettings {
     private volatile int maxRequestSizeMb = 500;
     private volatile boolean duckdbQuackEnabled = false;
     private volatile int queryParallelism = QUERY_PARALLELISM_UNSET;
+    private volatile int querySampleSize = QUERY_SAMPLE_SIZE_UNSET;
 
     @Autowired
     public AppSettings(S3Properties s3Properties) {
@@ -129,6 +139,28 @@ public class AppSettings {
         save();
     }
 
+    /**
+     * Number of sub prefixes sampled by the prefix analysis before a listing starts.
+     * Returns the value stored from the settings dialog, or
+     * {@link #DEFAULT_QUERY_SAMPLE_SIZE} while unset. The analysis decides between a
+     * sequential and a parallel listing, so higher values buy accuracy at the cost of a
+     * few more analysis requests per cache miss.
+     */
+    public int getQuerySampleSize() {
+        return querySampleSize >= 0 ? querySampleSize : DEFAULT_QUERY_SAMPLE_SIZE;
+    }
+
+    /**
+     * Stores the prefix-analysis sample count (1..64). A negative value resets the
+     * setting to "not set", which makes {@link #DEFAULT_QUERY_SAMPLE_SIZE} apply again.
+     */
+    public void setQuerySampleSize(int value) {
+        this.querySampleSize = value < 0
+                ? QUERY_SAMPLE_SIZE_UNSET
+                : Math.max(1, Math.min(value, MAX_QUERY_SAMPLE_SIZE));
+        save();
+    }
+
     public Map<String, Object> toMap() {
         return Map.of(
                 "snapshotRetentionDays", snapshotRetentionDays,
@@ -136,7 +168,8 @@ public class AppSettings {
                 "maxFileSizeMb", maxFileSizeMb,
                 "maxRequestSizeMb", maxRequestSizeMb,
                 "duckdbQuackEnabled", duckdbQuackEnabled,
-                "queryParallelism", getQueryParallelism());
+                "queryParallelism", getQueryParallelism(),
+                "querySampleSize", getQuerySampleSize());
     }
 
     private static boolean isValidZoneId(String id) {
@@ -175,6 +208,12 @@ public class AppSettings {
                 int v = n.intValue();
                 queryParallelism = v < 0 ? QUERY_PARALLELISM_UNSET : Math.min(v, MAX_QUERY_PARALLELISM);
             }
+            Object samples = data.get("querySampleSize");
+            if (samples instanceof Number n) {
+                int v = n.intValue();
+                querySampleSize = v < 0 ? QUERY_SAMPLE_SIZE_UNSET
+                        : Math.max(1, Math.min(v, MAX_QUERY_SAMPLE_SIZE));
+            }
         } catch (tools.jackson.core.JacksonException e) {
             log.error("Failed to load settings from {}: {}", settingsPath, e.getMessage());
         }
@@ -191,6 +230,8 @@ public class AppSettings {
             data.put("duckdbQuackEnabled", duckdbQuackEnabled);
             // raw value: -1 keeps the link to the application.yml default
             data.put("queryParallelism", queryParallelism);
+            // raw value: -1 means "not set in the dialog"
+            data.put("querySampleSize", querySampleSize);
             mapper.writeValue(settingsPath.toFile(), data);
         } catch (IOException e) {
             log.error("Failed to save settings: {}", e.getMessage());        }

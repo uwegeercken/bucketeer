@@ -9,7 +9,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Browse &amp; search** — paginated results, client-side filtering by name (regular expressions), size and last-modified date, sortable columns
 - **Prefix templates** — build S3 prefixes dynamically with functions and date placeholders; functions can be nested and combined with literal suffixes
 - **Bucket prefix scan** — explore the common prefixes of any bucket level by level (breadcrumb with sub-prefix counts, load-more pagination), filter the list client-side, and adopt any prefix into the search field; limits configurable on the Settings page
-- **Fast search** — search and downloads benefit from a two-phase common-prefix scan: flat buckets are listed sequentially, highly-structured buckets are listed in parallel (worker threads), so results appear much faster
+- **Fast search** — every listing (search, download, snapshot, REST list) picks its tactic per query: a quick prefix analysis chooses between a sequential flat stream and a parallel per-prefix harvest (worker threads), so large sub-prefixes are fetched concurrently while many tiny prefixes stay on one stream — see [Parallel Listing](https://github.com/uwegeercken/bucketeer/wiki/Parallel-Listing)
 - **Settings dialog** — all configuration (Query, History, Snapshots, Timezone, Upload, Scan) is grouped into blocks and opened from the gear icon on any page
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
 - **Selection &amp; bulk download** — collect objects across queries as batches and download them all as a ZIP
@@ -48,6 +48,7 @@ The full documentation lives in the [GitHub Wiki](https://github.com/uwegeercken
 - [Prefix Templates](https://github.com/uwegeercken/bucketeer/wiki/Prefix-Templates) — syntax, references, functions, wildcard and chaining
 - [Prefix Template Examples](https://github.com/uwegeercken/bucketeer/wiki/Prefix-Template-Examples) — 12 worked examples
 - [Query & Filtering](https://github.com/uwegeercken/bucketeer/wiki/Query-and-Filtering) — how searches and filters work
+- [Parallel Listing](https://github.com/uwegeercken/bucketeer/wiki/Parallel-Listing) — per-query tactic decision, prefix sampling, worker pool and configuration
 - [Snapshots](https://github.com/uwegeercken/bucketeer/wiki/Snapshots) — save, compare, clean up, and load snapshots back into the results
 - [REST API](https://github.com/uwegeercken/bucketeer/wiki/REST-API) — read-only terminal/scripting API under `/api/v1/`
 - [Key Check](https://github.com/uwegeercken/bucketeer/wiki/Key-Check) — verify keys from a CSV against S3
@@ -83,6 +84,10 @@ EOF
 ```
 
 The server only ever binds **localhost** (`allow_other_hostname` is never set) and requires the token from the log — use the exact host string `quack:localhost:<port>` on both sides. Port (default `9494`) and a fixed token can be set via `bucketeer.duckdb.quack.port` / `bucketeer.duckdb.quack.token` in `application.yml`; an empty token is generated randomly at start. Quack is a **beta** protocol — Bucketeer pins the DuckDB JDBC version in `pom.xml` to absorb API changes. If a Quack client drops the in-memory `objects` table, Bucketeer detects it on the next access, logs an error and recreates the empty table — the cache refills with the next search.
+
+## Parallel listing
+
+Search, download, snapshot and REST-list operations decide per query between a **sequential** flat listing stream and a **parallel** harvest that lists every top-level prefix on its own worker thread. The choice is made from a small random sample of the prefixes (default 8, `querySampleSize` in the Settings dialog) and an estimate of the S3 round trips: splitting pays off only when a sub-prefix holds roughly `1000 / workers` objects or more, so thousands of tiny prefixes stay on one cheap stream while large sub-prefixes are fetched concurrently. Workers run on a dedicated per-search pool, so the configured parallelism is honoured exactly, and a failed analysis falls back to sequential listing. The result set is identical either way — only the speed differs. Full decision model, sampling cache and settings: [Parallel Listing (Wiki)](https://github.com/uwegeercken/bucketeer/wiki/Parallel-Listing).
 
 ## License
 

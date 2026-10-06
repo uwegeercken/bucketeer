@@ -11,16 +11,18 @@ import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -32,8 +34,9 @@ public class BucketeerService implements BucketeerUseCase {
     public static final int DEFAULT_SCAN_MAX_PREFIXES = 200;
     public static final int DEFAULT_SCAN_MAX_DEPTH = 10;
 
-    /** Page size used for level scans and per-prefix harvesting (S3 maxKeys cap). */
-    private static final int LISTING_PAGE = 1000;
+    /** Page size used for level scans and per-prefix harvesting (S3 maxKeys cap). Also the
+     *  page size assumed by {@link PrefixProfile#prefersParallel(int)}. */
+    static final int LISTING_PAGE = 1000;
 
     /** Upper bound for parallel harvesters regardless of the configured parallelism. */
     private static final int MAX_PARALLEL_WORKERS = 32;
@@ -41,16 +44,16 @@ public class BucketeerService implements BucketeerUseCase {
     private final S3StoragePort s3StoragePort;
     private final PrefixTemplateEngine templateEngine;
     private final S3Properties s3Properties;
-    private final ThreadPoolTaskExecutor executor;
+    private final PrefixAnalyzer prefixAnalyzer;
     private final AppSettings appSettings;
 
     public BucketeerService(S3StoragePort s3StoragePort, PrefixTemplateEngine templateEngine,
-                            S3Properties s3Properties, ThreadPoolTaskExecutor executor,
+                            S3Properties s3Properties, PrefixAnalyzer prefixAnalyzer,
                             AppSettings appSettings) {
         this.s3StoragePort = s3StoragePort;
         this.templateEngine = templateEngine;
         this.s3Properties = s3Properties;
-        this.executor = executor;
+        this.prefixAnalyzer = prefixAnalyzer;
         this.appSettings = appSettings;
     }
 
@@ -167,9 +170,25 @@ public class BucketeerService implements BucketeerUseCase {
             return fetchAllObjectsSequential(serverName, bucket, resolvedPrefix, maxObjects, pageCallback);
         }
 
-        log.debug("Parallel listing {}/{} '{}': {} top-level prefix(es), parallelism {}",
-                serverName, bucket, resolvedPrefix, first.commonPrefixes().size(), parallelism);
-        return fetchAllObjectsParallel(serverName, bucket, resolvedPrefix, maxObjects, pageCallback, first, parallelism);
+        int workers = Math.max(1, Math.min(parallelism, MAX_PARALLEL_WORKERS));
+        boolean parallel;
+        try {
+            PrefixProfile profile = prefixAnalyzer.profileFor(serverName, bucket, resolvedPrefix,
+                    first.commonPrefixes(), appSettings.getQuerySampleSize(), workers);
+            parallel = profile.prefersParallel(workers);
+            log.debug("Listing tactic for {}/{} '{}': {} (median {} object(s) per prefix, "
+                            + "{} sample(s), {} top-level prefix(es), {} worker(s))",
+                    serverName, bucket, resolvedPrefix, parallel ? "parallel" : "sequential",
+                    profile.medianObjects(), profile.sampleCount(), profile.levelPrefixes(), workers);
+        } catch (RuntimeException e) {
+            log.warn("Prefix analysis for {}/{} '{}' failed ({}); using a sequential listing",
+                    serverName, bucket, resolvedPrefix, e.getMessage());
+            parallel = false;
+        }
+        if (!parallel) {
+            return fetchAllObjectsSequential(serverName, bucket, resolvedPrefix, maxObjects, pageCallback);
+        }
+        return fetchAllObjectsParallel(serverName, bucket, resolvedPrefix, maxObjects, pageCallback, first, workers);
     }
 
     /**
@@ -202,16 +221,18 @@ public class BucketeerService implements BucketeerUseCase {
      * (own continuation token) and puts the pages into the same queue. The {@link Consumer} is only ever
      * invoked from this thread (single-writer), so callers that mutate shared state stay safe. A shared
      * stop flag keeps the listing from running on after {@code maxObjects} is reached.
+     * The workers run on a dedicated fixed pool of exactly {@code workers} daemon threads
+     * ("s3-list-*") that is torn down when the listing ends, so the configured worker
+     * count is honoured regardless of any other executor in the application.
      */
     private boolean fetchAllObjectsParallel(String serverName, String bucket, String resolvedPrefix,
                                             long maxObjects, Consumer<ObjectListing> pageCallback,
-                                            LevelListing first, int parallelism) {
+                                            LevelListing first, int workers) {
         BlockingQueue<ObjectListing> pages = new LinkedBlockingQueue<>();
         BlockingQueue<String> work = new LinkedBlockingQueue<>();
         AtomicBoolean stop = new AtomicBoolean(false);
         AtomicBoolean workDone = new AtomicBoolean(false);
         AtomicReference<Throwable> failure = new AtomicReference<>();
-        int workers = Math.max(1, Math.min(parallelism, MAX_PARALLEL_WORKERS));
         CountDownLatch done = new CountDownLatch(workers);
 
         Runnable worker = () -> {
@@ -242,49 +263,69 @@ public class BucketeerService implements BucketeerUseCase {
                 done.countDown();
             }
         };
-        for (int i = 0; i < workers; i++) {
-            executor.execute(worker);
-        }
+        // A dedicated pool per listing guarantees that exactly `workers` threads run: a
+        // shared pool with core/max/queue sizing creates threads beyond the core size only
+        // once its queue is full, which silently under-provisions the harvesters.
+        AtomicInteger threadSeq = new AtomicInteger();
+        ExecutorService pool = Executors.newFixedThreadPool(workers, runnable -> {
+            Thread thread = new Thread(runnable, "s3-list-" + threadSeq.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        });
 
         long found = 0;
         boolean limitReached = false;
-
         LevelListing level = first;
-        while (level != null && !stop.get() && failure.get() == null) {
-            for (String subPrefix : level.commonPrefixes()) {
-                work.offer(subPrefix);
+        try {
+            for (int i = 0; i < workers; i++) {
+                pool.execute(worker);
             }
-            pages.offer(new ObjectListing(level.objects(), null, false));
-            found = drainAvailable(pages, pageCallback, found, maxObjects, stop);
-            if (maxObjects > 0 && found >= maxObjects) {
-                limitReached = true;
-                stop.set(true);
-                break;
-            }
-            level = needsMore(level)
-                    ? s3StoragePort.listObjectsWithLevel(serverName, bucket, resolvedPrefix,
-                    level.nextContinuationToken(), LISTING_PAGE)
-                    : null;
-        }
-        workDone.set(true);
 
-        while (!stop.get() && done.getCount() > 0) {
-            found = drainAvailable(pages, pageCallback, found, maxObjects, stop);
-            if (maxObjects > 0 && found >= maxObjects) {
-                limitReached = true;
-                stop.set(true);
-                break;
-            }
-            try {
-                if (done.await(200, TimeUnit.MILLISECONDS)) {
+            while (level != null && !stop.get() && failure.get() == null) {
+                for (String subPrefix : level.commonPrefixes()) {
+                    work.offer(subPrefix);
+                }
+                pages.offer(new ObjectListing(level.objects(), null, false));
+                found = drainAvailable(pages, pageCallback, found, maxObjects, stop);
+                if (maxObjects > 0 && found >= maxObjects) {
+                    limitReached = true;
+                    stop.set(true);
                     break;
                 }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Parallel object listing interrupted", e);
+                level = needsMore(level)
+                        ? s3StoragePort.listObjectsWithLevel(serverName, bucket, resolvedPrefix,
+                        level.nextContinuationToken(), LISTING_PAGE)
+                        : null;
             }
+            workDone.set(true);
+
+            while (!stop.get() && done.getCount() > 0) {
+                found = drainAvailable(pages, pageCallback, found, maxObjects, stop);
+                if (maxObjects > 0 && found >= maxObjects) {
+                    limitReached = true;
+                    stop.set(true);
+                    break;
+                }
+                try {
+                    if (done.await(200, TimeUnit.MILLISECONDS)) {
+                        break;
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Parallel object listing interrupted", e);
+                }
+            }
+            // workers can finish before the first drain inside the loop ever sees their
+            // pages, so the limit has to be evaluated after the final drain as well
+            found = drainAvailable(pages, pageCallback, found, maxObjects, stop);
+            if (maxObjects > 0 && found >= maxObjects) {
+                limitReached = true;
+                stop.set(true);
+            }
+        } finally {
+            stop.set(true);
+            pool.shutdownNow();
         }
-        found = drainAvailable(pages, pageCallback, found, maxObjects, stop);
 
         if (failure.get() != null) {
             throw new RuntimeException(

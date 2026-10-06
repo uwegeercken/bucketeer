@@ -8,16 +8,17 @@ import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
 import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,12 +33,13 @@ class BucketeerServiceTest {
     private S3StoragePort s3StoragePort;
     private AppSettings appSettings;
     private BucketeerService service;
-    private ThreadPoolTaskExecutor executor;
+    private PrefixAnalyzer prefixAnalyzer;
 
     /** AppSettings stub that reports the given effective parallelism. */
     private static AppSettings appSettingsWith(int parallelism) {
         AppSettings settings = mock(AppSettings.class);
         when(settings.getQueryParallelism()).thenReturn(parallelism);
+        when(settings.getQuerySampleSize()).thenReturn(AppSettings.DEFAULT_QUERY_SAMPLE_SIZE);
         return settings;
     }
 
@@ -45,16 +47,15 @@ class BucketeerServiceTest {
     void setUp() {
         s3StoragePort = mock(S3StoragePort.class);
         appSettings = appSettingsWith(4);
-        executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(4);
-        executor.initialize();
-        service = new BucketeerService(s3StoragePort, null, PROPERTIES, executor, appSettings);
-    }
-
-    @AfterEach
-    void tearDown() {
-        executor.shutdown();
+        prefixAnalyzer = mock(PrefixAnalyzer.class);
+        // default: a scope that pays off in parallel (multi-page sub prefixes)
+        when(prefixAnalyzer.profileFor(anyString(), anyString(), anyString(),
+                anyList(), anyInt(), anyInt()))
+                .thenReturn(PrefixProfile.of(2, List.of(
+                        new PrefixProfile.Sample("a/", BucketeerService.LISTING_PAGE, false, 1),
+                        new PrefixProfile.Sample("b/", BucketeerService.LISTING_PAGE, false, 1)),
+                        Instant.now()));
+        service = new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettings);
     }
 
     @Test
@@ -312,7 +313,7 @@ class BucketeerServiceTest {
     @DisplayName("fetchAllObjects uses a sequential listing when parallelism is disabled")
     void fetchSequentialWhenParallelismDisabled() {
         BucketeerService seqService =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, executor, appSettingsWith(0));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(0));
         when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
                 .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
 
@@ -325,7 +326,7 @@ class BucketeerServiceTest {
         verify(s3StoragePort, never()).listObjectsWithLevel(anyString(), anyString(), anyString(), any(), anyLong());
 
         BucketeerService singleWorker =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, executor, appSettingsWith(1));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
         collected.clear();
         boolean oneLimit = singleWorker.fetchAllObjects("server", "bucket", "data/", 0,
                 page -> collected.addAll(page.objects()));
@@ -341,7 +342,7 @@ class BucketeerServiceTest {
     void fetchUsesRuntimeParallelismOverYml() {
         // PROPERTIES declares parallelism 4 (application.yml), the stored setting 1 must win
         BucketeerService seqService =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, executor, appSettingsWith(1));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
         when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
                 .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
 
@@ -351,6 +352,112 @@ class BucketeerServiceTest {
 
         assertThat(collected).hasSize(1);
         verify(s3StoragePort, never()).listObjectsWithLevel(anyString(), anyString(), anyString(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects lists sequentially when the prefix analysis prefers it")
+    void fetchSequentialWhenAnalysisPrefersIt() {
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("root/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(), List.of("a/", "b/"), null, false));
+        when(s3StoragePort.listObjects("server", "bucket", "root/", null, 0))
+                .thenReturn(new ObjectListing(List.of(obj("root/1.txt")), "tok", true));
+        when(s3StoragePort.listObjects("server", "bucket", "root/", "tok", 0))
+                .thenReturn(new ObjectListing(List.of(obj("root/2.txt")), null, false));
+        // tiny sub prefixes in a wide scope: one flat stream beats one request per prefix
+        when(prefixAnalyzer.profileFor(anyString(), anyString(), anyString(), anyList(), anyInt(), anyInt()))
+                .thenReturn(PrefixProfile.of(1000, List.of(
+                        new PrefixProfile.Sample("a/", 3, false, 1),
+                        new PrefixProfile.Sample("b/", 3, false, 1)), Instant.now()));
+
+        List<S3Object> collected = new ArrayList<>();
+        boolean limit = service.fetchAllObjects("server", "bucket", "root/", 0,
+                page -> collected.addAll(page.objects()));
+
+        assertThat(limit).isFalse();
+        assertThat(collected.stream().map(S3Object::key).toList())
+                .containsExactly("root/1.txt", "root/2.txt");
+        // the flat stream follows the continuation token and never splits into prefixes
+        verify(s3StoragePort).listObjects("server", "bucket", "root/", "tok", 0);
+        verify(s3StoragePort, never())
+                .listObjects(eq("server"), eq("bucket"), eq("a/"), any(), anyLong());
+        // the analysis sees the first level page, the sample count and the worker count
+        verify(prefixAnalyzer).profileFor("server", "bucket", "root/",
+                List.of("a/", "b/"), AppSettings.DEFAULT_QUERY_SAMPLE_SIZE, 4);
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects skips the prefix analysis when parallelism is below 2")
+    void fetchSkipsAnalysisWhenParallelismDisabled() {
+        BucketeerService seqService =
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
+        when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
+                .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
+
+        List<S3Object> collected = new ArrayList<>();
+        seqService.fetchAllObjects("server", "bucket", "data/", 0,
+                page -> collected.addAll(page.objects()));
+
+        assertThat(collected).hasSize(1);
+        verify(prefixAnalyzer, never())
+                .profileFor(anyString(), anyString(), anyString(), anyList(), anyInt(), anyInt());
+        verify(s3StoragePort, never()).listObjectsWithLevel(anyString(), anyString(), anyString(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects falls back to a sequential listing when the analysis fails")
+    void fetchSequentialWhenAnalysisFails() {
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("root/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(), List.of("a/", "b/"), null, false));
+        when(s3StoragePort.listObjects("server", "bucket", "root/", null, 0))
+                .thenReturn(new ObjectListing(List.of(obj("root/1.txt")), null, false));
+        when(prefixAnalyzer.profileFor(anyString(), anyString(), anyString(), anyList(), anyInt(), anyInt()))
+                .thenThrow(new RuntimeException("sampling down"));
+
+        List<S3Object> collected = new ArrayList<>();
+        boolean limit = service.fetchAllObjects("server", "bucket", "root/", 0,
+                page -> collected.addAll(page.objects()));
+
+        assertThat(limit).isFalse();
+        assertThat(collected.stream().map(S3Object::key)).containsExactly("root/1.txt");
+        verify(s3StoragePort, never())
+                .listObjects(eq("server"), eq("bucket"), eq("a/"), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects runs the configured number of workers concurrently")
+    void fetchParallelRunsConfiguredWorkerCount() {
+        List<String> prefixes = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            prefixes.add("p%02d/".formatted(i));
+        }
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("root/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(), prefixes, null, false));
+
+        CountDownLatch gate = new CountDownLatch(4);
+        AtomicInteger active = new AtomicInteger();
+        AtomicInteger maxActive = new AtomicInteger();
+        when(s3StoragePort.listObjects(anyString(), anyString(), anyString(), any(), anyLong()))
+                .thenAnswer(invocation -> {
+                    int now = active.incrementAndGet();
+                    maxActive.accumulateAndGet(now, Math::max);
+                    gate.countDown();
+                    try {
+                        // hold this slot until four workers are inside a listing at once
+                        gate.await(3, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    active.decrementAndGet();
+                    return new ObjectListing(List.of(), null, false);
+                });
+
+        service.fetchAllObjects("server", "bucket", "root/", 0, page -> { });
+
+        assertThat(maxActive.get())
+                .as("the configured parallelism must actually run as concurrent workers")
+                .isGreaterThanOrEqualTo(4);
+        verify(s3StoragePort, times(20))
+                .listObjects(anyString(), eq("bucket"), anyString(), any(), anyLong());
     }
 
     private static S3Object obj(String key) {

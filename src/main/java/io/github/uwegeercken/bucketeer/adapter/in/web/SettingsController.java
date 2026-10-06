@@ -90,6 +90,12 @@ public class SettingsController {
                 appSettings.setQueryParallelism(n.intValue());
             }
         }
+        if (body.containsKey("querySampleSize")) {
+            Object val = body.get("querySampleSize");
+            if (val instanceof Number n) {
+                appSettings.setQuerySampleSize(n.intValue());
+            }
+        }
         return ResponseEntity.ok(appSettings.toMap());
     }
 }

@@ -113,6 +113,27 @@ class SettingsControllerTest {
         verify(appSettings).setQueryParallelism(-1);
     }
 
+    @Test
+    @DisplayName("saveSettings applies the prefix analysis sample count")
+    void saveSettingsAppliesQuerySampleSize() {
+        when(appSettings.toMap()).thenReturn(Map.of("querySampleSize", 16));
+
+        ResponseEntity<Map<String, Object>> resp = controller.saveSettings(Map.of("querySampleSize", 16));
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(appSettings).setQuerySampleSize(16);
+    }
+
+    @Test
+    @DisplayName("saveSettings accepts a negative sample count to fall back to the default")
+    void saveSettingsAcceptsNegativeQuerySampleSize() {
+        when(appSettings.toMap()).thenReturn(Map.of("querySampleSize", 8));
+
+        controller.saveSettings(Map.of("querySampleSize", -1));
+
+        verify(appSettings).setQuerySampleSize(-1);
+    }
+
     private void verifyNoSettersCalled() {
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setSnapshotRetentionDays(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setTimeZoneId(org.mockito.Mockito.anyString());
@@ -120,6 +141,7 @@ class SettingsControllerTest {
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setMaxRequestSizeMb(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setDuckdbQuackEnabled(org.mockito.Mockito.anyBoolean());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setQueryParallelism(org.mockito.Mockito.anyInt());
+        org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setQuerySampleSize(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(duckDbRepository, org.mockito.Mockito.never()).updateQuackServer();
     }
 }
