@@ -229,7 +229,7 @@
                         <div class="mb-3">
                             <label class="form-label fw-semibold small" th:text="#{settings.maxObjects.label}">Max objects per query</label>
                             <div class="d-flex align-items-center gap-3">
-                                <input type="number" id="maxObjectsInput" class="form-control form-control-sm"
+                                <input type="number" id="maxObjectsSettingInput" class="form-control form-control-sm"
                                        style="width: 130px;" min="0" max="10000000" step="1000"/>
                                 <span class="text-muted small" th:text="#{settings.maxObjects.hint}">Stop fetching after this many objects. 0 = unlimited.</span>
                             </div>
@@ -390,7 +390,7 @@
             function fillLocalStorageFields() {
                 var settings = loadSettings();
                 document.getElementById('pageSizeInput').value = settings.pageSize || DEFAULTS.pageSize;
-                document.getElementById('maxObjectsInput').value = settings.maxObjects !== undefined ? settings.maxObjects : DEFAULTS.maxObjects;
+                document.getElementById('maxObjectsSettingInput').value = settings.maxObjects !== undefined ? settings.maxObjects : DEFAULTS.maxObjects;
                 document.getElementById('historyMaxInput').value = settings.historyMax !== undefined ? settings.historyMax : DEFAULTS.historyMax;
                 document.getElementById('filterHistoryMaxInput').value = settings.filterHistoryMax !== undefined ? settings.filterHistoryMax : DEFAULTS.filterHistoryMax;
                 document.getElementById('scanMaxPrefixesInput').value = settings.scanMaxPrefixes !== undefined ? settings.scanMaxPrefixes : DEFAULTS.scanMaxPrefixes;
@@ -436,7 +436,7 @@
             }
 
             function clearInvalid() {
-                var ids = ['pageSizeInput', 'maxObjectsInput', 'retentionDaysInput', 'historyMaxInput',
+                var ids = ['pageSizeInput', 'maxObjectsSettingInput', 'retentionDaysInput', 'historyMaxInput',
                            'filterHistoryMaxInput', 'maxFileSizeInput', 'maxRequestSizeInput',
                            'scanMaxPrefixesInput', 'scanMaxDepthInput', 'parallelismInput', 'sampleSizeInput'];
                 ids.forEach(function(id) {
@@ -474,7 +474,7 @@
             window.saveSettings = function() {
                 var fields = {
                     pageSizeInput: { min: 10, max: 1000 },
-                    maxObjectsInput: { min: 0, max: 10000000 },
+                    maxObjectsSettingInput: { min: 0, max: 10000000 },
                     retentionDaysInput: { min: 0, max: 365 },
                     historyMaxInput: { min: 0, max: 500 },
                     filterHistoryMaxInput: { min: 0, max: 500 },
@@ -502,7 +502,7 @@
 
                 var settings = loadSettings();
                 settings.pageSize = values.pageSizeInput;
-                settings.maxObjects = values.maxObjectsInput;
+                settings.maxObjects = values.maxObjectsSettingInput;
                 settings.historyMax = values.historyMaxInput;
                 settings.filterHistoryMax = values.filterHistoryMaxInput;
                 settings.scanMaxPrefixes = values.scanMaxPrefixesInput;
@@ -534,7 +534,7 @@
                     if (key === 'retentionDays') return;
                     var el = document.getElementById({
                         pageSize: 'pageSizeInput',
-                        maxObjects: 'maxObjectsInput',
+                        maxObjects: 'maxObjectsSettingInput',
                         historyMax: 'historyMaxInput',
                         filterHistoryMax: 'filterHistoryMaxInput',
                         maxFileSize: 'maxFileSizeInput',
