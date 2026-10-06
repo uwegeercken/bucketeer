@@ -31,6 +31,15 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.9.0 <small class="text-muted">2026-10-06</small></h6>
+                    <ul>
+                        <li><strong>Documented environment variables</strong>: every runtime variable (parallel-query workers, prefix-analysis sample size, API token, encryption key, Quack server port and token, and more) is documented with defaults and precedence on one page in the README and the wiki &mdash; for the jar and the container image alike</li>
+                        <li><strong>Improved parallel processing</strong>: list operations (search, ZIP downloads, snapshots, REST list endpoint) pick the best listing tactic per query &mdash; a quick, cached prefix analysis (configurable sample size, default 8) decides between the sequential flat stream and a parallel per-prefix harvest with a configurable worker count (<code>bucketeer.query.parallelism</code>); the same result set arrives with far fewer S3 requests on deeply nested buckets</li>
+                        <li><strong>Listing report</strong>: after a search finishes, an info icon next to the result status opens a report showing server, bucket, resolved prefix, search time, worker count and whether the listing ran sequentially or in parallel &mdash; with the reason (prefix analysis, a single top-level prefix, disabled parallelism, or a fallback) and, when an analysis ran, the measured median objects per prefix, the sample count and whether the analysis was reused from the cache</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.8.4 <small class="text-muted">2026-10-04</small></h6>
                     <ul>
                         <li><strong>DuckDB-Quack remote access</strong>: an optional Quack server exposes Bucketeer&rsquo;s in-memory result cache to a second DuckDB process (e.g. the DuckDB CLI) &mdash; query the objects of the last search over localhost without an export. Enable it in the Settings dialog (section <em>DuckDB</em>); the server binds only localhost, authenticates callers with a token and logs the connection URI, the token and ready-made <code>ATTACH</code> / query samples at start. Port and a fixed token can be set via <code>bucketeer.duckdb.quack.port</code> / <code>bucketeer.duckdb.quack.token</code>; an empty token is generated randomly on every start</li>

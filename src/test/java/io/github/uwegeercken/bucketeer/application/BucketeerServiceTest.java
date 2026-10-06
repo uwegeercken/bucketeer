@@ -28,7 +28,7 @@ import static org.mockito.Mockito.*;
 class BucketeerServiceTest {
 
     private static final S3Properties PROPERTIES =
-            new S3Properties("0.8.4", "2026-10-04",
+            new S3Properties("0.9.0", "2026-10-06",
                     new S3Properties.Query(4), new S3Properties.Scan(10, 3));
 
     private S3StoragePort s3StoragePort;
