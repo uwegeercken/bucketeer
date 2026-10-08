@@ -112,6 +112,9 @@ public class BucketeerController {
                             finalServer, finalBucket, finalS3Prefix,
                             Math.max(0, maxObjects),
                             page -> {
+                                if (qc.isCancelled()) {
+                                    throw new QueryCancelledException();
+                                }
                                 List<S3Object> filtered = page.objects().stream()
                                         .filter(obj -> !obj.key().endsWith("/"))
                                         .filter(obj -> finalKeyFilter == null ||
@@ -126,7 +129,16 @@ public class BucketeerController {
                         log.info("Query limit of {} objects reached for {}/{}",
                                 maxObjects, finalServer, finalBucket);
                     }
-                    qc.done();
+                    // the cancel endpoint may have set CANCELLED while this page was
+                    // in flight - do not overwrite it with DONE
+                    if (qc.isCancelled()) {
+                        qc.markCancelled();
+                    } else {
+                        qc.done();
+                    }
+                } catch (QueryCancelledException e) {
+                    log.info("Query cancelled for {}/{} '{}'", finalServer, finalBucket, finalS3Prefix);
+                    qc.markCancelled();
                 } catch (Exception e) {
                     log.error("Query failed for server {}/{}: {}", finalServer, finalBucket, e.getMessage());
                     qc.error(e.getMessage());
@@ -227,6 +239,27 @@ public class BucketeerController {
     @ResponseBody
     public Map<String, Object> queryStatus(HttpSession session) {
         QueryContext qc = (QueryContext) session.getAttribute(QueryContext.SESSION_KEY);
+        return statusPayload(qc);
+    }
+
+    /**
+     * Aborts the currently running search. No-op when there is no query context or the
+     * query already reached a terminal state. The status flips to CANCELLED immediately
+     * so the browser can react without waiting for the fetch loop to notice; the running
+     * task confirms the transition idempotently and never overwrites it with DONE.
+     */
+    @PostMapping(value = "/api/query/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> cancelQuery(HttpSession session) {
+        QueryContext qc = (QueryContext) session.getAttribute(QueryContext.SESSION_KEY);
+        if (qc != null && qc.getStatus() == QueryContext.Status.RUNNING) {
+            qc.cancel();
+            qc.markCancelled();
+        }
+        return statusPayload(qc);
+    }
+
+    private static Map<String, Object> statusPayload(QueryContext qc) {
         if (qc == null) {
             Map<String, Object> idle = new HashMap<>();
             idle.put("status", "IDLE");

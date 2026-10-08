@@ -28,7 +28,7 @@ import static org.mockito.Mockito.*;
 class BucketeerServiceTest {
 
     private static final S3Properties PROPERTIES =
-            new S3Properties("0.9.0", "2026-10-06",
+            new S3Properties("0.9.1", "2026-10-08",
                     new S3Properties.Query(4), new S3Properties.Scan(10, 3));
 
     private S3StoragePort s3StoragePort;
@@ -308,6 +308,43 @@ class BucketeerServiceTest {
                 page -> collected.addAll(page.objects())))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("boom");
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects stops immediately when the page callback aborts a sequential listing")
+    void fetchSequentialAbortsWhenCallbackThrows() {
+        BucketeerService seqService =
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
+        when(s3StoragePort.listObjects(eq("server"), eq("bucket"), eq("data/"), any(), anyLong()))
+                .thenReturn(new ObjectListing(List.of(obj("data/a")), "tok1", true),
+                        new ObjectListing(List.of(obj("data/b")), null, false));
+
+        AtomicInteger pages = new AtomicInteger();
+        assertThatThrownBy(() -> seqService.fetchAllObjects("server", "bucket", "data/", 0,
+                page -> {
+                    if (pages.incrementAndGet() > 1) {
+                        throw new RuntimeException("cancel");
+                    }
+                }))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("cancel");
+
+        // the loop must not run on after the callback aborts
+        verify(s3StoragePort, times(2)).listObjects(eq("server"), eq("bucket"), eq("data/"), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("fetchAllObjects tears the workers down cleanly when the page callback aborts a parallel listing")
+    void fetchParallelAbortsWhenCallbackThrows() {
+        when(s3StoragePort.listObjectsWithLevel(eq("server"), eq("bucket"), eq("root/"), any(), anyLong()))
+                .thenReturn(new LevelListing(List.of(), List.of("a/", "b/"), null, false));
+        when(s3StoragePort.listObjects(eq("server"), eq("bucket"), anyString(), any(), anyLong()))
+                .thenReturn(new ObjectListing(List.of(obj("a/1.txt"), obj("a/2.txt")), null, false));
+
+        assertThatThrownBy(() -> service.fetchAllObjects("server", "bucket", "root/", 0,
+                page -> { throw new RuntimeException("cancel"); }))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("cancel");
     }
 
     @Test

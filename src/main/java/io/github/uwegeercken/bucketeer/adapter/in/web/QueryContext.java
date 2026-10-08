@@ -13,11 +13,12 @@ public class QueryContext implements Serializable {
 
     public static final String SESSION_KEY = "bucketeer_query_context";
 
-    public enum Status { IDLE, RUNNING, DONE, ERROR }
+    public enum Status { IDLE, RUNNING, DONE, ERROR, CANCELLED }
 
     private volatile Status status = Status.IDLE;
     private final AtomicLong objectsFound = new AtomicLong(0);
     private volatile boolean limitReached = false;
+    private volatile boolean cancelled = false;
     private volatile String errorMessage;
     private volatile ListingReport listingReport;
 
@@ -25,6 +26,7 @@ public class QueryContext implements Serializable {
         status = Status.RUNNING;
         objectsFound.set(0);
         limitReached = false;
+        cancelled = false;
         errorMessage = null;
         listingReport = null;
     }
@@ -32,6 +34,10 @@ public class QueryContext implements Serializable {
     public void incrementFound(long count) { objectsFound.addAndGet(count); }
     public void done()                     { status = Status.DONE; }
     public void error(String message)      { status = Status.ERROR; errorMessage = message; }
+    public void markCancelled()            { status = Status.CANCELLED; }
+
+    /** Flags the running query as cancelled; the fetch loop observes this between pages. */
+    public void cancel()                   { cancelled = true; }
 
     public void limitReached()             { limitReached = true; }
 
@@ -40,6 +46,7 @@ public class QueryContext implements Serializable {
     public Status getStatus()       { return status; }
     public long getObjectsFound()   { return objectsFound.get(); }
     public boolean isLimitReached() { return limitReached; }
+    public boolean isCancelled()    { return cancelled; }
     public String getErrorMessage() { return errorMessage; }
     public ListingReport getListingReport() { return listingReport; }
 }

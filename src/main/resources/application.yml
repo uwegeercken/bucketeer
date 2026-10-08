@@ -21,8 +21,8 @@ server:
   port: 8444
 
 bucketeer:
-  version: "0.9.0"
-  release-date: "2026-10-06"
+  version: "0.9.1"
+  release-date: "2026-10-08"
   api-token: ""
   query:
     # Default for the parallel listing workers; editable per instance in the Settings modal

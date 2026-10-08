@@ -29,7 +29,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.9.0.jar
+java -jar target/bucketeer-0.9.1.jar
 ```
 
 Open [http://localhost:8444](http://localhost:8444).

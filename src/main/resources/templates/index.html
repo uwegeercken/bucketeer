@@ -326,6 +326,9 @@
     const labelObjTotal  = /*[[#{msg.objectsTotal}]]*/ 'objects loaded.';
     const labelNoObj     = /*[[#{msg.noObjects}]]*/ 'No objects found.';
     const labelQryErr    = /*[[#{msg.queryError}]]*/ 'Error:';
+    const labelQryCancelled = /*[[#{msg.queryCancelled}]]*/ 'Query cancelled';
+    const labelSearch    = /*[[#{label.search}]]*/ 'Search';
+    const labelCancelQuery = /*[[#{btn.cancelQuery}]]*/ 'Abort query';
     const labelObjMatch  = /*[[#{msg.objectsMatching}]]*/ 'objects matching filter';
     const labelPage      = /*[[#{msg.page}]]*/ 'page';
     const labelPrev      = /*[[#{btn.prev}]]*/ '\u2190 Previous';
@@ -459,7 +462,7 @@
                     errorEl.style.display = 'block';
                     prefixEl.classList.add('is-invalid');
                     prefixEl.classList.remove('is-valid');
-                    searchBtn.disabled = true;
+                    if (!queryActive) searchBtn.disabled = true;
                     setResolvedPopover('');
                 }
             }).catch(() => {});
@@ -1118,15 +1121,49 @@
         }, 500);
     }
 
+    // The search button doubles as the cancel button while a query is running:
+    // search icon -> starts the query and switches to a cancel icon,
+    // cancel icon -> aborts the running query.
+    let queryActive = false;
+
+    function setSearchButtonMode(running) {
+        const btn = document.getElementById('searchBtn');
+        if (!btn) return;
+        const icon = btn.querySelector('i.bi');
+        queryActive = running;
+        btn.title = running ? labelCancelQuery : labelSearch;
+        btn.setAttribute('aria-label', running ? labelCancelQuery : labelSearch);
+        if (icon) {
+            icon.classList.toggle('bi-search', !running);
+            icon.classList.toggle('bi-x-circle', running);
+        }
+    }
+
+    async function cancelQuery() {
+        try {
+            const res  = await fetch('/api/query/cancel', { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'CANCELLED' || data.status === 'DONE' || data.status === 'ERROR') {
+                handleQueryResult(data);
+            } else {
+                setSearchButtonMode(true);
+            }
+        } catch (e) {
+            setSearchButtonMode(true);
+        }
+    }
+
     function handleQueryResult(data) {
         const statusText = document.getElementById('queryStatusText');
         if (data.status === 'RUNNING') {
             statusText.classList.remove('text-warning');
             statusText.textContent = data.objectsFound + ' ' + labelObjFound;
+            setSearchButtonMode(true);
         } else if (data.status === 'DONE') {
             clearInterval(pollInterval);
             stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
+            setSearchButtonMode(false);
             statusText.classList.remove('text-warning');
             listingReport = data.report || null;
             updateListingReportButton();
@@ -1155,10 +1192,20 @@
             clearInterval(pollInterval);
             stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
+            setSearchButtonMode(false);
             statusText.classList.add('text-danger');
             listingReport = data.report || null;
             updateListingReportButton();
             statusText.textContent = labelQryErr + ' ' + data.error;
+        } else if (data.status === 'CANCELLED') {
+            clearInterval(pollInterval);
+            stopTimer();
+            document.getElementById('querySpinner').style.display = 'none';
+            setSearchButtonMode(false);
+            statusText.classList.add('text-warning');
+            listingReport = null;
+            updateListingReportButton();
+            statusText.textContent = data.objectsFound + ' ' + labelObjTotal + ' \u2013 ' + labelQryCancelled;
         }
     }
 
@@ -1496,6 +1543,10 @@
     const CONFETTI_COLORS = ['#f44336', '#ff9800', '#ffeb3b', '#4caf50', '#2196f3', '#9c27b0', '#00bcd4', '#e91e63'];
 
     function handleFormSubmit() {
+        if (queryActive) {
+            cancelQuery();
+            return false;
+        }
         const key = document.getElementById('keyInput').value.trim().toLowerCase();
         if (SECRET_KEYS.includes(key)) {
             launchEasterEgg();

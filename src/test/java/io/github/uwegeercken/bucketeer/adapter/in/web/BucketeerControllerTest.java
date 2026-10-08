@@ -13,15 +13,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.ui.Model;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -333,6 +339,87 @@ class BucketeerControllerTest {
 
         assertThat(resp.get("status")).isEqualTo("IDLE");
         assertThat(resp.get("report")).isNull();
+    }
+
+    @Test
+    @DisplayName("cancelQuery aborts a running query and reports CANCELLED")
+    void cancelRunningQueryMarksCancelled() {
+        QueryContext qc = new QueryContext();
+        qc.start();
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute(QueryContext.SESSION_KEY)).thenReturn(qc);
+
+        Map<String, Object> resp = controller.cancelQuery(session);
+
+        assertThat(resp.get("status")).isEqualTo("CANCELLED");
+        assertThat(qc.isCancelled()).isTrue();
+        assertThat(qc.getObjectsFound()).isZero();
+        assertThat(resp.get("error")).isEqualTo("");
+    }
+
+    @Test
+    @DisplayName("cancelQuery is a no-op without a query context")
+    void cancelWithoutContextIsIdle() {
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute(QueryContext.SESSION_KEY)).thenReturn(null);
+
+        Map<String, Object> resp = controller.cancelQuery(session);
+
+        assertThat(resp.get("status")).isEqualTo("IDLE");
+    }
+
+    @Test
+    @DisplayName("cancelQuery leaves a finished query untouched")
+    void cancelFinishedQueryIsNoOp() {
+        QueryContext qc = new QueryContext();
+        qc.start();
+        qc.done();
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute(QueryContext.SESSION_KEY)).thenReturn(qc);
+
+        Map<String, Object> resp = controller.cancelQuery(session);
+
+        assertThat(resp.get("status")).isEqualTo("DONE");
+        assertThat(qc.isCancelled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a cancelled search task marks the query context CANCELLED, not ERROR")
+    void cancelledSearchTaskMarksContextCancelled() {
+        when(useCase.availableFunctions()).thenReturn(List.of());
+        when(useCase.fetchAllObjects(any(), any(), any(), anyLong(), any(), any()))
+                .thenAnswer(inv -> { throw new QueryCancelledException(); });
+        HttpSession session = mock(HttpSession.class);
+        AtomicReference<QueryContext> controllerQc = new AtomicReference<>();
+        doAnswer(inv -> {
+            controllerQc.set(inv.getArgument(1));
+            return null;
+        }).when(session).setAttribute(eq(QueryContext.SESSION_KEY), any());
+
+        BucketeerController c = new BucketeerController(useCase, storage,
+                new SessionContext() {
+                    @Override
+                    public String getSelectedServer() {
+                        return "server";
+                    }
+                }, duckDb, new ThreadPoolTaskExecutor() {
+                    @Override
+                    public void execute(Runnable task) {
+                        task.run();
+                    }
+                }, new RecordingActionHistory(), appSettings);
+        c.index("bucket", "data/", null, true, 0, session, mock(Model.class));
+
+        verify(useCase, org.mockito.Mockito.atLeastOnce())
+                .fetchAllObjects(any(), any(), any(), anyLong(), any(), any());
+
+        assertThat(controllerQc.get()).isNotNull();
+        assertThat(controllerQc.get().getStatus()).isEqualTo(QueryContext.Status.CANCELLED);
+
+        when(session.getAttribute(QueryContext.SESSION_KEY)).thenReturn(controllerQc.get());
+        Map<String, Object> resp = controller.queryStatus(session);
+        assertThat(resp.get("status")).isEqualTo("CANCELLED");
+        assertThat(resp.get("error")).isEqualTo("");
     }
 
     private static class RecordingDuckDb extends DuckDbRepository {
