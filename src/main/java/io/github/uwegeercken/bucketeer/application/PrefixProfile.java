@@ -8,9 +8,9 @@ import java.util.List;
  * Measured object distribution across the sub prefixes of one listing scope.
  *
  * <p>Produced by a {@link PrefixAnalyzer} before the listing starts and used to pick the
- * cheaper of the two listing tactics: one flat paginated stream (sequential) or one
+ * cheaper of the two listing strategys: one flat paginated stream (sequential) or one
  * recursive listing per top-level prefix (parallel). The comparison is made on request
- * counts because both tactics transfer the same payload - only the number of S3 round
+ * counts because both strategys transfer the same payload - only the number of S3 round
  * trips differs. Sequential issues roughly {@code ceil(prefixes * objects / page)}
  * requests, parallel issues {@code prefixes * ceil(objects / page)} requests that run on
  * {@code parallelism} workers. That makes splitting worthwhile only when the average

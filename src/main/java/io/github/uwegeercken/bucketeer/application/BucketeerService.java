@@ -157,7 +157,7 @@ public class BucketeerService implements BucketeerUseCase {
         Instant startedAt = Instant.now();
         int parallelism = appSettings.getQueryParallelism();
         if (parallelism < 2) {
-            log.debug("Listing tactic for {}/{} '{}': sequential (parallelism disabled)",
+            log.debug("Listing strategy for {}/{} '{}': sequential (parallelism disabled)",
                     serverName, bucket, resolvedPrefix);
             reportConsumer.accept(new ListingReport(serverName, bucket, resolvedPrefix, startedAt,
                     1, ListingReport.Decision.SEQUENTIAL_PARALLELISM, null, null, null, null));
@@ -178,7 +178,7 @@ public class BucketeerService implements BucketeerUseCase {
         }
 
         if (first.commonPrefixes() == null || first.commonPrefixes().size() <= 1) {
-            log.debug("Listing tactic for {}/{} '{}': sequential ({} top-level prefix(es), no split possible)",
+            log.debug("Listing strategy for {}/{} '{}': sequential ({} top-level prefix(es), no split possible)",
                     serverName, bucket, resolvedPrefix,
                     first.commonPrefixes() == null ? 0 : first.commonPrefixes().size());
             reportConsumer.accept(new ListingReport(serverName, bucket, resolvedPrefix, startedAt,
@@ -191,7 +191,7 @@ public class BucketeerService implements BucketeerUseCase {
             PrefixProfile profile = prefixAnalyzer.profileFor(serverName, bucket, resolvedPrefix,
                     first.commonPrefixes(), appSettings.getQuerySampleSize(), workers);
             parallel = profile.prefersParallel(workers);
-            log.debug("Listing tactic for {}/{} '{}': {} (median {} object(s) per prefix, "
+            log.debug("Listing strategy for {}/{} '{}': {} (median {} object(s) per prefix, "
                             + "{} sample(s), {} top-level prefix(es), {} worker(s))",
                     serverName, bucket, resolvedPrefix, parallel ? "parallel" : "sequential",
                     profile.medianObjects(), profile.sampleCount(), profile.levelPrefixes(), workers);

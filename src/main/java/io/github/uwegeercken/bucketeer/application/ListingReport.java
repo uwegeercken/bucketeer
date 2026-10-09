@@ -4,7 +4,7 @@ import java.io.Serializable;
 import java.time.Instant;
 
 /**
- * Describes how one listing query was executed: which listing tactic (sequential vs.
+ * Describes how one listing query was executed: which listing strategy (sequential vs.
  * parallel) was chosen, with how many workers, and - when a prefix analysis ran - how
  * the distribution was measured. Produced inside {@link BucketeerService#fetchAllObjects}
  * in every branch and handed to an optional report consumer, which the session search
@@ -14,7 +14,7 @@ import java.time.Instant;
  * UI can explain <em>why</em> a query ran sequentially (parallelism disabled, a single
  * top-level prefix, or a fallback after a failed analysis).
  *
- * @param decision        which tactic was chosen and why
+ * @param decision        which strategy was chosen and why
  * @param workers         effective worker count considered for the listing
  *                        (1 when parallelism is disabled)
  * @param medianObjects   median objects per sampled sub prefix, only when an analysis ran

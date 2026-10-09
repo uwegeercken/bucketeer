@@ -247,7 +247,7 @@
                             <div class="d-flex align-items-center gap-3">
                                 <input type="number" id="sampleSizeInput" class="form-control form-control-sm"
                                        style="width: 100px;" min="1" max="64" step="1"/>
-                                <span class="text-muted small" th:text="#{settings.samples.hint}">Samples used to analyse the prefix distribution before a query picks its listing tactic (server-side, all browsers).</span>
+                                <span class="text-muted small" th:text="#{settings.samples.hint}">Samples used to analyse the prefix distribution before a query picks its listing strategy (server-side, all browsers).</span>
                             </div>
                         </div>
                     </div>
@@ -1494,33 +1494,31 @@
                             aria-label="Close" th:aria-label="#{btn.close}"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="small">
-                        <div class="row mb-1">
-                            <div class="col-4 text-muted" th:text="#{report.server}">Server</div>
-                            <div class="col-8 font-monospace" id="lrServer">--</div>
-                        </div>
-                        <div class="row mb-1">
-                            <div class="col-4 text-muted" th:text="#{report.bucket}">Bucket</div>
-                            <div class="col-8 font-monospace" id="lrBucket">--</div>
-                        </div>
-                        <div class="row mb-1">
-                            <div class="col-4 text-muted" th:text="#{report.prefix}">Prefix</div>
-                            <div class="col-8 font-monospace text-truncate" id="lrPrefix">--</div>
-                        </div>
-                        <div class="row mb-1">
-                            <div class="col-4 text-muted" th:text="#{report.searchedAt}">Searched at</div>
-                            <div class="col-8" id="lrSearchedAt">--</div>
-                        </div>
-                        <div class="row mb-1">
-                            <div class="col-4 text-muted" th:text="#{report.workers}">Threads</div>
-                            <div class="col-8" id="lrWorkers">--</div>
-                        </div>
-                        <div class="row mb-1">
-                            <div class="col-4 text-muted" th:text="#{report.tactic}">Tactic</div>
-                            <div class="col-8">
-                                <span class="badge" id="lrTacticBadge">--</span>
-                                <span class="text-muted small" id="lrDecision"></span>
-                            </div>
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted" th:text="#{report.server}">Server</div>
+                        <div class="col-8" id="lrServer">--</div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted" th:text="#{report.bucket}">Bucket</div>
+                        <div class="col-8" id="lrBucket">--</div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted" th:text="#{report.prefix}">Prefix</div>
+                        <div class="col-8 text-truncate" id="lrPrefix">--</div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted" th:text="#{report.searchedAt}">Searched at</div>
+                        <div class="col-8" id="lrSearchedAt">--</div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted" th:text="#{report.workers}">Threads</div>
+                        <div class="col-8" id="lrWorkers">--</div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted" th:text="#{report.tactic}">Strategy</div>
+                        <div class="col-8">
+                            <span class="badge" id="lrTacticBadge">--</span>
+                            <span id="lrDecision"></span>
                         </div>
                     </div>
 
@@ -1528,7 +1526,7 @@
 
                     <div id="lrAnalysis" style="display:none;">
                         <div class="panel-title" th:text="#{report.analysis}">Analysis</div>
-                        <div class="small mt-1">
+                        <div class="mt-1">
                             <div class="row mb-1">
                                 <div class="col-4 text-muted" th:text="#{report.median}">Median objects per prefix</div>
                                 <div class="col-8" id="lrMedian">--</div>
@@ -1560,11 +1558,11 @@
             parallel:   /*[[#{report.tactic.parallel}]]*/ 'Parallel',
             sequential: /*[[#{report.tactic.sequential}]]*/ 'Sequential',
             decision: {
-                parallel:   /*[[#{report.decision.parallel}]]*/ 'Parallel (prefix analysis)',
-                balanced:   /*[[#{report.decision.balanced}]]*/ 'Sequential (prefix analysis)',
-                noSplit:    /*[[#{report.decision.noSplit}]]*/ 'Sequential (single top-level prefix)',
-                parallelism:/*[[#{report.decision.parallelism}]]*/ 'Sequential (parallelism disabled)',
-                fallback:   /*[[#{report.decision.fallback}]]*/ 'Sequential (fallback after failed analysis)'
+                parallel:   /*[[#{report.decision.parallel}]]*/ '(prefix analysis)',
+                balanced:   /*[[#{report.decision.balanced}]]*/ '(prefix analysis)',
+                noSplit:    /*[[#{report.decision.noSplit}]]*/ '(single top-level prefix)',
+                parallelism:/*[[#{report.decision.parallelism}]]*/ '(parallelism disabled)',
+                fallback:   /*[[#{report.decision.fallback}]]*/ '(fallback after failed analysis)'
             },
             cachedYes: /*[[#{report.cached.yes}]]*/ 'Yes',
             cachedNo:  /*[[#{report.cached.no}]]*/ 'No'

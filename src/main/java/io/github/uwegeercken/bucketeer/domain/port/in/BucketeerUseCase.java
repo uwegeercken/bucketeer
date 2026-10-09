@@ -57,7 +57,7 @@ public interface BucketeerUseCase {
     /**
      * Fetches ALL objects for the given prefix, paginating through all S3 pages.
      * The pageCallback is called after each S3 page with the objects from that page.
-     * Once the listing tactic has been decided (or skipped), the reportConsumer is
+     * Once the listing strategy has been decided (or skipped), the reportConsumer is
      * handed a {@link io.github.uwegeercken.bucketeer.application.ListingReport} that
      * describes how the query ran.
      *
@@ -66,7 +66,7 @@ public interface BucketeerUseCase {
      * @param resolvedPrefix the resolved prefix
      * @param maxObjects     stop after this many objects (0 = no limit)
      * @param pageCallback   called after each page with the objects from that page
-     * @param reportConsumer receives the tactic report for this query (always invoked once)
+     * @param reportConsumer receives the strategy report for this query (always invoked once)
      * @return true if the maxObjects limit was reached before all pages were fetched
      */
     boolean fetchAllObjects(String serverName, String bucket, String resolvedPrefix,
