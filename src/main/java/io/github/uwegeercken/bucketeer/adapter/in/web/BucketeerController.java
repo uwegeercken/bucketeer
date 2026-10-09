@@ -267,6 +267,8 @@ public class BucketeerController {
             idle.put("error", "");
             idle.put("limitReached", false);
             idle.put("report", null);
+            idle.put("startedAt", null);
+            idle.put("finishedAt", null);
             return idle;
         }
         Map<String, Object> result = new HashMap<>();
@@ -275,6 +277,8 @@ public class BucketeerController {
         result.put("limitReached", qc.isLimitReached());
         result.put("error", qc.getErrorMessage() != null ? qc.getErrorMessage() : "");
         result.put("report", qc.getListingReport());
+        result.put("startedAt", qc.getStartedAt() != null ? qc.getStartedAt().toString() : null);
+        result.put("finishedAt", qc.getFinishedAt() != null ? qc.getFinishedAt().toString() : null);
         return result;
     }
 

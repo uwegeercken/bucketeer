@@ -1158,6 +1158,9 @@
         if (data.status === 'RUNNING') {
             statusText.classList.remove('text-warning');
             statusText.textContent = data.objectsFound + ' ' + labelObjFound;
+            // recalibrate against the server start time, so the live timer stays
+            // truthful when the page was reloaded while the query was still running
+            if (data.startedAt) queryStartTime = Date.parse(data.startedAt);
             setSearchButtonMode(true);
         } else if (data.status === 'DONE') {
             clearInterval(pollInterval);
@@ -1185,8 +1188,15 @@
                 document.getElementById('filterForm').style.display = 'block';
                 loadResults();
             }
-            if (!snapshotActive && queryStartTime) {
-                timerEl.textContent = '[' + formatClock(new Date()) + '] \u00b7 ' + formatElapsed(Date.now() - queryStartTime);
+            if (!snapshotActive) {
+                // the server keeps the authoritative start/finish timestamps, so the
+                // duration and finish clock survive page reloads (e.g. after visiting
+                // the snapshots page); fall back to the live timer values when absent
+                const startMs = data.startedAt ? Date.parse(data.startedAt) : queryStartTime;
+                if (startMs) {
+                    const finishMs = data.finishedAt ? Date.parse(data.finishedAt) : Date.now();
+                    timerEl.textContent = '[' + formatClock(new Date(finishMs)) + '] \u00b7 ' + formatElapsed(finishMs - startMs);
+                }
             }
         } else if (data.status === 'ERROR') {
             clearInterval(pollInterval);

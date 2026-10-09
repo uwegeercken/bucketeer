@@ -3,6 +3,7 @@ package io.github.uwegeercken.bucketeer.adapter.in.web;
 import io.github.uwegeercken.bucketeer.application.ListingReport;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -21,18 +22,22 @@ public class QueryContext implements Serializable {
     private volatile boolean cancelled = false;
     private volatile String errorMessage;
     private volatile ListingReport listingReport;
+    private volatile Instant startedAt;
+    private volatile Instant finishedAt;
 
     public void start() {
         status = Status.RUNNING;
         objectsFound.set(0);
         limitReached = false;
         cancelled = false;
+        startedAt = Instant.now();
+        finishedAt = null;
         errorMessage = null;
         listingReport = null;
     }
 
     public void incrementFound(long count) { objectsFound.addAndGet(count); }
-    public void done()                     { status = Status.DONE; }
+    public void done()                     { status = Status.DONE; finishedAt = Instant.now(); }
     public void error(String message)      { status = Status.ERROR; errorMessage = message; }
     public void markCancelled()            { status = Status.CANCELLED; }
 
@@ -49,4 +54,6 @@ public class QueryContext implements Serializable {
     public boolean isCancelled()    { return cancelled; }
     public String getErrorMessage() { return errorMessage; }
     public ListingReport getListingReport() { return listingReport; }
+    public Instant getStartedAt()   { return startedAt; }
+    public Instant getFinishedAt()  { return finishedAt; }
 }

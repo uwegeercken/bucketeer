@@ -339,6 +339,27 @@ class BucketeerControllerTest {
 
         assertThat(resp.get("status")).isEqualTo("IDLE");
         assertThat(resp.get("report")).isNull();
+        assertThat(resp.get("startedAt")).isNull();
+        assertThat(resp.get("finishedAt")).isNull();
+    }
+
+    @Test
+    @DisplayName("queryStatus reports the timestamps of a finished query")
+    void queryStatusIncludesTimestamps() {
+        QueryContext qc = new QueryContext();
+        qc.start();
+        qc.done();
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute(QueryContext.SESSION_KEY)).thenReturn(qc);
+
+        Map<String, Object> resp = controller.queryStatus(session);
+
+        assertThat(resp.get("status")).isEqualTo("DONE");
+        assertThat(resp.get("startedAt")).isNotNull();
+        assertThat(resp.get("finishedAt")).isNotNull();
+        Instant started = Instant.parse((String) resp.get("startedAt"));
+        Instant finished = Instant.parse((String) resp.get("finishedAt"));
+        assertThat(finished).isAfterOrEqualTo(started);
     }
 
     @Test
