@@ -70,7 +70,7 @@
               class="d-flex align-items-center gap-2 position-absolute start-50 translate-middle-x">
             <label class="text-secondary small" th:text="#{label.server}">Server</label>
             <select name="serverName" id="headerServerSelect" class="form-select form-select-sm w-auto"
-                    onchange="sessionStorage.removeItem('bkt_bucket');sessionStorage.removeItem('bkt_prefix');sessionStorage.removeItem('bkt_key');this.form.submit()"
+                    onchange="sessionStorage.removeItem('bkt_server');sessionStorage.removeItem('bkt_bucket');sessionStorage.removeItem('bkt_prefix');sessionStorage.removeItem('bkt_key');this.form.submit()"
                     th:if="${serverNames != null and !serverNames.isEmpty()}">
                 <option th:each="s : ${serverNames}"
                         th:value="${s}"

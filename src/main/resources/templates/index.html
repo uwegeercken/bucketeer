@@ -839,9 +839,7 @@
         const knownServers = serverSelect ? Array.from(serverSelect.options).map(o => o.value) : [];
         if (server && server !== currentServer && knownServers.includes(server)) {
             sessionStorage.setItem('bkt_pending_combo', JSON.stringify({ bucket: bucket, prefix: prefix, key: key }));
-            sessionStorage.removeItem('bkt_bucket');
-            sessionStorage.removeItem('bkt_prefix');
-            sessionStorage.removeItem('bkt_key');
+            clearFormSessionState();
             const form = document.createElement('form');
             form.method = 'POST'; form.action = '/session/server';
             const inp = document.createElement('input');
@@ -849,9 +847,7 @@
             form.appendChild(inp); document.body.appendChild(form); form.submit();
             return;
         }
-        sessionStorage.removeItem('bkt_bucket');
-        sessionStorage.removeItem('bkt_prefix');
-        sessionStorage.removeItem('bkt_key');
+        clearFormSessionState();
         const bucketEl = document.getElementById('bucketInput');
         if (bucket && !bucketEl.querySelector('option[value="' + CSS.escape(bucket) + '"]')) {
             const opt = document.createElement('option');
@@ -998,7 +994,15 @@
         return parts.join('<br/>') || 'Keine Daten';
     }
 
+    function clearFormSessionState() {
+        sessionStorage.removeItem('bkt_server');
+        sessionStorage.removeItem('bkt_bucket');
+        sessionStorage.removeItem('bkt_prefix');
+        sessionStorage.removeItem('bkt_key');
+    }
+
     function saveFormState() {
+        sessionStorage.setItem('bkt_server',   currentServer || '');
         sessionStorage.setItem('bkt_bucket', document.getElementById('bucketInput').value);
         sessionStorage.setItem('bkt_prefix', document.getElementById('prefixInput').value);
         sessionStorage.setItem('bkt_key',    document.getElementById('keyInput').value);
@@ -1007,6 +1011,16 @@
     }
 
     function restoreFormState() {
+        // A stored form scope only belongs to the server it was saved under
+        // (bkt_server). If the effective server no longer matches - e.g. after
+        // an app restart the session silently fell back to the first configured
+        // server - discard the stale scope instead of restoring bucket/prefix/key
+        // that belong to another server (silently: the form simply stays empty).
+        const savedServer = sessionStorage.getItem('bkt_server');
+        if (savedServer && savedServer !== currentServer) {
+            clearFormSessionState();
+            return;
+        }
         try {
             const pending = JSON.parse(sessionStorage.getItem('bkt_pending_combo') || 'null');
             if (pending) {

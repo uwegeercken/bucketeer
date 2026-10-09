@@ -126,6 +126,15 @@ public class SnapshotController {
         try {
             long rowCount = duckDb.loadParquet(parquetPath.toString());
 
+            // Mirror the favorites/history behaviour: loading a snapshot switches the
+            // effective server to the snapshot's server, so the shown scope (header,
+            // bucket, prefix) always belongs to the server the data actually comes from.
+            // Done after a successful load, so a failed snapshot never changes the server.
+            String server = meta.serverName();
+            if (server != null && !server.isBlank() && !server.equals(sessionContext.getSelectedServer())) {
+                sessionContext.setSelectedServer(server);
+            }
+
             QueryContext qc = new QueryContext();
             qc.start();
             qc.incrementFound(rowCount);
