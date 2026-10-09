@@ -31,6 +31,14 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.9.2 <small class="text-muted">2026-10-09</small></h6>
+                    <ul>
+                        <li><strong>Search scope tied to the selected server</strong>: the bucket / prefix / key of the search form are now stored together with the server they belong to &mdash; after an app restart or a server change the form no longer silently restores values from another server (a stale scope is discarded and the form stays empty), so a search can never run against the wrong server. Loading a snapshot switches to the snapshot's server, just like selecting a favourite or a history entry</li>
+                        <li><strong>Correct search time display</strong>: the start and finish time of a running or finished search are taken from the server, so the shown execution time and the completion time are always correct</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.9.1 <small class="text-muted">2026-10-08</small></h6>
                     <ul>
                         <li><strong>Abort running queries</strong>: while a search is running, the search button turns into a cancel (&#10007;) icon &mdash; clicking it again stops the listing at the next page boundary (in parallel mode the worker threads are shut down), flips the query to <em>cancelled</em> and shows how many objects were already loaded; the partial results stay discardable &mdash; the table is not populated and the next search starts clean</li>
