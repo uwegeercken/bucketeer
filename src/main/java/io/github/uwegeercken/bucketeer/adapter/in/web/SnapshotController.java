@@ -194,7 +194,8 @@ public class SnapshotController {
                                 .toList();
                         duckDb.insertBatch(filtered);
                         qc.incrementFound(filtered.size());
-                    });
+                    },
+                    qc::setListingReport);
             qc.done();
         } catch (Exception e) {
             qc.error(e.getMessage());

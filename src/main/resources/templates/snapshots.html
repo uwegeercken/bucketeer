@@ -32,6 +32,8 @@
             <div class="d-flex align-items-center gap-2">
                 <div class="spinner-border spinner-border-sm text-primary" id="progressSpinner"></div>
                 <span id="progressText" th:text="#{snapshot.creating}">Creating snapshot...</span>
+                <span class="text-muted small" id="progressTimer"></span>
+                <span class="badge bg-secondary" id="progressStrategy" style="display:none;"></span>
             </div>
         </div>
         <div id="snapshotList">
@@ -83,8 +85,11 @@
     const labelSnapshotBucket  = /*[[#{snapshot.bucket}]]*/ 'Bucket';
     const labelSnapshotPrefix  = /*[[#{snapshot.prefix}]]*/ 'Prefix';
     const labelSnapshotMismatch = /*[[#{snapshot.compareMismatch}]]*/ 'Snapshots must have the same server, bucket and prefix.';
-    const labelSnapshotCreating = /*[[#{snapshot.creating}]]*/ 'Creating snapshot...';
     const labelSnapshotRepeatErr = /*[[#{snapshot.repeat.error}]]*/ 'Failed to repeat snapshot';
+    const labelObjFound          = /*[[#{msg.objectsFound}]]*/ 'objects found...';
+    const labelAnalyzing         = /*[[#{snapshot.analyzing}]]*/ 'Analyzing...';
+    const labelTacticParallel    = /*[[#{report.tactic.parallel}]]*/ 'Parallel';
+    const labelTacticSequential  = /*[[#{report.tactic.sequential}]]*/ 'Sequential';
     const labelRowMenu          = /*[[#{btn.rowMenu}]]*/ 'Actions';
 
     let diffId1 = null;
@@ -93,6 +98,14 @@
 
     function formatDateTime(value) {
         return formatBucketDateTime(value);
+    }
+
+    function formatElapsed(ms) {
+        const sec = Math.floor(ms / 1000);
+        if (sec <= 60) return sec + 's';
+        const min = Math.floor(sec / 60);
+        const rem = sec % 60;
+        return min + 'm ' + rem + 's';
     }
 
     function formatMsg(tpl) {
@@ -174,20 +187,65 @@
         await fetch('/api/snapshots/' + id + '/reveal', { method: 'POST' });
     }
 
+    let repeatPoll = null;
+
     async function repeatSnapshot(id) {
+        if (repeatPoll) return; // a repeat is already running - ignore a second click
+
         const progressPanel = document.getElementById('progressPanel');
-        const progressText = document.getElementById('progressText');
-        progressText.textContent = labelSnapshotCreating;
+        const progressText  = document.getElementById('progressText');
+        const progressTimer = document.getElementById('progressTimer');
+        const progressBadge = document.getElementById('progressStrategy');
+
         progressPanel.style.display = 'block';
+        progressText.textContent = labelAnalyzing;
+        progressTimer.textContent = '';
+        progressBadge.style.display = 'none';
+
+        // While the repeat request is in flight the server keeps a live QueryContext in the
+        // session, so we poll the same status endpoint the search page uses and mirror its
+        // display: object count, elapsed time and the chosen listing strategy.
+        let startMs = null;
+        let strategyShown = false;
+        repeatPoll = setInterval(async () => {
+            try {
+                const res  = await fetch('/api/query/status');
+                const data = await res.json();
+                if (data.status !== 'RUNNING' && data.status !== 'DONE') return;
+                progressText.textContent = data.objectsFound + ' ' + labelObjFound;
+                if (data.startedAt) startMs = Date.parse(data.startedAt);
+                if (startMs) {
+                    const endMs = (data.status === 'DONE' && data.finishedAt)
+                        ? Date.parse(data.finishedAt) : Date.now();
+                    progressTimer.textContent = formatElapsed(endMs - startMs);
+                }
+                if (!strategyShown && data.report) {
+                    const parallel = data.report.decision === 'PARALLEL';
+                    progressBadge.textContent = parallel ? labelTacticParallel : labelTacticSequential;
+                    progressBadge.classList.toggle('bg-success', parallel);
+                    progressBadge.classList.toggle('bg-secondary', !parallel);
+                    progressBadge.style.display = '';
+                    strategyShown = true;
+                }
+            } catch (e) { /* ignore transient poll errors */ }
+        }, 500);
+
+        function stopRepeatProgress() {
+            clearInterval(repeatPoll);
+            repeatPoll = null;
+            progressPanel.style.display = 'none';
+        }
+
         try {
             const res = await fetch('/api/snapshots/' + id + '/repeat', { method: 'POST' });
             const data = await res.json();
             if (!res.ok) {
                 throw new Error(data.error || ('HTTP ' + res.status));
             }
-            window.location.href = '/snapshots';
+            stopRepeatProgress();
+            loadSnapshots();
         } catch (e) {
-            progressPanel.style.display = 'none';
+            stopRepeatProgress();
             alert(labelSnapshotRepeatErr + ': ' + e.message);
         }
     }

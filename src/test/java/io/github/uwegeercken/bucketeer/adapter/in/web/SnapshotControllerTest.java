@@ -1,5 +1,6 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
+import io.github.uwegeercken.bucketeer.application.ListingReport;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.infrastructure.config.SnapshotRepository;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
@@ -7,6 +8,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
@@ -14,10 +16,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class SnapshotControllerTest {
@@ -81,5 +88,39 @@ class SnapshotControllerTest {
         controller.loadSnapshot("s1", mock(HttpSession.class));
 
         assertThat(ctx.getSelectedServer()).isEqualTo("Minio Local");
+    }
+
+    @Test
+    @DisplayName("repeatSnapshot hands the listing report to the query context")
+    void repeatSnapshotCapturesListingReport(@TempDir Path tempDir) throws Exception {
+        when(snapshotRepo.findById("s1")).thenReturn(snapshot("Minio Local"));
+        when(snapshotRepo.getSnapshotsDir()).thenReturn(tempDir);
+        when(duckDb.count()).thenReturn(42L);
+        when(bucketeerController.searchTarget(any(), any(), any()))
+                .thenReturn(new BucketeerController.SearchTarget("events/", null));
+
+        ListingReport report = new ListingReport("Minio Local", "topf1", "events/",
+                Instant.parse("2026-10-09T10:00:00Z"), 4, ListingReport.Decision.PARALLEL,
+                10, 3, 2, false);
+        when(bucketeerUseCase.fetchAllObjects(anyString(), anyString(), anyString(),
+                anyLong(), any(), any()))
+                .thenAnswer(inv -> {
+                    Consumer<ListingReport> reportConsumer = inv.getArgument(5);
+                    reportConsumer.accept(report);
+                    return false;
+                });
+
+        SessionContext ctx = new SessionContext();
+        ctx.setSelectedServer("Minio Local");
+        SnapshotController controller = newController(ctx);
+        HttpSession session = mock(HttpSession.class);
+
+        ResponseEntity<Map<String, Object>> resp = controller.repeatSnapshot("s1", session);
+
+        assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
+        ArgumentCaptor<Object> qcCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(session).setAttribute(eq(QueryContext.SESSION_KEY), qcCaptor.capture());
+        QueryContext qc = (QueryContext) qcCaptor.getValue();
+        assertThat(qc.getListingReport()).isSameAs(report);
     }
 }
