@@ -343,3 +343,77 @@ footer {
 .scan-modal .modal-body #scanMoreBtn {
     align-self: flex-start;
 }
+
+/* Tools modal: fullscreen maximize (input or output) */
+#toolsModal.tools-output-max .modal-dialog,
+#toolsModal.tools-input-max .modal-dialog {
+    width: calc(100vw - 2rem);
+    max-width: none;
+    height: calc(100vh - 2rem);
+    margin: 1rem auto;
+}
+#toolsModal.tools-output-max .modal-content,
+#toolsModal.tools-input-max .modal-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+#toolsModal.tools-output-max .modal-body,
+#toolsModal.tools-input-max .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Output maximize: grow output, hide input side */
+#toolsModal.tools-output-max #toolsOutputSection {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+#toolsModal.tools-output-max #toolsOutput {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+#toolsModal.tools-output-max #toolsInputSection,
+#toolsModal.tools-output-max #toolsActions,
+#toolsModal.tools-output-max #toolsError {
+    display: none !important;
+}
+
+/* Input maximize: grow input (incl. find/replace), hide output side */
+#toolsModal.tools-input-max #toolsInputSection {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+#toolsModal.tools-input-max #toolsInput {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+#toolsModal.tools-input-max #toolsOutputSection,
+#toolsModal.tools-input-max #toolsActions,
+#toolsModal.tools-input-max #toolsError {
+    display: none !important;
+}
+
+/* Tools find/replace bar: let the inputs shrink so the buttons always fit */
+.tools-find-bar .form-control {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Tools find/replace bar: uniform 30x23px buttons (Aa, .*, prev/next, replace/all) */
+.tools-find-bar .btn {
+    width: 30px;
+    height: 23px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}

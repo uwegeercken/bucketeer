@@ -157,29 +157,74 @@
                             aria-label="Close" th:aria-label="#{btn.close}"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold" th:text="#{tools.input}">Input</label>
+                    <div class="mb-3" id="toolsInputSection">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <label class="form-label small fw-semibold mb-0" for="toolsInput" th:text="#{tools.input}">Input</label>
+                            <div class="d-flex align-items-center gap-1">
+                                <button type="button" id="toolsFindToggle" class="btn btn-sm btn-outline-secondary btn-icon"
+                                        onclick="toolsToggleFindBar()" th:title="#{tools.findReplace}" th:aria-label="#{tools.findReplace}">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                                <button type="button" id="toolsInputMaxBtn" class="btn btn-sm btn-outline-secondary btn-icon"
+                                        onclick="toolsToggleInputMax()" th:title="#{tools.maximize}" th:aria-label="#{tools.maximize}">
+                                    <i class="bi bi-arrows-fullscreen"></i>
+                                </button>
+                            </div>
+                        </div>
+
                         <textarea id="toolsInput" class="form-control form-control-sm font-monospace" rows="4"
                                   th:placeholder="#{tools.input.placeholder}"
                                   placeholder="Paste or type text... (one value per line)"></textarea>
+
+                        <div id="toolsFindBar" class="tools-find-bar mt-1" style="display:none;">
+                            <div class="d-flex align-items-center gap-1 mb-1">
+                                <input type="text" id="toolsFindInput" class="form-control form-control-sm font-monospace flex-grow-1"
+                                       th:placeholder="#{tools.find.placeholder}" placeholder="Find"
+                                       oninput="toolsUpdateFindStatus()" onkeydown="toolsFindKeydown(event)"/>
+                                <button type="button" id="toolsMatchCase" class="btn btn-sm btn-outline-secondary btn-icon"
+                                        onclick="toolsToggleMatchCase()" th:title="#{tools.matchCase}"
+                                        th:aria-label="#{tools.matchCase}">Aa</button>
+                                <button type="button" id="toolsRegex" class="btn btn-sm btn-outline-secondary btn-icon"
+                                        onclick="toolsToggleRegex()" th:title="#{tools.regex}"
+                                        th:aria-label="#{tools.regex}">.*</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" onclick="toolsFindPrev()"
+                                        th:title="#{tools.findPrev}" th:aria-label="#{tools.findPrev}">
+                                    <i class="bi bi-arrow-up"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" onclick="toolsFindNext()"
+                                        th:title="#{tools.findNext}" th:aria-label="#{tools.findNext}">
+                                    <i class="bi bi-arrow-down"></i>
+                                </button>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <input type="text" id="toolsReplaceInput" class="form-control form-control-sm font-monospace flex-grow-1"
+                                       th:placeholder="#{tools.replace.placeholder}" placeholder="Replace"
+                                       onkeydown="toolsFindKeydown(event)"/>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" onclick="toolsReplaceOne()"
+                                        th:title="#{tools.replace}" th:aria-label="#{tools.replace}">R</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" onclick="toolsReplaceAll()"
+                                        th:title="#{tools.replaceAll}" th:aria-label="#{tools.replaceAll}">Rr</button>
+                            </div>
+                            <div id="toolsFindStatus" class="small text-muted mt-1"></div>
+                        </div>
                     </div>
 
-                    <div class="d-flex flex-wrap gap-1 mb-3">
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('b64enc')"
+                    <div class="d-flex flex-wrap gap-1 mb-3" id="toolsActions">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('b64enc')"
                                 th:text="#{tools.encode.base64}">Base64 Encode</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('b64dec')"
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('b64dec')"
                                 th:text="#{tools.decode.base64}">Base64 Decode</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('urlenc')"
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('urlenc')"
                                 th:text="#{tools.encode.url}">URL Encode</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('urldec')"
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('urldec')"
                                 th:text="#{tools.decode.url}">URL Decode</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('ts2date')"
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('ts2date')"
                                 th:text="#{tools.ts.toDate}">Timestamp (ms) → Date</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('date2ts')"
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('date2ts')"
                                 th:text="#{tools.date.toTs}">Date → Timestamp (ms)</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('jsonpretty')"
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('jsonpretty')"
                                 th:text="#{tools.json.pretty}">JSON Pretty</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toolsTransform('jsonmin')"
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('jsonmin')"
                                 th:text="#{tools.json.minify}">JSON Minify</button>
                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toolsTransform('sha256')"
                                 th:text="#{tools.hash.sha256}">SHA-256</button>
@@ -187,8 +232,14 @@
 
                     <div id="toolsError" class="alert alert-danger py-1 px-2 mb-2" style="display:none; font-size:0.82rem;"></div>
 
-                    <div>
-                        <label class="form-label small fw-semibold" th:text="#{tools.output}">Output</label>
+                    <div id="toolsOutputSection">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <label class="form-label small fw-semibold mb-0" for="toolsOutput" th:text="#{tools.output}">Output</label>
+                            <button type="button" id="toolsOutputMaxBtn" class="btn btn-sm btn-outline-secondary btn-icon"
+                                    onclick="toolsToggleOutputMax()" th:title="#{tools.maximize}" th:aria-label="#{tools.maximize}">
+                                <i class="bi bi-arrows-fullscreen"></i>
+                            </button>
+                        </div>
                         <textarea id="toolsOutput" class="form-control form-control-sm font-monospace" rows="4" readonly></textarea>
                         <div class="d-flex align-items-center gap-2 mt-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary"
@@ -578,8 +629,16 @@
         (function() {
             var msg = {
                 errorDecode: /*[[#{tools.error.decode}]]*/ 'Invalid input',
-                errorEmpty:  /*[[#{tools.error.empty}]]*/  'No input text'
+                errorEmpty:  /*[[#{tools.error.empty}]]*/  'No input text',
+                maximize:    /*[[#{tools.maximize}]]*/      'Maximize output',
+                restore:     /*[[#{tools.restore}]]*/       'Restore',
+                findNone:    /*[[#{tools.find.none}]]*/     'No matches',
+                findInvalid: /*[[#{tools.find.invalid}]]*/  'Invalid regular expression',
+                replaced:    /*[[#{tools.find.replaced}]]*/ 'Replaced',
+                found:       /*[[#{tools.find.found}]]*/    'Found'
             };
+
+            var findState = { matchCase: false, regex: false };
 
             window.toolsCopyResult = function() {
                 var output = document.getElementById('toolsOutput').value;
@@ -654,6 +713,216 @@
                 } catch(e) {
                     errEl.textContent = msg.errorDecode;
                     errEl.style.display = 'block';
+                }
+            };
+
+            // ---- Input / output maximize / restore ----------------------------
+            var MAX_STATES = [
+                { cls: 'tools-input-max',  btn: 'toolsInputMaxBtn' },
+                { cls: 'tools-output-max', btn: 'toolsOutputMaxBtn' }
+            ];
+
+            function toolsResetMaxButtons() {
+                MAX_STATES.forEach(function(s) {
+                    var btn = document.getElementById(s.btn);
+                    if (!btn) return;
+                    btn.querySelector('i').className = 'bi bi-arrows-fullscreen';
+                    btn.title = msg.maximize;
+                    btn.setAttribute('aria-label', msg.maximize);
+                });
+            }
+
+            function toolsClearMaxState() {
+                var modal = document.getElementById('toolsModal');
+                MAX_STATES.forEach(function(s) { modal.classList.remove(s.cls); });
+                toolsResetMaxButtons();
+            }
+
+            function toolsToggleMax(state) {
+                var modal = document.getElementById('toolsModal');
+                var wasOn = modal.classList.contains(state.cls);
+                toolsClearMaxState();
+                if (wasOn) return;
+                modal.classList.add(state.cls);
+                var btn = document.getElementById(state.btn);
+                if (btn) {
+                    btn.querySelector('i').className = 'bi bi-fullscreen-exit';
+                    btn.title = msg.restore;
+                    btn.setAttribute('aria-label', msg.restore);
+                }
+            }
+
+            window.toolsToggleInputMax  = function() { toolsToggleMax(MAX_STATES[0]); };
+            window.toolsToggleOutputMax = function() { toolsToggleMax(MAX_STATES[1]); };
+
+            var toolsModalEl = document.getElementById('toolsModal');
+            if (toolsModalEl) {
+                toolsModalEl.addEventListener('hidden.bs.modal', function() { toolsClearMaxState(); });
+            }
+
+            // ---- Find / replace in the input textarea --------------------------
+            function toolsFindInput() { return document.getElementById('toolsInput'); }
+            function toolsReplaceInput() { return document.getElementById('toolsReplaceInput'); }
+
+            function toolsEscapeRegExp(s) {
+                return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
+            // Builds a RegExp for the current find text; literal text is escaped
+            // unless the regex toggle is active.
+            function toolsBuildRegex(global) {
+                var text = document.getElementById('toolsFindInput').value;
+                if (!text) return { empty: true };
+                var source = findState.regex ? text : toolsEscapeRegExp(text);
+                try {
+                    return { regex: new RegExp(source, (global ? 'g' : '') + (findState.matchCase ? '' : 'i')) };
+                } catch (e) {
+                    return { error: true };
+                }
+            }
+
+            function toolsCollectMatches(value, re) {
+                var matches = [];
+                var m;
+                re.lastIndex = 0;
+                while ((m = re.exec(value)) !== null) {
+                    matches.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
+                    if (m[0].length === 0) re.lastIndex++;
+                    if (matches.length > 200000) break;
+                }
+                return matches;
+            }
+
+            function toolsSetFindStatus(text, isError) {
+                var el = document.getElementById('toolsFindStatus');
+                if (!el) return;
+                el.textContent = text || '';
+                el.classList.toggle('text-danger', !!isError);
+                el.classList.toggle('text-muted', !isError);
+            }
+
+            function toolsScrollTo(ta, start) {
+                var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 16;
+                var line = ta.value.substring(0, start).split('\n').length - 1;
+                ta.scrollTop = Math.max(0, line * lineHeight - ta.clientHeight / 2);
+            }
+
+            window.toolsToggleFindBar = function() {
+                var bar = document.getElementById('toolsFindBar');
+                var show = bar.style.display === 'none';
+                bar.style.display = show ? '' : 'none';
+                document.getElementById('toolsFindToggle').classList.toggle('active', show);
+                if (show) document.getElementById('toolsFindInput').focus();
+            };
+
+            window.toolsCloseFindBar = function() {
+                document.getElementById('toolsFindBar').style.display = 'none';
+                document.getElementById('toolsFindToggle').classList.remove('active');
+                toolsSetFindStatus('', false);
+            };
+
+            window.toolsToggleMatchCase = function() {
+                findState.matchCase = !findState.matchCase;
+                document.getElementById('toolsMatchCase').classList.toggle('active', findState.matchCase);
+                toolsUpdateFindStatus();
+            };
+
+            window.toolsToggleRegex = function() {
+                findState.regex = !findState.regex;
+                document.getElementById('toolsRegex').classList.toggle('active', findState.regex);
+                toolsUpdateFindStatus();
+            };
+
+            window.toolsUpdateFindStatus = function() {
+                if (!document.getElementById('toolsFindInput').value) { toolsSetFindStatus('', false); return; }
+                var re = toolsBuildRegex(true);
+                if (re.error) { toolsSetFindStatus(msg.findInvalid, true); return; }
+                if (re.empty) { toolsSetFindStatus('', false); return; }
+                var count = toolsCollectMatches(toolsFindInput().value, re.regex).length;
+                toolsSetFindStatus(count ? msg.found + ': ' + count : msg.findNone, false);
+            };
+
+            window.toolsFindNext = function() { toolsFind(true); };
+            window.toolsFindPrev = function() { toolsFind(false); };
+
+            function toolsFind(forward) {
+                var ta = toolsFindInput();
+                var re = toolsBuildRegex(true);
+                if (re.empty) { toolsSetFindStatus('', false); return; }
+                if (re.error) { toolsSetFindStatus(msg.findInvalid, true); return; }
+                var matches = toolsCollectMatches(ta.value, re.regex);
+                if (!matches.length) { toolsSetFindStatus(msg.findNone, false); return; }
+
+                var idx = forward ? 0 : matches.length - 1;
+                var i;
+                if (forward) {
+                    for (i = 0; i < matches.length; i++) {
+                        if (matches[i].start >= ta.selectionEnd) { idx = i; break; }
+                    }
+                } else {
+                    for (i = matches.length - 1; i >= 0; i--) {
+                        if (matches[i].start < ta.selectionStart) { idx = i; break; }
+                    }
+                }
+                var m = matches[idx];
+                ta.focus();
+                ta.setSelectionRange(m.start, m.end);
+                toolsScrollTo(ta, m.start);
+                toolsSetFindStatus(msg.found + ': ' + (idx + 1) + ' / ' + matches.length, false);
+            }
+
+            window.toolsReplaceOne = function() {
+                var ta = toolsFindInput();
+                var re = toolsBuildRegex(true);
+                if (re.empty) return;
+                if (re.error) { toolsSetFindStatus(msg.findInvalid, true); return; }
+                var matches = toolsCollectMatches(ta.value, re.regex);
+                if (!matches.length) { toolsSetFindStatus(msg.findNone, false); return; }
+
+                // Replace the current selection if it is exactly a match, else the next one.
+                var idx = 0;
+                for (var i = 0; i < matches.length; i++) {
+                    if (matches[i].start === ta.selectionStart && matches[i].end === ta.selectionEnd) { idx = i; break; }
+                    if (matches[i].start >= ta.selectionEnd) { idx = i; break; }
+                }
+                var m = matches[idx];
+                var replacement = document.getElementById('toolsReplaceInput').value;
+                var inserted = findState.regex
+                    ? m.text.replace(toolsBuildRegex(false).regex, replacement) // expand $1 group refs
+                    : replacement;                                              // literal insertion
+                var value = ta.value;
+                ta.value = value.substring(0, m.start) + inserted + value.substring(m.end);
+                var caret = m.start + inserted.length;
+                ta.focus();
+                ta.setSelectionRange(caret, caret);
+                toolsScrollTo(ta, caret);
+                toolsSetFindStatus(msg.replaced + ': 1', false);
+            };
+
+            window.toolsReplaceAll = function() {
+                var ta = toolsFindInput();
+                var re = toolsBuildRegex(true);
+                if (re.empty) return;
+                if (re.error) { toolsSetFindStatus(msg.findInvalid, true); return; }
+                var matches = toolsCollectMatches(ta.value, re.regex);
+                if (!matches.length) { toolsSetFindStatus(msg.findNone, false); return; }
+
+                var replacement = document.getElementById('toolsReplaceInput').value;
+                if (findState.regex) {
+                    ta.value = ta.value.replace(re.regex, replacement);
+                } else {
+                    // insert literally, without $-substitution
+                    ta.value = ta.value.replace(re.regex, function() { return replacement; });
+                }
+                toolsSetFindStatus(msg.replaced + ': ' + matches.length, false);
+            };
+
+            window.toolsFindKeydown = function(e) {
+                if (e.key === 'Escape') { e.preventDefault(); toolsCloseFindBar(); return; }
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (e.target && e.target.id === 'toolsReplaceInput') toolsReplaceOne();
+                    else toolsFindNext();
                 }
             };
         })();
