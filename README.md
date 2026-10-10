@@ -2,8 +2,7 @@
 
 A web-based **S3 object browser** for any S3-compatible server — list, filter, sort, download, move, delete, upload and compare objects in your browser.
 
-![Bucketeer](img_1.png)
-
+![Bucketeer](img.png)
 ## Features
 
 - **Browse &amp; search** — paginated results, client-side filtering by name (regular expressions), size and last-modified date, sortable columns
