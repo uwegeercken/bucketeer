@@ -31,6 +31,14 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.9.3 <small class="text-muted">2026-10-10</small></h6>
+                    <ul>
+                        <li><strong>Toolbox: enlarge text areas and find &amp; replace</strong>: the input and output text areas can be expanded to fill the whole dialog, and the input offers in-place search and replace &mdash; step through the matches, replace a single occurrence or all at once, with optional case-sensitivity and regular-expression mode and a live match counter</li>
+                        <li><strong>Clearer toolbox errors</strong>: a failed transformation now reports that the input is invalid for the selected function instead of always pointing at decoding</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.9.2 <small class="text-muted">2026-10-09</small></h6>
                     <ul>
                         <li><strong>Search scope tied to the selected server</strong>: the bucket / prefix / key of the search form are now stored together with the server they belong to &mdash; after an app restart or a server change the form no longer silently restores values from another server (a stale scope is discarded and the form stays empty), so a search can never run against the wrong server. Loading a snapshot switches to the snapshot's server, just like selecting a favourite or a history entry</li>
