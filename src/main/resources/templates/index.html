@@ -134,6 +134,7 @@
                 <div class="spinner-border spinner-border-sm text-primary" id="querySpinner"></div>
                 <span class="text-muted small" id="queryStatusText" th:text="#{msg.queryRunning}">Loading...</span>
                 <span class="text-muted small" id="queryTimer" style="display:none;"></span>
+                <span class="badge bg-secondary" id="queryStrategyBadge" style="display:none;"></span>
                 <button type="button" id="btnListingReport" class="btn btn-sm btn-outline-secondary btn-icon"
                         onclick="openListingReport()" th:title="#{report.title}" style="display:none;">
                     <i class="bi bi-info-circle"></i>
@@ -1167,6 +1168,22 @@
         }
     }
 
+    // Shows the listing-strategy badge (parallel / sequential) while a search is running;
+    // hidden again once the query finished, where the regular done display takes over.
+    function setQueryStrategyBadge(report, visible) {
+        const badge = document.getElementById('queryStrategyBadge');
+        if (!badge) return;
+        if (visible && report && report.decision) {
+            const parallel = report.decision === 'PARALLEL';
+            badge.textContent = parallel ? lrLabels.parallel : lrLabels.sequential;
+            badge.classList.toggle('bg-success', parallel);
+            badge.classList.toggle('bg-secondary', !parallel);
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
     function handleQueryResult(data) {
         const statusText = document.getElementById('queryStatusText');
         if (data.status === 'RUNNING') {
@@ -1175,6 +1192,7 @@
             // recalibrate against the server start time, so the live timer stays
             // truthful when the page was reloaded while the query was still running
             if (data.startedAt) queryStartTime = Date.parse(data.startedAt);
+            setQueryStrategyBadge(data.report, true);
             setSearchButtonMode(true);
         } else if (data.status === 'DONE') {
             clearInterval(pollInterval);
@@ -1184,6 +1202,7 @@
             statusText.classList.remove('text-warning');
             listingReport = data.report || null;
             updateListingReportButton();
+            setQueryStrategyBadge(null, false);
             const timerEl = document.getElementById('queryTimer');
             const snapshotActive = typeof snapshotContext !== 'undefined' && snapshotContext !== null;
             if (data.objectsFound === 0) {
@@ -1217,6 +1236,7 @@
             stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
             setSearchButtonMode(false);
+            setQueryStrategyBadge(null, false);
             statusText.classList.add('text-danger');
             listingReport = data.report || null;
             updateListingReportButton();
@@ -1226,6 +1246,7 @@
             stopTimer();
             document.getElementById('querySpinner').style.display = 'none';
             setSearchButtonMode(false);
+            setQueryStrategyBadge(null, false);
             statusText.classList.add('text-warning');
             listingReport = null;
             updateListingReportButton();
@@ -1521,6 +1542,7 @@
         queryStartTime = null;
         clearInterval(pollInterval);
         stopTimer();
+        setQueryStrategyBadge(null, false);
         document.getElementById('querySpinner').style.display = 'none';
         document.getElementById('resultsPanel').style.display = 'none';
         currentPage = 0;
@@ -1585,6 +1607,7 @@
         sortDir = 'asc';
         listingReport = null;
         updateListingReportButton();
+        setQueryStrategyBadge(null, false);
         return true;
     }
 
