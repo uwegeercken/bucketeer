@@ -628,14 +628,14 @@
     <script th:inline="javascript">
         (function() {
             var msg = {
-                errorDecode: /*[[#{tools.error.decode}]]*/ 'Invalid input',
-                errorEmpty:  /*[[#{tools.error.empty}]]*/  'No input text',
-                maximize:    /*[[#{tools.maximize}]]*/      'Maximize output',
-                restore:     /*[[#{tools.restore}]]*/       'Restore',
-                findNone:    /*[[#{tools.find.none}]]*/     'No matches',
-                findInvalid: /*[[#{tools.find.invalid}]]*/  'Invalid regular expression',
-                replaced:    /*[[#{tools.find.replaced}]]*/ 'Replaced',
-                found:       /*[[#{tools.find.found}]]*/    'Found'
+                errorFunction: /*[[#{tools.error.function}]]*/ 'Invalid input for the selected function',
+                errorEmpty:    /*[[#{tools.error.empty}]]*/    'No input text',
+                maximize:      /*[[#{tools.maximize}]]*/       'Maximize output',
+                restore:       /*[[#{tools.restore}]]*/        'Restore',
+                findNone:      /*[[#{tools.find.none}]]*/      'No matches',
+                findInvalid:   /*[[#{tools.find.invalid}]]*/   'Invalid regular expression',
+                replaced:      /*[[#{tools.find.replaced}]]*/  'Replaced',
+                found:         /*[[#{tools.find.found}]]*/     'Found'
             };
 
             var findState = { matchCase: false, regex: false };
@@ -711,7 +711,7 @@
                             + '.' + ms(d.getMilliseconds());
                     }
                 } catch(e) {
-                    errEl.textContent = msg.errorDecode;
+                    errEl.textContent = msg.errorFunction;
                     errEl.style.display = 'block';
                 }
             };
