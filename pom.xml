@@ -45,6 +45,8 @@
         <java.version>21</java.version>
         <aws.sdk.version>2.55.11</aws.sdk.version>
         <tomcat.version>11.0.26</tomcat.version>
+        <!-- Jackson 3 (tools.jackson.core) - bump above the Spring Boot 4.1.1 default for CVE fixes -->
+        <jackson-bom.version>3.1.7</jackson-bom.version>
     </properties>
 
     <dependencies>
