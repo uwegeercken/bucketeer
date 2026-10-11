@@ -1,5 +1,6 @@
 package io.github.uwegeercken.bucketeer.infrastructure.config;
 
+import io.github.uwegeercken.bucketeer.domain.template.LabelTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -12,7 +13,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -25,6 +29,9 @@ public class AppSettings {
 
     /** Upper bound for the prefix-analysis samples drawn per listing scope. */
     public static final int MAX_QUERY_SAMPLE_SIZE = 64;
+
+    /** Upper bound for the number of prefix variables (named reusable templates). */
+    public static final int MAX_PREFIX_VARIABLES = 20;
 
     /** Sample count used while nothing is stored in the settings dialog. */
     public static final int DEFAULT_QUERY_SAMPLE_SIZE = 8;
@@ -49,6 +56,7 @@ public class AppSettings {
     private volatile boolean duckdbQuackEnabled = false;
     private volatile int queryParallelism = QUERY_PARALLELISM_UNSET;
     private volatile int querySampleSize = QUERY_SAMPLE_SIZE_UNSET;
+    private volatile List<LabelTemplate> labelTemplates = List.of();
 
     @Autowired
     public AppSettings(S3Properties s3Properties) {
@@ -161,6 +169,42 @@ public class AppSettings {
         save();
     }
 
+    public List<LabelTemplate> getLabelTemplates() {
+        return labelTemplates;
+    }
+
+    /**
+     * Stores the prefix variables (named reusable templates). Invalid entries (blank
+     * or malformed names, blank templates, duplicates) are dropped, and the list is
+     * capped at {@link #MAX_PREFIX_VARIABLES}.
+     */
+    public void setLabelTemplates(List<LabelTemplate> templates) {
+        this.labelTemplates = normalizeLabelTemplates(templates);
+        save();
+    }
+
+    private static List<LabelTemplate> normalizeLabelTemplates(List<LabelTemplate> templates) {
+        if (templates == null || templates.isEmpty()) return List.of();
+        Map<String, String> seen = new LinkedHashMap<>();
+        for (LabelTemplate t : templates) {
+            if (t == null) continue;
+            String name = t.name() == null ? "" : t.name().trim();
+            String template = t.template() == null ? "" : t.template().trim();
+            if (name.isEmpty() || template.isEmpty() || !LabelTemplate.isValidName(name)) continue;
+            if (seen.putIfAbsent(name, template) == null && seen.size() >= MAX_PREFIX_VARIABLES) break;
+        }
+        if (seen.isEmpty()) return List.of();
+        return seen.entrySet().stream()
+                .map(e -> new LabelTemplate(e.getKey(), e.getValue()))
+                .toList();
+    }
+
+    private static List<Map<String, String>> labelTemplatesToMaps(List<LabelTemplate> templates) {
+        return templates.stream()
+                .map(t -> Map.of("name", t.name(), "template", t.template()))
+                .toList();
+    }
+
     public Map<String, Object> toMap() {
         return Map.of(
                 "snapshotRetentionDays", snapshotRetentionDays,
@@ -169,7 +213,8 @@ public class AppSettings {
                 "maxRequestSizeMb", maxRequestSizeMb,
                 "duckdbQuackEnabled", duckdbQuackEnabled,
                 "queryParallelism", getQueryParallelism(),
-                "querySampleSize", getQuerySampleSize());
+                "querySampleSize", getQuerySampleSize(),
+                "labelTemplates", labelTemplatesToMaps(labelTemplates));
     }
 
     private static boolean isValidZoneId(String id) {
@@ -214,6 +259,20 @@ public class AppSettings {
                 querySampleSize = v < 0 ? QUERY_SAMPLE_SIZE_UNSET
                         : Math.max(1, Math.min(v, MAX_QUERY_SAMPLE_SIZE));
             }
+            Object variables = data.get("labelTemplates");
+            if (variables instanceof List<?> list) {
+                List<LabelTemplate> parsed = new ArrayList<>();
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m) {
+                        Object n = m.get("name");
+                        Object t = m.get("template");
+                        if (n instanceof String ns && t instanceof String ts) {
+                            parsed.add(new LabelTemplate(ns, ts));
+                        }
+                    }
+                }
+                labelTemplates = normalizeLabelTemplates(parsed);
+            }
         } catch (tools.jackson.core.JacksonException e) {
             log.error("Failed to load settings from {}: {}", settingsPath, e.getMessage());
         }
@@ -232,6 +291,7 @@ public class AppSettings {
             data.put("queryParallelism", queryParallelism);
             // raw value: -1 means "not set in the dialog"
             data.put("querySampleSize", querySampleSize);
+            data.put("labelTemplates", labelTemplatesToMaps(labelTemplates));
             mapper.writeValue(settingsPath.toFile(), data);
         } catch (IOException e) {
             log.error("Failed to save settings: {}", e.getMessage());        }

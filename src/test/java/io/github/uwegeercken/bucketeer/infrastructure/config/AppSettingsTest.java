@@ -1,11 +1,14 @@
 package io.github.uwegeercken.bucketeer.infrastructure.config;
 
+import io.github.uwegeercken.bucketeer.domain.template.LabelTemplate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -144,6 +147,52 @@ class AppSettingsTest {
         new AppSettings(file, 4).setQuerySampleSize(-1);
         assertThat(new AppSettings(file, 4).getQuerySampleSize())
                 .isEqualTo(AppSettings.DEFAULT_QUERY_SAMPLE_SIZE);
+    }
+
+    @Test
+    @DisplayName("prefix variables persist across a restart")
+    void prefixVariablesPersist(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("settings.json");
+        AppSettings first = new AppSettings(file, 4);
+        first.setLabelTemplates(List.of(
+                new LabelTemplate("year", "{left(key, 4)}"),
+                new LabelTemplate("shard", "{split(key, /, 1)}")));
+
+        AppSettings reloaded = new AppSettings(file, 4);
+        assertThat(reloaded.getLabelTemplates()).containsExactly(
+                new LabelTemplate("year", "{left(key, 4)}"),
+                new LabelTemplate("shard", "{split(key, /, 1)}"));
+        assertThat(reloaded.toMap().get("labelTemplates")).asList().hasSize(2);
+    }
+
+    @Test
+    @DisplayName("prefix variables drop invalid names, duplicates and blank templates")
+    void prefixVariablesAreNormalized() {
+        AppSettings settings = new AppSettings(tempPath(), 4);
+
+        settings.setLabelTemplates(List.of(
+                new LabelTemplate("ok", "{left(key,4)}"),
+                new LabelTemplate("  ", "{left(key,4)}"),
+                new LabelTemplate("Bad-Name", "{left(key,4)}"),
+                new LabelTemplate("ok", "{substring(key,1,2)}"),
+                new LabelTemplate("dup", "  ")));
+
+        assertThat(settings.getLabelTemplates()).containsExactly(
+                new LabelTemplate("ok", "{left(key,4)}"));
+    }
+
+    @Test
+    @DisplayName("prefix variables are capped at the maximum count")
+    void prefixVariablesAreCapped() {
+        AppSettings settings = new AppSettings(tempPath(), 4);
+        List<LabelTemplate> many = new ArrayList<>();
+        for (int i = 0; i < AppSettings.MAX_PREFIX_VARIABLES + 5; i++) {
+            many.add(new LabelTemplate("v" + i, "{left(key,4)}"));
+        }
+
+        settings.setLabelTemplates(many);
+
+        assertThat(settings.getLabelTemplates()).hasSize(AppSettings.MAX_PREFIX_VARIABLES);
     }
 
     private static Path tempPath() {

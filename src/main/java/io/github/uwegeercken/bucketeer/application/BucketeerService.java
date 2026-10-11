@@ -6,6 +6,8 @@ import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.domain.template.LabelTemplate;
+import io.github.uwegeercken.bucketeer.domain.template.LabelTemplateSubstitutor;
 import io.github.uwegeercken.bucketeer.domain.template.PrefixTemplateEngine;
 import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
@@ -14,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -26,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 @Service
 public class BucketeerService implements BucketeerUseCase {
@@ -47,15 +51,17 @@ public class BucketeerService implements BucketeerUseCase {
     private final S3Properties s3Properties;
     private final PrefixAnalyzer prefixAnalyzer;
     private final AppSettings appSettings;
+    private final LabelTemplateSubstitutor labelTemplateSubstitutor;
 
     public BucketeerService(S3StoragePort s3StoragePort, PrefixTemplateEngine templateEngine,
                             S3Properties s3Properties, PrefixAnalyzer prefixAnalyzer,
-                            AppSettings appSettings) {
+                            AppSettings appSettings, LabelTemplateSubstitutor labelTemplateSubstitutor) {
         this.s3StoragePort = s3StoragePort;
         this.templateEngine = templateEngine;
         this.s3Properties = s3Properties;
         this.prefixAnalyzer = prefixAnalyzer;
         this.appSettings = appSettings;
+        this.labelTemplateSubstitutor = labelTemplateSubstitutor;
     }
 
     @Override
@@ -75,12 +81,51 @@ public class BucketeerService implements BucketeerUseCase {
 
     @Override
     public String resolveTemplate(String template, String key, String bucket) {
+        if (template != null && template.contains("@{")) {
+            LabelTemplateSubstitutor.SubstitutionResult result =
+                    labelTemplateSubstitutor.substitute(template, prefixVariables());
+            if (result.hasProblems()) {
+                throw new IllegalArgumentException(String.join("; ", result.problems()));
+            }
+            template = result.text();
+        }
         return templateEngine.resolve(template, key, bucket);
     }
 
     @Override
     public List<String> validateTemplate(String template) {
-        return templateEngine.validate(template);
+        return validateTemplate(template, null, null);
+    }
+
+    @Override
+    public List<String> validateTemplate(String template, String key, String bucket) {
+        List<String> problems = new ArrayList<>();
+        if (template == null) return problems;
+        if (template.contains("@{")) {
+            LabelTemplateSubstitutor.SubstitutionResult result =
+                    labelTemplateSubstitutor.substitute(template, prefixVariables());
+            problems.addAll(result.problems());
+            template = result.text();
+        }
+        if (problems.isEmpty()) {
+            templateEngine.validate(template).forEach(f -> problems.add("Unknown function: " + f));
+        }
+        if (problems.isEmpty()) {
+            try {
+                templateEngine.resolve(template, key, bucket);
+            } catch (RuntimeException e) {
+                problems.add(e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        }
+        return problems;
+    }
+
+    /** The currently configured prefix variables as a name -> template map. */
+    private Map<String, String> prefixVariables() {
+        List<LabelTemplate> variables = appSettings.getLabelTemplates();
+        if (variables == null || variables.isEmpty()) return Map.of();
+        return variables.stream()
+                .collect(Collectors.toMap(LabelTemplate::name, LabelTemplate::template));
     }
 
     @Override

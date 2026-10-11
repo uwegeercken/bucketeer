@@ -31,6 +31,15 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.9.4 <small class="text-muted">2026-10-11</small></h6>
+                    <ul>
+                        <li><strong>Prefix variables</strong>: reusable named templates can be defined in the settings dialog and referenced in the search prefix as <code>@{name}</code> &mdash; the reference is replaced by the template text before the prefix is resolved, so the same rule can be reused across buckets without repeating it. Variables may reference each other (cycle-safe), work inside function arguments, and are validated live in the editor with a test-key preview. The prefix field tooltip lists the defined variables.</li>
+                        <li>Prefix variable editor: three test fields (bucket, prefix, key) mirror the query &mdash; <code>{key}</code> and <code>{bucket}</code> resolve from the test key/bucket, and <code>p1 … pN</code> refer to the segments of the test prefix (the variable is appended to it). Validation reports resolution errors (wrong argument counts, out-of-range references) inline, and the function list inserts real, correct examples.</li>
+                        <li>Prefix/template resolution errors from in-progress input are no longer logged as server errors</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.9.3 <small class="text-muted">2026-10-10</small></h6>
                     <ul>
                         <li><strong>Toolbox: enlarge text areas and find &amp; replace</strong>: the input and output text areas can be expanded to fill the whole dialog, and the input offers in-place search and replace &mdash; step through the matches, replace a single occurrence or all at once, with optional case-sensitivity and regular-expression mode and a live match counter</li>
@@ -123,7 +132,7 @@
                     <h6>0.7.8 <small class="text-muted">2026-09-09</small></h6>
                     <ul>
                         <li><strong>New function <code>replace</code></strong>: <code>{replace(ref, find, replacement)}</code> replaces all literal occurrences of <em>find</em> with <em>replacement</em> (both are searched literally, no regex). An empty replacement deletes the search string, e.g. <code>{replace(key, -, _)}</code> normalizes separators, <code>{replace(key, .json, )}</code> removes a suffix</li>
-                        <li><strong>New function <code>split</code></strong>: <code>{split(ref, delimiter, n)}</code> splits by a literal delimiter and returns the part at the 1-based index <code>n</code> (empty parts are kept), e.g. extracting a path segment from the key</li>
+                        <li><strong>New function <code>split</code></strong>: <code>{split(ref, delimiter, n)}</code> splits by a literal delimiter and returns the part at the 1-based index <code>n</code> (empty parts are kept)</li>
                         <li><strong>Wildcards with prefix templates</strong>: a trailing <code>*</code> in the Key field is now removed <em>before</em> the template is resolved, so a template search lists all objects under the derived prefix instead of returning nothing</li>
                         <li>Dependency updates: Spring Boot 4.1.1, AWS SDK 2.54.11</li>
                     </ul>
@@ -399,6 +408,7 @@
                     </tbody>
                 </table>
                 <p th:utext="#{help.syntax.pN.rules}"></p>
+                <p class="text-muted small" th:text="#{help.syntax.pN.editorNote}"></p>
 
                 <h6 class="mt-3" th:text="#{help.syntax.chaining}">Function Chaining</h6>
                 <p th:text="#{help.syntax.chaining.intro}"></p>

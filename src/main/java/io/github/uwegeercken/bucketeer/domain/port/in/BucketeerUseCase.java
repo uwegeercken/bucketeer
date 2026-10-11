@@ -20,6 +20,13 @@ public interface BucketeerUseCase {
 
     List<String> validateTemplate(String template);
 
+    /**
+     * Validates a template like {@link #validateTemplate(String)} but additionally attempts a real
+     * resolution with the given key and bucket, so structural errors (wrong argument counts,
+     * out-of-range segment references, …) are reported as well.
+     */
+    List<String> validateTemplate(String template, String key, String bucket);
+
     ObjectListing listObjects(String serverName, String bucket, String resolvedPrefix, String continuationToken);
 
     /**

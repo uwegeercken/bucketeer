@@ -304,6 +304,48 @@
                     </div>
 
                     <div class="settings-group">
+                        <div class="panel-title" th:text="#{settings.section.variables}">Prefix variables</div>
+                        <div class="text-muted small mb-2" th:text="#{settings.variables.hint}">
+                            Reusable named templates for the search prefix. Reference them in the prefix field
+                            as @{name}; the reference is replaced by the template text before the prefix is
+                            resolved. Available to all servers and buckets.
+                        </div>
+                        <div class="text-muted small mb-2" th:text="#{settings.variables.pnHint}">
+                            p1, p2 … refer to the segments of the test prefix; {key} and {bucket} come from the test key and test bucket.
+                        </div>
+                        <div class="mb-2 d-flex flex-wrap gap-3">
+                            <div>
+                                <label class="form-label fw-semibold small" th:text="#{settings.variables.testBucket}">Test bucket</label>
+                                <input type="text" id="variableTestBucketInput" class="form-control form-control-sm font-monospace"
+                                       style="width: 160px;" value="my-bucket"/>
+                            </div>
+                            <div>
+                                <label class="form-label fw-semibold small" th:text="#{settings.variables.testPrefix}">Test prefix</label>
+                                <input type="text" id="variableTestPrefixInput" class="form-control form-control-sm font-monospace"
+                                       style="width: 220px;" value="2024/06/01/"/>
+                            </div>
+                            <div>
+                                <label class="form-label fw-semibold small" th:text="#{settings.variables.testKey}">Test key</label>
+                                <input type="text" id="variableTestKeyInput" class="form-control form-control-sm font-monospace"
+                                       style="width: 200px;" value="event.json"/>
+                            </div>
+                        </div>
+                        <div id="variablesList" class="mb-2"></div>
+                        <div class="mb-2 d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="addVariableRow()" th:text="#{settings.variables.add}">Add variable</button>
+                            <span class="text-muted small" th:text="#{settings.variables.max}">Max: 20</span>
+                            <span id="variablesSaveError" class="text-danger small"></span>
+                        </div>
+                        <div class="mb-0 small">
+                            <details>
+                                <summary class="fw-semibold" th:text="#{settings.variables.functions}">Available functions</summary>
+                                <div id="variableFunctionList" class="mt-1 d-flex flex-wrap gap-1"></div>
+                            </details>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
                         <div class="panel-title" th:text="#{settings.section.history}">History</div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold small" th:text="#{settings.historyMax.label}">History size (entries)</label>
@@ -433,6 +475,13 @@
                 samples: 8
             };
 
+            var VARIABLE_LABELS = {
+                name:        /*[[#{settings.variables.name}]]*/        'Name',
+                template:    /*[[#{settings.variables.template}]]*/    'Template',
+                remove:      /*[[#{settings.variables.remove}]]*/      'Remove',
+                errorPrefix: /*[[#{settings.variables.errorPrefix}]]*/ 'Prefix variables:'
+            };
+
             function loadSettings() {
                 try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); }
                 catch (e) { return {}; }
@@ -451,6 +500,172 @@
             function duckdbQuackChecked() {
                 var el = document.getElementById('duckdbQuackEnabled');
                 return !!(el && el.checked);
+            }
+
+            var __activeVarTemplate = null;
+            var __variableDebounce = {};
+
+            window.addVariableRow = function(name, template) {
+                var list = document.getElementById('variablesList');
+                if (!list) return;
+                var row = document.createElement('div');
+                row.className = 'variable-row border rounded p-2 mb-2';
+                row.innerHTML =
+                    '<div class="d-flex gap-2 align-items-center mb-1">' +
+                    '  <input type="text" class="variable-name form-control form-control-sm font-monospace" style="width:180px;">' +
+                    '  <input type="text" class="variable-template form-control form-control-sm font-monospace">' +
+                    '  <button type="button" class="btn btn-sm btn-outline-danger">&times;</button>' +
+                    '</div>' +
+                    '<div class="d-flex align-items-center gap-2 small">' +
+                    '  <span class="text-muted">&#8594;</span>' +
+                    '  <span class="variable-preview text-success font-monospace"></span>' +
+                    '  <span class="variable-row-error text-danger small"></span>' +
+                    '</div>';
+                var nameEl = row.querySelector('.variable-name');
+                var tplEl = row.querySelector('.variable-template');
+                nameEl.placeholder = VARIABLE_LABELS.name;
+                nameEl.title = 'a-z0-9_, max 32';
+                tplEl.placeholder = '{left(key, 4)}/...';
+                tplEl.title = VARIABLE_LABELS.template;
+                row.querySelector('button').title = VARIABLE_LABELS.remove;
+                nameEl.value = name || '';
+                tplEl.value = template || '';
+                nameEl.addEventListener('input', function() {
+                    row.querySelector('.variable-row-error').textContent = '';
+                });
+                tplEl.addEventListener('focus', function() { __activeVarTemplate = tplEl; });
+                tplEl.addEventListener('input', function() {
+                    row.querySelector('.variable-row-error').textContent = '';
+                    previewVariable(row);
+                });
+                row.querySelector('button').addEventListener('click', function() { row.remove(); });
+                list.appendChild(row);
+                if (template) previewVariable(row);
+            };
+
+            function renderVariables(data) {
+                var list = document.getElementById('variablesList');
+                if (!list) return;
+                list.innerHTML = '';
+                var vars = (data && data.labelTemplates) || [];
+                vars.forEach(function(v) { addVariableRow(v.name, v.template); });
+            }
+
+            function collectVariables() {
+                var rows = document.querySelectorAll('#variablesList .variable-row');
+                var vars = [];
+                var names = {};
+                var problems = [];
+                rows.forEach(function(row) {
+                    var name = row.querySelector('.variable-name').value.trim();
+                    var template = row.querySelector('.variable-template').value.trim();
+                    if (!name && !template) return;
+                    if (!name) { problems.push('a variable is missing its name'); return; }
+                    if (!/^[a-z0-9_]{1,32}$/.test(name)) {
+                        problems.push("invalid name '" + name + "' (a-z0-9_, max 32)");
+                        return;
+                    }
+                    if (names[name]) { problems.push("duplicate name '" + name + "'"); return; }
+                    if (!template) { problems.push("variable '" + name + "' has no template"); return; }
+                    names[name] = true;
+                    vars.push({ name: name, template: template });
+                });
+                if (vars.length > 20) problems.push('too many variables (max 20)');
+                return { vars: vars, problems: problems };
+            }
+
+            function variableTestContext() {
+                var bucketInput = document.getElementById('variableTestBucketInput');
+                var prefixInput = document.getElementById('variableTestPrefixInput');
+                var keyInput = document.getElementById('variableTestKeyInput');
+                return {
+                    bucket: (bucketInput && bucketInput.value.trim()) || '',
+                    prefix: (prefixInput && prefixInput.value.trim()) || '',
+                    key: (keyInput && keyInput.value.trim()) || ''
+                };
+            }
+
+            // The variable is appended to the test prefix (a slash is added if needed), so that pN
+            // references resolve against the test prefix segments, exactly like in a real search.
+            function combinedPrefix(testPrefix, varTemplate) {
+                if (!testPrefix) return varTemplate;
+                return testPrefix.endsWith('/') ? testPrefix + varTemplate : testPrefix + '/' + varTemplate;
+            }
+
+            function previewVariable(row) {
+                var tpl = row.querySelector('.variable-template').value;
+                var previewEl = row.querySelector('.variable-preview');
+                var errEl = row.querySelector('.variable-row-error');
+                if (!tpl) { previewEl.textContent = ''; errEl.textContent = ''; return; }
+                var ctx = variableTestContext();
+                var combined = combinedPrefix(ctx.prefix, tpl);
+                clearTimeout(__variableDebounce[row]);
+                __variableDebounce[row] = setTimeout(function() {
+                    var query = 'prefix=' + encodeURIComponent(combined)
+                        + '&key=' + encodeURIComponent(ctx.key)
+                        + '&bucket=' + encodeURIComponent(ctx.bucket);
+                    fetch('/api/validate-prefix?' + query)
+                        .then(function(r) { return r.json(); })
+                        .then(function(v) {
+                            if (!v.valid) { errEl.textContent = v.error; previewEl.textContent = ''; return; }
+                            errEl.textContent = '';
+                            fetch('/api/resolve-prefix?' + query)
+                                .then(function(r) { return r.text(); })
+                                .then(function(text) { previewEl.textContent = text; })
+                                .catch(function() {});
+                        }).catch(function() {});
+                }, 300);
+            }
+
+            ['variableTestBucketInput', 'variableTestPrefixInput', 'variableTestKeyInput'].forEach(function(id) {
+                var input = document.getElementById(id);
+                if (!input) return;
+                input.addEventListener('input', function() {
+                    document.querySelectorAll('#variablesList .variable-row').forEach(function(row) {
+                        previewVariable(row);
+                    });
+                });
+            });
+
+            function insertVariableSnippet(snippet) {
+                var target = __activeVarTemplate || document.querySelector('#variablesList .variable-template');
+                if (!target) return;
+                var start = target.selectionStart || target.value.length;
+                var end = target.selectionEnd || target.value.length;
+                target.value = target.value.slice(0, start) + snippet + target.value.slice(end);
+                target.dispatchEvent(new Event('input'));
+                target.focus();
+            }
+
+            function renderFunctionList(functions) {
+                var el = document.getElementById('variableFunctionList');
+                if (!el) return;
+                el.innerHTML = '';
+                (functions || []).forEach(function(f) {
+                    var entry = document.createElement('div');
+                    entry.className = 'w-100';
+                    var head = document.createElement('button');
+                    head.type = 'button';
+                    head.className = 'btn btn-sm btn-outline-secondary';
+                    head.textContent = f.name + (f.argCount ? ' \u00b7 ' + f.argCount + ' arg(s)' : '');
+                    head.title = f.description || '';
+                    var examples = f.examples || [];
+                    head.addEventListener('click', function() {
+                        insertVariableSnippet(examples.length ? examples[0].expr : '{' + f.name + '(key)}');
+                    });
+                    entry.appendChild(head);
+                    examples.forEach(function(ex) {
+                        var chip = document.createElement('button');
+                        chip.type = 'button';
+                        chip.className = 'btn btn-sm btn-link p-0 ms-2 font-monospace';
+                        chip.style.fontSize = '0.78rem';
+                        chip.textContent = ex.expr;
+                        chip.title = ex.note || '';
+                        chip.addEventListener('click', function() { insertVariableSnippet(ex.expr); });
+                        entry.appendChild(chip);
+                    });
+                    el.appendChild(entry);
+                });
             }
 
             function fillServerFields(data) {
@@ -484,6 +699,8 @@
                     opt.selected = (current === z);
                     tzSelect.appendChild(opt);
                 });
+                renderVariables(data);
+                renderFunctionList(data.templateFunctions);
             }
 
             function clearInvalid() {
@@ -560,6 +777,14 @@
                 settings.scanMaxDepth = values.scanMaxDepthInput;
                 localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 
+                var collected = collectVariables();
+                var errSpan = document.getElementById('variablesSaveError');
+                if (errSpan) errSpan.textContent = '';
+                if (collected.problems.length) {
+                    if (errSpan) errSpan.textContent = VARIABLE_LABELS.errorPrefix + ' ' + collected.problems.join('; ');
+                    return;
+                }
+
                 fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -570,14 +795,27 @@
                         maxRequestSizeMb: values.maxRequestSizeInput,
                         duckdbQuackEnabled: duckdbQuackChecked(),
                         queryParallelism: values.parallelismInput,
-                        querySampleSize: values.sampleSizeInput
+                        querySampleSize: values.sampleSizeInput,
+                        labelTemplates: collected.vars
                     })
+                }).then(function(r) {
+                    if (!r.ok) {
+                        return r.json().then(function(b) {
+                            throw new Error(b.error || 'Failed to save settings');
+                        });
+                    }
+                    return r.json();
+                }).then(function(data) {
+                    renderVariables(data);
+                    var msg = document.getElementById('settingsSaveMsg');
+                    if (msg) {
+                        msg.style.display = 'block';
+                        clearTimeout(window.__settingsSaveTimer);
+                        window.__settingsSaveTimer = setTimeout(function() { msg.style.display = 'none'; }, 2000);
+                    }
+                }).catch(function(err) {
+                    if (errSpan) errSpan.textContent = err.message || 'Failed to save settings';
                 });
-
-                var msg = document.getElementById('settingsSaveMsg');
-                msg.style.display = 'block';
-                clearTimeout(window.__settingsSaveTimer);
-                window.__settingsSaveTimer = setTimeout(function() { msg.style.display = 'none'; }, 2000);
             };
 
             window.resetSettings = function() {
@@ -602,6 +840,10 @@
                 if (tzSelect.options.length > 0) tzSelect.value = tzSelect.options[0].value;
                 var duckdbQuackResetEl = document.getElementById('duckdbQuackEnabled');
                 if (duckdbQuackResetEl) duckdbQuackResetEl.checked = false;
+                var variablesListEl = document.getElementById('variablesList');
+                if (variablesListEl) variablesListEl.innerHTML = '';
+                var variablesErrEl = document.getElementById('variablesSaveError');
+                if (variablesErrEl) variablesErrEl.textContent = '';
 
                 fetch('/api/settings', {
                     method: 'POST',
@@ -613,7 +855,8 @@
                         maxRequestSizeMb: DEFAULTS.maxRequestSize,
                         duckdbQuackEnabled: false,
                         queryParallelism: DEFAULTS.parallelism,
-                        querySampleSize: DEFAULTS.samples
+                        querySampleSize: DEFAULTS.samples,
+                        labelTemplates: []
                     })
                 });
                 var msg = document.getElementById('settingsSaveMsg');

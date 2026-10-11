@@ -18,15 +18,14 @@ public class SplitFunction implements TemplateFunction {
     @Override
     public String description() {
         return "Splits the input by the given delimiter (literal string) and returns the part at the 1-based index. " +
-               "Useful for extracting a path segment from a key. Index 1 is the first part; " +
-               "empty parts are kept; out-of-range indices produce an empty string.";
+               "Index 1 is the first part; empty parts are kept; out-of-range indices produce an empty string.";
     }
 
     @Override
     public List<String> examples() {
         return List.of(
-                "{split(key, /, 2)}    → second part, e.g. \"a/b/c\" → \"b\"",
-                "{split(key, -, 1)}    → first part, e.g. \"ABC-DEF\" → \"ABC\"",
+                "{split(key, _, 1)}    → first part, e.g. \"example_key_01.json\" → \"example\"",
+                "{split(key, -, 2)}    → e.g. \"ABC-DEF\" → \"DEF\"",
                 "{split(key, ., 2)}    → e.g. \"data.json\" → \"json\"",
                 "{split(p3, _, 2)}     → split a literal segment, e.g. \"a_b_c\" → \"b\""
         );

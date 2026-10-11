@@ -90,7 +90,6 @@ public class KeyCheckController {
                 try {
                     fullKey = assembleFullKey(line.prefix(), line.key(), bucket);
                 } catch (RuntimeException e) {
-                    log.error("Prefix resolution failed for {}: {}", line.rawLine(), e.getMessage());
                     results.add(errorRow(line.rawLine(), line.prefix(), line.key(), e.getMessage()));
                     synchronized (processed) {
                         processed[0]++;

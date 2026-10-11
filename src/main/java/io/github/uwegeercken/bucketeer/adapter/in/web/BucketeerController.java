@@ -5,6 +5,7 @@ import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.domain.template.LabelTemplate;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;
 import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
@@ -83,6 +84,13 @@ public class BucketeerController {
                 bucketeerUseCase.availableFunctions().stream()
                         .map(f -> "<code>{" + f + "(ref, ...)}</code>")
                         .collect(Collectors.joining("<br/>"));
+        List<LabelTemplate> prefixVariables = appSettings.getLabelTemplates();
+        if (prefixVariables != null && !prefixVariables.isEmpty()) {
+            tooltipText += "<br/><strong>Prefix variables:</strong><br/>" +
+                    prefixVariables.stream()
+                            .map(v -> "<code>@{" + v.name() + "}</code>")
+                            .collect(Collectors.joining("<br/>"));
+        }
         model.addAttribute("tooltipText", tooltipText);
 
         if (Boolean.TRUE.equals(search) && currentServer != null && StringUtils.hasText(bucket)) {
@@ -428,18 +436,21 @@ public class BucketeerController {
         try {
             return bucketeerUseCase.resolveTemplate(prefix, key, bucket);
         } catch (Exception e) {
-            log.error("Failed to resolve prefix '{}': {}", prefix, e.getMessage());
             return "";
         }
     }
 
     @GetMapping(value = "/api/validate-prefix", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public Map<String, Object> validatePrefix(@RequestParam(required = false) String prefix) {
+    public Map<String, Object> validatePrefix(
+            @RequestParam(required = false) String prefix,
+            @RequestParam(required = false) String key,
+            @RequestParam(required = false) String bucket) {
         if (!StringUtils.hasText(prefix)) return Map.of("valid", true, "error", "");
-        List<String> unknown = bucketeerUseCase.validateTemplate(prefix);
-        if (unknown.isEmpty()) return Map.of("valid", true, "error", "");
-        return Map.of("valid", false, "error", "Unknown function(s): " + String.join(", ", unknown));
+        String previewKey = key != null && key.endsWith("*") ? key.substring(0, key.length() - 1) : key;
+        List<String> problems = bucketeerUseCase.validateTemplate(prefix, previewKey, bucket);
+        if (problems.isEmpty()) return Map.of("valid", true, "error", "");
+        return Map.of("valid", false, "error", String.join("; ", problems));
     }
 
     @GetMapping(value = "/api/scan-prefixes", produces = MediaType.APPLICATION_JSON_VALUE)

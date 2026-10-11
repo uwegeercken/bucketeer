@@ -444,7 +444,11 @@
             searchBtn.disabled = false;
             return;
         }
-        fetch('/api/validate-prefix?prefix=' + encodeURIComponent(prefix))
+        const bucketVal = document.getElementById('bucketInput').value;
+        const previewKey = key.endsWith('*') ? key.slice(0, -1) : key;
+        fetch('/api/validate-prefix?prefix=' + encodeURIComponent(prefix)
+                + '&key=' + encodeURIComponent(previewKey)
+                + '&bucket=' + encodeURIComponent(bucketVal))
             .then(r => r.json())
             .then(result => {
                 if (result.valid) {
@@ -452,8 +456,6 @@
                     prefixEl.classList.remove('is-invalid');
                     prefixEl.classList.add('is-valid');
                     searchBtn.disabled = false;
-                    const bucketVal = document.getElementById('bucketInput').value;
-                    const previewKey = key.endsWith('*') ? key.slice(0, -1) : key;
                     fetch('/api/resolve-prefix?prefix=' + encodeURIComponent(prefix) + '&key=' + encodeURIComponent(previewKey) + '&bucket=' + encodeURIComponent(bucketVal))
                         .then(r => r.text())
                         .then(resolved => { setResolvedPopover(resolved); })

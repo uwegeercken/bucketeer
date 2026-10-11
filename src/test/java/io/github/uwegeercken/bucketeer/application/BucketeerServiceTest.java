@@ -6,6 +6,9 @@ import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.domain.template.LabelTemplate;
+import io.github.uwegeercken.bucketeer.domain.template.LabelTemplateSubstitutor;
+import io.github.uwegeercken.bucketeer.domain.template.PrefixTemplateEngine;
 import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +31,7 @@ import static org.mockito.Mockito.*;
 class BucketeerServiceTest {
 
     private static final S3Properties PROPERTIES =
-            new S3Properties("0.9.3", "2026-10-10",
+            new S3Properties("0.9.4", "2026-10-11",
                     new S3Properties.Query(4), new S3Properties.Scan(10, 3));
 
     private S3StoragePort s3StoragePort;
@@ -56,7 +59,8 @@ class BucketeerServiceTest {
                         new PrefixProfile.Sample("a/", BucketeerService.LISTING_PAGE, false, 1),
                         new PrefixProfile.Sample("b/", BucketeerService.LISTING_PAGE, false, 1)),
                         Instant.now()));
-        service = new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettings);
+        service = new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettings,
+                new LabelTemplateSubstitutor());
     }
 
     @Test
@@ -314,7 +318,7 @@ class BucketeerServiceTest {
     @DisplayName("fetchAllObjects stops immediately when the page callback aborts a sequential listing")
     void fetchSequentialAbortsWhenCallbackThrows() {
         BucketeerService seqService =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1), new LabelTemplateSubstitutor());
         when(s3StoragePort.listObjects(eq("server"), eq("bucket"), eq("data/"), any(), anyLong()))
                 .thenReturn(new ObjectListing(List.of(obj("data/a")), "tok1", true),
                         new ObjectListing(List.of(obj("data/b")), null, false));
@@ -351,7 +355,7 @@ class BucketeerServiceTest {
     @DisplayName("fetchAllObjects uses a sequential listing when parallelism is disabled")
     void fetchSequentialWhenParallelismDisabled() {
         BucketeerService seqService =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(0));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(0), new LabelTemplateSubstitutor());
         when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
                 .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
 
@@ -364,7 +368,7 @@ class BucketeerServiceTest {
         verify(s3StoragePort, never()).listObjectsWithLevel(anyString(), anyString(), anyString(), any(), anyLong());
 
         BucketeerService singleWorker =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1), new LabelTemplateSubstitutor());
         collected.clear();
         boolean oneLimit = singleWorker.fetchAllObjects("server", "bucket", "data/", 0,
                 page -> collected.addAll(page.objects()));
@@ -380,7 +384,7 @@ class BucketeerServiceTest {
     void fetchUsesRuntimeParallelismOverYml() {
         // PROPERTIES declares parallelism 4 (application.yml), the stored setting 1 must win
         BucketeerService seqService =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1), new LabelTemplateSubstitutor());
         when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
                 .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
 
@@ -427,7 +431,7 @@ class BucketeerServiceTest {
     @DisplayName("fetchAllObjects skips the prefix analysis when parallelism is below 2")
     void fetchSkipsAnalysisWhenParallelismDisabled() {
         BucketeerService seqService =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1), new LabelTemplateSubstitutor());
         when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
                 .thenReturn(new ObjectListing(List.of(obj("data/a")), null, false));
 
@@ -538,7 +542,7 @@ class BucketeerServiceTest {
     @DisplayName("fetchAllObjects captures a parallelism-disabled report")
     void reportCapturesParallelismDisabled() {
         BucketeerService seqService =
-                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1));
+                new BucketeerService(s3StoragePort, null, PROPERTIES, prefixAnalyzer, appSettingsWith(1), new LabelTemplateSubstitutor());
         when(s3StoragePort.listObjects("server", "bucket", "data/", null, 0))
                 .thenReturn(new ObjectListing(List.of(), null, false));
 
@@ -630,6 +634,93 @@ class BucketeerServiceTest {
                 .isGreaterThanOrEqualTo(4);
         verify(s3StoragePort, times(20))
                 .listObjects(anyString(), eq("bucket"), anyString(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("resolveTemplate expands prefix variables before delegating to the engine")
+    void resolveExpandsVariablesBeforeEngine() {
+        PrefixTemplateEngine engine = mock(PrefixTemplateEngine.class);
+        when(appSettings.getLabelTemplates()).thenReturn(List.of(
+                new LabelTemplate("part", "{left(key, 4)}")));
+        BucketeerService svc = new BucketeerService(s3StoragePort, engine, PROPERTIES,
+                prefixAnalyzer, appSettings, new LabelTemplateSubstitutor());
+
+        svc.resolveTemplate("data/@{part}/", "2024/06/01/e.json", "bucket");
+
+        verify(engine).resolve("data/{left(key, 4)}/", "2024/06/01/e.json", "bucket");
+    }
+
+    @Test
+    @DisplayName("resolveTemplate fails when a prefix variable is unknown")
+    void resolveFailsOnUnknownVariable() {
+        PrefixTemplateEngine engine = mock(PrefixTemplateEngine.class);
+        BucketeerService svc = new BucketeerService(s3StoragePort, engine, PROPERTIES,
+                prefixAnalyzer, appSettings, new LabelTemplateSubstitutor());
+
+        assertThatThrownBy(() -> svc.resolveTemplate("data/@{nope}/", "k", "b"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown prefix variable: nope");
+        verifyNoInteractions(engine);
+    }
+
+    @Test
+    @DisplayName("validateTemplate reports cycles in prefix variables")
+    void validateReportsCycles() {
+        PrefixTemplateEngine engine = mock(PrefixTemplateEngine.class);
+        when(appSettings.getLabelTemplates()).thenReturn(List.of(
+                new LabelTemplate("a", "@{b}"),
+                new LabelTemplate("b", "@{a}")));
+        BucketeerService svc = new BucketeerService(s3StoragePort, engine, PROPERTIES,
+                prefixAnalyzer, appSettings, new LabelTemplateSubstitutor());
+
+        List<String> problems = svc.validateTemplate("@{a}");
+
+        assertThat(problems).anyMatch(p -> p.contains("Cycle detected"));
+    }
+
+    @Test
+    @DisplayName("validateTemplate without variables still reports unknown functions")
+    void validateWithoutVariables() {
+        PrefixTemplateEngine engine = mock(PrefixTemplateEngine.class);
+        when(appSettings.getLabelTemplates()).thenReturn(List.of());
+        when(engine.validate("{nope(key)}")).thenReturn(List.of("nope"));
+        BucketeerService svc = new BucketeerService(s3StoragePort, engine, PROPERTIES,
+                prefixAnalyzer, appSettings, new LabelTemplateSubstitutor());
+
+        List<String> problems = svc.validateTemplate("{nope(key)}");
+
+        assertThat(problems).containsExactly("Unknown function: nope");
+    }
+
+    @Test
+    @DisplayName("validateTemplate reports structural resolve errors such as a wrong argument count")
+    void validateReportsStructuralResolveErrors() {
+        PrefixTemplateEngine engine = mock(PrefixTemplateEngine.class);
+        when(appSettings.getLabelTemplates()).thenReturn(List.of());
+        when(engine.validate("{repeat(p1)}")).thenReturn(List.of());
+        when(engine.resolve("{repeat(p1)}", "2024/06/01/e.json", "bucket"))
+                .thenThrow(new IllegalArgumentException(
+                        "Function 'repeat' expects 0 parameter(s) but got 1 at segment 1"));
+        BucketeerService svc = new BucketeerService(s3StoragePort, engine, PROPERTIES,
+                prefixAnalyzer, appSettings, new LabelTemplateSubstitutor());
+
+        List<String> problems = svc.validateTemplate("{repeat(p1)}", "2024/06/01/e.json", "bucket");
+
+        assertThat(problems).containsExactly(
+                "Function 'repeat' expects 0 parameter(s) but got 1 at segment 1");
+    }
+
+    @Test
+    @DisplayName("validateTemplate with key and bucket reports no problems for a resolvable template")
+    void validateAcceptsResolvableTemplate() {
+        PrefixTemplateEngine engine = mock(PrefixTemplateEngine.class);
+        when(appSettings.getLabelTemplates()).thenReturn(List.of());
+        when(engine.validate("{left(key, 4)}")).thenReturn(List.of());
+        when(engine.resolve("{left(key, 4)}", "2024/06/01/e.json", "bucket")).thenReturn("2024");
+        BucketeerService svc = new BucketeerService(s3StoragePort, engine, PROPERTIES,
+                prefixAnalyzer, appSettings, new LabelTemplateSubstitutor());
+
+        assertThat(svc.validateTemplate("{left(key, 4)}", "2024/06/01/e.json", "bucket")).isEmpty();
     }
 
     private static S3Object obj(String key) {

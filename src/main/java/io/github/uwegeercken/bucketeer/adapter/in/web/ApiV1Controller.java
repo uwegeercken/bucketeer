@@ -80,7 +80,6 @@ public class ApiV1Controller {
         try {
             return ResponseEntity.ok(bucketeerUseCase.resolveTemplate(prefix, key, bucket));
         } catch (Exception e) {
-            log.error("Failed to resolve prefix '{}': {}", prefix, e.getMessage());
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
@@ -90,11 +89,11 @@ public class ApiV1Controller {
         if (!StringUtils.hasText(prefix)) {
             return ResponseEntity.ok(Map.of("valid", true, "error", ""));
         }
-        List<String> unknown = bucketeerUseCase.validateTemplate(prefix);
-        if (unknown.isEmpty()) {
+        List<String> problems = bucketeerUseCase.validateTemplate(prefix);
+        if (problems.isEmpty()) {
             return ResponseEntity.ok(Map.of("valid", true, "error", ""));
         }
-        return ResponseEntity.ok(Map.of("valid", false, "error", "Unknown function(s): " + String.join(", ", unknown)));
+        return ResponseEntity.ok(Map.of("valid", false, "error", String.join("; ", problems)));
     }
 
     @GetMapping(value = "/list", produces = MediaType.APPLICATION_JSON_VALUE)

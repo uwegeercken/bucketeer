@@ -268,7 +268,7 @@ footer {
 
 /* Settings modal */
 .settings-modal {
-    width: 640px;
+    width: 860px;
     max-width: calc(100vw - 2rem);
     margin: 1rem auto;
 }
