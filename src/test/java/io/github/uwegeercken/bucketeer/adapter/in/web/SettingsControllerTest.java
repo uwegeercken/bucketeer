@@ -99,6 +99,18 @@ class SettingsControllerTest {
     }
 
     @Test
+    @DisplayName("saveSettings saving the time zone rebuilds the objects_enriched view")
+    void saveSettingsTimezoneRebuildsEnrichedView() {
+        when(appSettings.toMap()).thenReturn(Map.of("timeZoneId", "Europe/Berlin"));
+
+        ResponseEntity<Map<String, Object>> resp = controller.saveSettings(Map.of("timeZoneId", "Europe/Berlin"));
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(appSettings).setTimeZoneId("Europe/Berlin");
+        verify(duckDbRepository).recreateViews();
+    }
+
+    @Test
     @DisplayName("saveSettings toggling duckdbQuackEnabled persists the flag and reconciles the Quack server")
     void saveSettingsTogglesQuackServer() {
         when(appSettings.toMap()).thenReturn(Map.of(
@@ -234,5 +246,6 @@ class SettingsControllerTest {
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setQueryParallelism(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(appSettings, org.mockito.Mockito.never()).setQuerySampleSize(org.mockito.Mockito.anyInt());
         org.mockito.Mockito.verify(duckDbRepository, org.mockito.Mockito.never()).updateQuackServer();
+        org.mockito.Mockito.verify(duckDbRepository, org.mockito.Mockito.never()).recreateViews();
     }
 }

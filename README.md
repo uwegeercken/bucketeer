@@ -79,8 +79,11 @@ duckdb <<'EOF'
 LOAD quack;
 ATTACH 'quack:localhost:9494' AS bucketeer (TOKEN '64a2...');
 SELECT count(*) FROM bucketeer.objects;
+SELECT year, month, count(*) FROM bucketeer.objects_enriched GROUP BY 1, 2 ORDER BY 1, 2;
 EOF
 ```
+
+Two relations are exposed: `objects` (the raw cache: `key`, `bucket`, `size_bytes`, `last_modified` in UTC, `etag`) and the derived view `objects_enriched`, which adds `last_modified_local` plus the date/time parts `year`, `quarter`, `month`, `week` (ISO), `day`, `day_of_week` (ISO, Monday = 1), `hour`, `minute` and `second` — computed in the configured time zone (Settings → *Time zone*), so grouping by day or hour matches the UI without a manual conversion. The view is rebuilt when the time zone changes.
 
 The server only ever binds **localhost** (`allow_other_hostname` is never set) and requires the token from the log — use the exact host string `quack:localhost:<port>` on both sides. Port (default `9494`) and a fixed token can be set via `bucketeer.duckdb.quack.port` / `bucketeer.duckdb.quack.token` in `application.yml`; an empty token is generated randomly at start. Quack is a **beta** protocol — Bucketeer pins the DuckDB JDBC version in `pom.xml` to absorb API changes. If a Quack client drops the in-memory `objects` table, Bucketeer detects it on the next access, logs an error and recreates the empty table — the cache refills with the next search.
 

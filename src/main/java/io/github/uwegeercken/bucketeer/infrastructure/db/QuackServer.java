@@ -67,7 +67,7 @@ public class QuackServer {
         }
         log.info("DuckDB Quack server listening on {} (token: {})", uri, token);
         log.info("Connect from another DuckDB process: ATTACH '{}' AS bucketeer (TOKEN '{}');", uri, token);
-        log.info("Query samples: FROM bucketeer.objects; FROM bucketeer.query('show tables'); FROM bucketeer.query('describe objects');");
+        log.info("Query samples: FROM bucketeer.objects; FROM bucketeer.objects_enriched; FROM bucketeer.query('show tables'); FROM bucketeer.query('describe objects_enriched');");
         return true;
     }
 

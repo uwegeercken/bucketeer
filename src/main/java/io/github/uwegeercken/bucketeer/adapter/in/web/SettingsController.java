@@ -121,6 +121,8 @@ public class SettingsController {
             Object tz = body.get("timeZoneId");
             if (tz instanceof String s) {
                 appSettings.setTimeZoneId(s);
+                // The time parts of the objects_enriched view are baked in with the zone.
+                duckDbRepository.recreateViews();
             }
         }
         if (body.containsKey("maxFileSizeMb")) {

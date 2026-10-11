@@ -123,6 +123,62 @@ public class DuckDbRepository {
                 )
             """);
         }
+        createEnrichedView();
+    }
+
+    /**
+     * (Re)creates the {@code objects_enriched} view: the cached objects plus a local-time
+     * timestamp and derived date/time parts ({@code year} … {@code second}). The application
+     * itself never reads this view - it exists so a DuckDB Quack client can group and filter
+     * the last search's objects by day or hour without a manual conversion, e.g.
+     * {@code SELECT year, month, count(*) FROM bucketeer.objects_enriched GROUP BY 1, 2}.
+     *
+     * <p>{@code last_modified} is stored as a naive TIMESTAMP whose wall clock is the JVM
+     * default zone (the JDBC driver converts {@link java.sql.Timestamp} values with that zone,
+     * independent of the DuckDB session time zone). The view therefore first recovers the
+     * instant ({@code AT TIME ZONE <system zone>}) and then renders it in the configured
+     * display zone. Because both zones are baked in as literals, {@link #recreateViews()} must
+     * run after the time zone setting changes.
+     */
+    private void createEnrichedView() throws SQLException {
+        String storedZone = ZoneId.systemDefault().getId().replace("'", "''");
+        String displayZone = zone().getId().replace("'", "''");
+        String local = "(last_modified AT TIME ZONE '" + storedZone
+                + "') AT TIME ZONE '" + displayZone + "'";
+        String sql = """
+                CREATE OR REPLACE VIEW objects_enriched AS
+                WITH base AS (
+                    SELECT key, bucket, size_bytes, last_modified, etag,
+                           %s AS last_modified_local
+                    FROM objects
+                )
+                SELECT key, bucket, size_bytes, last_modified, etag, last_modified_local,
+                       year(last_modified_local)   AS year,
+                       quarter(last_modified_local) AS quarter,
+                       month(last_modified_local)  AS month,
+                       week(last_modified_local)   AS week,
+                       day(last_modified_local)    AS day,
+                       isodow(last_modified_local) AS day_of_week,
+                       hour(last_modified_local)   AS hour,
+                       minute(last_modified_local) AS minute,
+                       second(last_modified_local) AS second
+                FROM base
+                """.formatted(local);
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(sql);
+        }
+    }
+
+    /**
+     * Rebuilds the derived views so the time parts follow a changed time zone setting.
+     * Failures are logged only - the cache stays usable without the view.
+     */
+    public synchronized void recreateViews() {
+        try {
+            createEnrichedView();
+        } catch (SQLException e) {
+            log.warn("Failed to recreate objects_enriched view: {}", e.getMessage());
+        }
     }
 
     /**
@@ -147,6 +203,10 @@ public class DuckDbRepository {
     /** Starts the Quack remote server at boot when the setting is enabled. */
     @PostConstruct
     public synchronized void startQuackServerIfEnabled() {
+        // The constructor runs before the time zone provider is injected, so the enriched view
+        // is (re)built here to pick up the configured time zone. It also (re)appears at startup
+        // if a previous Quack client dropped it.
+        recreateViews();
         if (appSettings != null && appSettings.isDuckdbQuackEnabled()) {
             updateQuackServer();
         }
