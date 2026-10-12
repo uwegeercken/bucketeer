@@ -18,6 +18,10 @@
                     type="button" role="tab" th:text="#{help.tab.releases}">Releases</button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDuckdb"
+                    type="button" role="tab" th:text="#{help.tab.duckdb}">DuckDB Quack</button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabTemplate"
                     type="button" role="tab" th:text="#{help.tab.template}">Template Help</button>
         </li>
@@ -373,7 +377,66 @@
             </div>
         </div>
 
-        <!-- Tab 2: Template Help -->
+        <!-- Tab 2: DuckDB Quack -->
+        <div class="tab-pane fade" id="tabDuckdb" role="tabpanel">
+
+            <div class="panel">
+                <div class="panel-title" th:text="#{help.duckdb.section.overview}">Overview</div>
+                <p th:utext="#{help.duckdb.intro}"></p>
+                <p class="text-muted small mb-0" th:utext="#{help.duckdb.enable.text}"></p>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title" th:text="#{help.duckdb.section.connect}">Connect</div>
+                <p th:text="#{help.duckdb.connect.intro}"></p>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span id="quackStatus" class="badge bg-secondary"
+                          th:text="#{help.duckdb.status.disabled}">Not enabled</span>
+                    <button type="button" id="quackCopy" class="btn btn-sm btn-outline-secondary ms-auto"
+                            th:text="#{help.duckdb.copy}">Copy</button>
+                </div>
+                <pre id="quackAttach" class="syntax-block mb-0">LOAD quack;
+ATTACH 'quack:localhost:9494' AS bucketeer (TOKEN '64a2...');
+SELECT count(*) FROM bucketeer.objects;</pre>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title" th:text="#{help.duckdb.section.relations}">Exposed relations</div>
+                <p th:text="#{help.duckdb.relations.intro}"></p>
+                <table class="table table-sm table-bordered w-auto mb-0">
+                    <thead class="table-secondary">
+                    <tr>
+                        <th th:text="#{help.duckdb.relations.relation}">Relation</th>
+                        <th th:text="#{help.duckdb.relations.columns}">Columns</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><code>objects</code></td>
+                        <td class="small" th:utext="#{help.duckdb.relations.objects}"></td>
+                    </tr>
+                    <tr>
+                        <td><code>objects_enriched</code></td>
+                        <td class="small" th:utext="#{help.duckdb.relations.enriched}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title" th:text="#{help.duckdb.section.notes}">Notes</div>
+                <ul class="mb-0">
+                    <li th:utext="#{help.duckdb.notes.localhost}"></li>
+                    <li th:utext="#{help.duckdb.notes.token}"></li>
+                    <li th:utext="#{help.duckdb.notes.config}"></li>
+                    <li th:utext="#{help.duckdb.notes.beta}"></li>
+                    <li th:utext="#{help.duckdb.notes.drop}"></li>
+                </ul>
+            </div>
+
+        </div>
+
+        <!-- Tab 3: Template Help -->
         <div class="tab-pane fade" id="tabTemplate" role="tabpanel">
 
             <div class="panel">
@@ -449,6 +512,72 @@
 <footer th:replace="~{layout :: footer}"></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    (function () {
+        var attachEl = document.getElementById('quackAttach');
+        var statusEl = document.getElementById('quackStatus');
+        var copyBtn = document.getElementById('quackCopy');
+        if (!attachEl || !statusEl) return;
+
+        var labels = {
+            running: /*[[#{help.duckdb.status.running}]]*/ 'Running',
+            enabled: /*[[#{help.duckdb.status.enabled}]]*/ 'Enabled',
+            disabled: /*[[#{help.duckdb.status.disabled}]]*/ 'Not enabled',
+            copy: /*[[#{help.duckdb.copy}]]*/ 'Copy',
+            copied: /*[[#{help.duckdb.copied}]]*/ 'Copied'
+        };
+
+        function setStatus(cssClass, text) {
+            statusEl.className = 'badge ' + cssClass;
+            statusEl.textContent = text;
+        }
+
+        function snippet(port, token) {
+            return 'LOAD quack;\n'
+                + "ATTACH 'quack:localhost:" + port + "' AS bucketeer (TOKEN '" + token + "');\n"
+                + 'SELECT count(*) FROM bucketeer.objects;';
+        }
+
+        // Fill the snippet with the live port/token; the static example stays as a fallback.
+        fetch('/api/settings')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                var q = data && data.quack;
+                if (!q) return;
+                if (q.running) {
+                    setStatus('bg-success', labels.running);
+                    attachEl.textContent = snippet(q.port, q.token);
+                } else if (q.enabled) {
+                    setStatus('bg-warning text-dark', labels.enabled);
+                } else {
+                    setStatus('bg-secondary', labels.disabled);
+                }
+            })
+            .catch(function () { /* keep the static example */ });
+
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+                var text = attachEl.textContent;
+                var done = function () {
+                    copyBtn.textContent = labels.copied;
+                    setTimeout(function () { copyBtn.textContent = labels.copy; }, 1500);
+                };
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(done);
+                } else {
+                    var ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); } finally { ta.remove(); }
+                    done();
+                }
+            });
+        }
+    })();
+</script>
 <th:block th:replace="~{layout :: uploadModal}"></th:block>
 </body>
 </html>

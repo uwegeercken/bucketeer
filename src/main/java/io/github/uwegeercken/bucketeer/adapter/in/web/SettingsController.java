@@ -70,6 +70,12 @@ public class SettingsController {
         Map<String, Object> body = new LinkedHashMap<>(appSettings.toMap());
         body.put("systemTimeZoneId", ZoneId.systemDefault().getId());
         body.put("timeZoneOptions", COMMON_ZONES);
+        Map<String, Object> quack = new LinkedHashMap<>();
+        quack.put("enabled", appSettings.isDuckdbQuackEnabled());
+        quack.put("running", duckDbRepository.quackRunning());
+        quack.put("port", duckDbRepository.quackPort());
+        quack.put("token", duckDbRepository.quackToken());
+        body.put("quack", quack);
         body.put("templateFunctions", templateFunctions.stream()
                 .map(f -> Map.<String, Object>of(
                         "name", f.name(),

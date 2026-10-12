@@ -238,6 +238,24 @@ public class DuckDbRepository {
         }
     }
 
+    /** True while the Quack remote server is actually listening. */
+    public synchronized boolean quackRunning() {
+        return quackServer != null;
+    }
+
+    /** The effective Quack port: the running server's, or the configured one. */
+    public synchronized int quackPort() {
+        return quackServer != null ? quackServer.port() : quackPort;
+    }
+
+    /**
+     * The effective Quack token: the running server's (generated when none is configured),
+     * or the configured one while the server is stopped (may be empty then).
+     */
+    public synchronized String quackToken() {
+        return quackServer != null ? quackServer.token() : quackToken;
+    }
+
     /** Clears all cached objects. Called before a new query. */
     public void clear() {
         try (Statement stmt = connection.createStatement()) {

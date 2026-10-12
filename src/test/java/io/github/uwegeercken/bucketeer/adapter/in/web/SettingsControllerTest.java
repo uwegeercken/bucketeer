@@ -199,6 +199,46 @@ class SettingsControllerTest {
     }
 
     @Test
+    @DisplayName("getSettings exposes the live DuckDB Quack status for the help page")
+    void getSettingsExposesQuackStatus() {
+        when(appSettings.toMap()).thenReturn(Map.of());
+        when(appSettings.isDuckdbQuackEnabled()).thenReturn(true);
+        when(duckDbRepository.quackRunning()).thenReturn(true);
+        when(duckDbRepository.quackPort()).thenReturn(9595);
+        when(duckDbRepository.quackToken()).thenReturn("abc123");
+
+        Map<String, Object> body = controller.getSettings();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> quack = (Map<String, Object>) body.get("quack");
+        assertThat(quack)
+                .containsEntry("enabled", true)
+                .containsEntry("running", true)
+                .containsEntry("port", 9595)
+                .containsEntry("token", "abc123");
+    }
+
+    @Test
+    @DisplayName("getSettings reports a stopped Quack server with the configured port and empty token")
+    void getSettingsExposesStoppedQuackServer() {
+        when(appSettings.toMap()).thenReturn(Map.of());
+        when(appSettings.isDuckdbQuackEnabled()).thenReturn(false);
+        when(duckDbRepository.quackRunning()).thenReturn(false);
+        when(duckDbRepository.quackPort()).thenReturn(9494);
+        when(duckDbRepository.quackToken()).thenReturn("");
+
+        Map<String, Object> body = controller.getSettings();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> quack = (Map<String, Object>) body.get("quack");
+        assertThat(quack)
+                .containsEntry("enabled", false)
+                .containsEntry("running", false)
+                .containsEntry("port", 9494)
+                .containsEntry("token", "");
+    }
+
+    @Test
     @DisplayName("saveSettings persists valid prefix variables")
     void saveSettingsPersistsPrefixVariables() {
         when(substitutor.substitute(anyString(), anyMap()))
