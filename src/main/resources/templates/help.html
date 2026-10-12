@@ -35,6 +35,18 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.9.5 <small class="text-muted">2026-10-12</small></h6>
+                    <ul>
+                        <li><strong>Key Check: background run with progress and cancel</strong>: the check now runs in the background instead of blocking the page &mdash; a progress line reports <code>Processed X of Y (Z%)</code> while it runs, and a <strong>Cancel</strong> button stops it, keeping the keys checked so far. Large files (hundreds of thousands of keys) no longer freeze the user interface.</li>
+                        <li><strong>Key Check: paged results and filters</strong>: results are shown one page at a time (using the configured page size) and can be filtered to <code>All</code>, <code>Existing</code>, <code>Missing</code> or <code>Errors</code>; the summary now also counts error rows separately.</li>
+                        <li><strong>Key Check: fixed the crash on large files</strong>: a file with more lines than the worker queue could be aborted with a rejected task; the checks are now fanned out over a dedicated, correctly sized worker pool.</li>
+                        <li><strong>Snapshot export as CSV</strong> (snapshot context menu): export either <code>prefix + key</code> &mdash; a compact file that can be re-imported into the Key Check &mdash; or the <code>full data</code> of a snapshot</li>
+                        <li>CSV exports strip surrounding quotes from the ETag, so the exported files stay clean and re-importable</li>
+                        <li>Errors from the internal <code>/api/**</code> endpoints are reported as JSON instead of an HTML error page, so the UI shows the real message</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.9.4 <small class="text-muted">2026-10-11</small></h6>
                     <ul>
                         <li><strong>Prefix variables</strong>: reusable named templates can be defined in the settings dialog and referenced in the search prefix as <code>@{name}</code> &mdash; the reference is replaced by the template text before the prefix is resolved, so the same rule can be reused across buckets without repeating it. Variables may reference each other (cycle-safe), work inside function arguments, and are validated live in the editor with a test-key preview. The prefix field tooltip lists the defined variables.</li>
