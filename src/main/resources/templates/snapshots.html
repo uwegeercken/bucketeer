@@ -420,6 +420,22 @@
             revealSnapshot(id);
         });
 
+        document.getElementById('snapCtxExportKeys').addEventListener('click', () => {
+            if (!ctxSnapshotId) return;
+            const id = ctxSnapshotId;
+            ctxSnapshotId = null;
+            window.BucketeerContextMenu.close();
+            window.location.href = '/api/snapshots/' + encodeURIComponent(id) + '/export?format=prefix-key';
+        });
+
+        document.getElementById('snapCtxExportData').addEventListener('click', () => {
+            if (!ctxSnapshotId) return;
+            const id = ctxSnapshotId;
+            ctxSnapshotId = null;
+            window.BucketeerContextMenu.close();
+            window.location.href = '/api/snapshots/' + encodeURIComponent(id) + '/export?format=parquet';
+        });
+
         document.getElementById('snapCtxDelete').addEventListener('click', () => {
             if (!ctxSnapshotId) return;
             const id = ctxSnapshotId;

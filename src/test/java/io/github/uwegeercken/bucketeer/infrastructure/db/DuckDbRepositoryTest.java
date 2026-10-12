@@ -6,7 +6,10 @@ import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -146,5 +149,68 @@ class DuckDbRepositoryTest {
                 Instant.parse("2024-06-07T22:30:45Z"), "e")));
 
         assertThat(enrichedRow("a/file.json")).containsEntry("year", "2024").containsEntry("hour", "22");
+    }
+
+    @Test
+    @DisplayName("exportSnapshotToCsv writes the parquet schema and a prefix+key file, both with a header")
+    void exportSnapshotToCsvWritesBothFormats(@TempDir Path dir) throws Exception {
+        repo.insertBatch(List.of(
+                new S3Object("events/shard-01/a.json", "topf1", 10L, Instant.parse("2024-06-07T22:30:45Z"), "e1"),
+                new S3Object("top.json", "topf1", 20L, Instant.parse("2024-06-08T01:00:00Z"), "e2")));
+
+        Path parquet = dir.resolve("snap.parquet");
+        repo.exportAllToParquet(parquet.toString());
+
+        Path dataCsv = dir.resolve("data.csv");
+        repo.exportSnapshotToCsv(parquet.toString(), dataCsv.toString(), DuckDbRepository.SnapshotCsvFormat.PARQUET);
+        List<String> dataLines = Files.readAllLines(dataCsv);
+        assertThat(dataLines.get(0)).isEqualTo("key,bucket,size_bytes,last_modified,etag");
+        assertThat(dataLines).anySatisfy(l -> assertThat(l).contains("events/shard-01/a.json").contains("topf1"));
+        assertThat(dataLines).anySatisfy(l -> assertThat(l).startsWith("top.json,topf1,20,"));
+
+        Path keysCsv = dir.resolve("keys.csv");
+        repo.exportSnapshotToCsv(parquet.toString(), keysCsv.toString(), DuckDbRepository.SnapshotCsvFormat.PREFIX_KEY);
+        List<String> keyLines = Files.readAllLines(keysCsv);
+        assertThat(keyLines.get(0)).isEqualTo("prefix,key");
+        assertThat(keyLines).containsSequence("events/shard-01/,a.json", ",top.json");
+    }
+
+    @Test
+    @DisplayName("exportSnapshotToCsv trims the ETag quotes left in older snapshot files")
+    void exportSnapshotToCsvTrimsEtagQuotes(@TempDir Path dir) throws Exception {
+        repo.insertBatch(List.of(new S3Object("a.json", "bucket", 1L,
+                Instant.parse("2024-06-07T22:30:45Z"), "\"abc123\"")));
+
+        Path parquet = dir.resolve("snap.parquet");
+        repo.exportAllToParquet(parquet.toString());
+
+        Path csv = dir.resolve("data.csv");
+        repo.exportSnapshotToCsv(parquet.toString(), csv.toString(), DuckDbRepository.SnapshotCsvFormat.PARQUET);
+
+        List<String> lines = Files.readAllLines(csv);
+        assertThat(lines.get(0)).isEqualTo("key,bucket,size_bytes,last_modified,etag");
+        assertThat(lines.get(1)).doesNotContain("\"").endsWith(",abc123");
+    }
+
+    @Test
+    @DisplayName("exportDiffToCsv trims the ETag quotes coming from a legacy snapshot file")
+    void exportDiffToCsvTrimsEtagQuotes(@TempDir Path dir) throws Exception {
+        repo.insertBatch(List.of(new S3Object("gone.json", "bucket", 1L,
+                Instant.parse("2024-06-07T22:30:45Z"), "\"legacy\"")));
+        Path snapshot = dir.resolve("snap.parquet");
+        repo.exportAllToParquet(snapshot.toString());
+
+        repo.clear();
+        repo.insertBatch(List.of(new S3Object("fresh.json", "bucket", 2L,
+                Instant.parse("2024-06-08T22:30:45Z"), "plain")));
+
+        Path csv = dir.resolve("diff.csv");
+        repo.exportDiffToCsv(snapshot.toString(), csv.toString());
+
+        List<String> lines = Files.readAllLines(csv);
+        assertThat(lines).anySatisfy(line -> assertThat(line)
+                .startsWith("removed,gone.json,bucket,1,")
+                .endsWith(",legacy"));
+        assertThat(lines).noneSatisfy(line -> assertThat(line).contains("\""));
     }
 }

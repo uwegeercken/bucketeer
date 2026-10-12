@@ -9,6 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
@@ -122,5 +124,62 @@ class SnapshotControllerTest {
         verify(session).setAttribute(eq(QueryContext.SESSION_KEY), qcCaptor.capture());
         QueryContext qc = (QueryContext) qcCaptor.getValue();
         assertThat(qc.getListingReport()).isSameAs(report);
+    }
+
+    @Test
+    @DisplayName("exportSnapshotCsv streams the snapshot parquet as CSV using the parquet format")
+    void exportSnapshotCsvStreamsParquetFormat(@TempDir Path tempDir) throws Exception {
+        when(snapshotRepo.findById("s1")).thenReturn(snapshot("Minio Local"));
+        when(snapshotRepo.getSnapshotsDir()).thenReturn(tempDir);
+        Files.write(tempDir.resolve("snapshot_s1_data.parquet"), new byte[]{1});
+        SnapshotController controller = newController(new SessionContext());
+
+        ResponseEntity<Resource> resp = controller.exportSnapshotCsv("s1", "parquet");
+
+        assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(resp.getHeaders().getContentType().toString()).isEqualTo("text/csv");
+        assertThat(resp.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+                .contains("attachment").contains(".csv");
+        verify(duckDb).exportSnapshotToCsv(anyString(), anyString(),
+                eq(DuckDbRepository.SnapshotCsvFormat.PARQUET));
+    }
+
+    @Test
+    @DisplayName("exportSnapshotCsv maps the prefix-key format to the Key Check layout")
+    void exportSnapshotCsvMapsPrefixKeyFormat(@TempDir Path tempDir) throws Exception {
+        when(snapshotRepo.findById("s1")).thenReturn(snapshot("Minio Local"));
+        when(snapshotRepo.getSnapshotsDir()).thenReturn(tempDir);
+        Files.write(tempDir.resolve("snapshot_s1_data.parquet"), new byte[]{1});
+        SnapshotController controller = newController(new SessionContext());
+
+        ResponseEntity<Resource> resp = controller.exportSnapshotCsv("s1", "prefix-key");
+
+        assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
+        verify(duckDb).exportSnapshotToCsv(anyString(), anyString(),
+                eq(DuckDbRepository.SnapshotCsvFormat.PREFIX_KEY));
+    }
+
+    @Test
+    @DisplayName("exportSnapshotCsv rejects an unknown snapshot id and a missing data file")
+    void exportSnapshotCsvRejectsUnknownIdAndMissingData(@TempDir Path tempDir) {
+        when(snapshotRepo.findById("s1")).thenReturn(snapshot("Minio Local"));
+        when(snapshotRepo.findById("nope")).thenReturn(null);
+        when(snapshotRepo.getSnapshotsDir()).thenReturn(tempDir);
+        SnapshotController controller = newController(new SessionContext());
+
+        // the data file for s1 is never written
+        assertThat(controller.exportSnapshotCsv("s1", "parquet").getStatusCode().value()).isEqualTo(400);
+        assertThat(controller.exportSnapshotCsv("nope", "parquet").getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("exportSnapshotCsv rejects an unknown format while the snapshot exists")
+    void exportSnapshotCsvRejectsUnknownFormat(@TempDir Path tempDir) throws Exception {
+        when(snapshotRepo.findById("s1")).thenReturn(snapshot("Minio Local"));
+        when(snapshotRepo.getSnapshotsDir()).thenReturn(tempDir);
+        Files.write(tempDir.resolve("snapshot_s1_data.parquet"), new byte[]{1});
+        SnapshotController controller = newController(new SessionContext());
+
+        assertThat(controller.exportSnapshotCsv("s1", "xlsx").getStatusCode().value()).isEqualTo(400);
     }
 }

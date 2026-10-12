@@ -61,6 +61,8 @@
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm text-primary" id="progressSpinner"></div>
             <span id="progressText">Processing...</span>
+            <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="cancelBtn"
+                    onclick="cancelCheck()" th:text="#{btn.cancel}">Cancel</button>
         </div>
     </div>
 
@@ -73,14 +75,28 @@
     <div class="panel" id="resultsPanel" style="display:none;">
         <div class="panel-title d-flex align-items-center justify-content-between">
             <span id="resultsTitle" th:text="#{keycheck.results}">Results</span>
-            <button type="button" class="btn btn-sm btn-outline-success btn-icon"
-                    id="exportBtn" style="display:none;"
-                    onclick="exportCsv()" th:title="#{keycheck.export}">
-                <i class="bi bi-download"></i>
-            </button>
+            <div class="d-flex align-items-center gap-1">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Filter">
+                    <button type="button" class="btn btn-outline-secondary active" id="filterAll"
+                            onclick="setFilter('all')" th:text="#{keycheck.filter.all}">All</button>
+                    <button type="button" class="btn btn-outline-secondary" id="filterExists"
+                            onclick="setFilter('exists')" th:text="#{keycheck.filter.exists}">Existing</button>
+                    <button type="button" class="btn btn-outline-secondary" id="filterMissing"
+                            onclick="setFilter('missing')" th:text="#{keycheck.filter.missing}">Missing</button>
+                    <button type="button" class="btn btn-outline-secondary" id="filterError"
+                            onclick="setFilter('error')" th:text="#{keycheck.filter.error}">Errors</button>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-success btn-icon"
+                        id="exportBtn" style="display:none;"
+                        onclick="exportCsv()" th:title="#{keycheck.export}">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
         </div>
         <div id="summary" class="mb-2"></div>
+        <div id="paginationTop" class="d-flex align-items-center gap-1 mb-2" style="display:none;"></div>
         <div id="resultsTable"></div>
+        <div id="paginationBottom" class="d-flex align-items-center gap-1 mt-2" style="display:none;"></div>
     </div>
 
     <th:block th:replace="~{layout :: tagsModal}"></th:block>
@@ -107,8 +123,26 @@
     const labelKeycheckEtag        = /*[[#{keycheck.etag}]]*/ 'ETag';
     const labelKeycheckStatus      = /*[[#{keycheck.status}]]*/ 'Status';
     const labelKeycheckExport      = /*[[#{keycheck.export}]]*/ 'Export CSV';
+    const labelKeycheckErrorCount  = /*[[#{keycheck.filter.error}]]*/ 'Errors';
+    const labelKeycheckProgress    = /*[[#{keycheck.progress}]]*/ 'Processed {0} of {1} ({2}%)';
+    const labelKeycheckCancelling  = /*[[#{keycheck.cancelling}]]*/ 'Cancelling...';
+    const labelKeycheckCancelled   = /*[[#{keycheck.cancelled}]]*/ 'Check cancelled';
+    const labelKeycheckNoResults   = /*[[#{keycheck.noResults}]]*/ 'No results.';
     const labelRowMenu             = /*[[#{btn.rowMenu}]]*/ 'Actions';
     const currentServer            = /*[[${selectedServer}]]*/ '';
+
+    const SETTINGS_KEY = 'bucketeer_settings';
+    const PAGE_SIZE = (() => {
+        try {
+            const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+            return s.pageSize && s.pageSize >= 10 && s.pageSize <= 1000 ? s.pageSize : 100;
+        } catch { return 100; }
+    })();
+
+    let pollTimer = null;
+    let currentPage = 0;
+    let currentFilter = 'all';
+    let currentBucket = '';
 
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -154,15 +188,26 @@
 
         const progressPanel = document.getElementById('progressPanel');
         const progressText = document.getElementById('progressText');
+        const progressSpinner = document.getElementById('progressSpinner');
+        const cancelBtn = document.getElementById('cancelBtn');
         const resultsPanel = document.getElementById('resultsPanel');
         const errorPanel = document.getElementById('errorPanel');
         const checkBtn = document.getElementById('checkBtn');
+
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
         progressPanel.style.display = 'block';
         resultsPanel.style.display = 'none';
         errorPanel.style.display = 'none';
         checkBtn.disabled = true;
+        progressSpinner.style.display = '';
+        cancelBtn.style.display = '';
+        cancelBtn.disabled = false;
         progressText.textContent = escHtml(labelKeycheckProcessed) + '...';
+        currentBucket = bucket;
+        currentPage = 0;
+        currentFilter = 'all';
+        updateFilterButtons();
 
         const formData = new FormData();
         formData.append('file', file);
@@ -174,39 +219,116 @@
             const res = await fetch('/api/keycheck/check', { method: 'POST', body: formData });
             const data = await res.json();
 
-            progressPanel.style.display = 'none';
-            checkBtn.disabled = false;
-
             if (data.error) {
+                stopProgress();
                 document.getElementById('errorText').textContent = escHtml(data.error);
                 errorPanel.style.display = 'block';
                 return;
             }
-
-            showResults(data, bucket);
+            pollStatus();
         } catch (err) {
-            progressPanel.style.display = 'none';
-            checkBtn.disabled = false;
+            stopProgress();
             document.getElementById('errorText').textContent = 'Error: ' + escHtml(err.message);
             errorPanel.style.display = 'block';
         }
     }
 
-    function showResults(data, bucket) {
-        const panel = document.getElementById('resultsPanel');
-        const summaryEl = document.getElementById('summary');
+    function stopProgress() {
+        document.getElementById('progressPanel').style.display = 'none';
+        document.getElementById('checkBtn').disabled = false;
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+
+    async function cancelCheck() {
+        document.getElementById('cancelBtn').disabled = true;
+        try { await fetch('/api/keycheck/cancel', { method: 'POST' }); } catch {}
+    }
+
+    function pollStatus() {
+        const tick = async () => {
+            let s;
+            try {
+                const res = await fetch('/api/keycheck/status');
+                s = await res.json();
+            } catch { return; }
+
+            updateProgress(s);
+            if (s.status !== 'DONE' && s.status !== 'CANCELLED' && s.status !== 'ERROR') return;
+
+            stopProgress();
+            if (s.status === 'ERROR') {
+                document.getElementById('errorText').textContent = 'Error: ' + escHtml(s.error || '');
+                document.getElementById('errorPanel').style.display = 'block';
+                return;
+            }
+            showSummary(s);
+            loadResults();
+        };
+        tick();
+        pollTimer = setInterval(tick, 500);
+    }
+
+    function updateProgress(s) {
+        const total = s.total || 0;
+        const processed = s.processed || 0;
+        const pct = total > 0 ? Math.floor(processed * 100 / total) : 0;
+
+        const cancelBtn = document.getElementById('cancelBtn');
+        if (s.cancelling) {
+            cancelBtn.disabled = true;
+            document.getElementById('progressText').textContent = escHtml(labelKeycheckCancelling);
+        } else {
+            document.getElementById('progressText').textContent = labelKeycheckProgress
+                .replace('{0}', processed).replace('{1}', total).replace('{2}', pct);
+        }
+    }
+
+    function showSummary(s) {
+        document.getElementById('summary').innerHTML =
+            '<span class="badge bg-success me-1">' + escHtml(labelKeycheckExists) + ': ' + s.existCount + '</span>'
+            + '<span class="badge bg-danger me-1">' + escHtml(labelKeycheckMissing) + ': ' + s.missingCount + '</span>'
+            + '<span class="badge bg-warning text-dark me-1">' + escHtml(labelKeycheckErrorCount) + ': ' + s.errorCount + '</span>'
+            + '<span class="text-muted small ms-2">'
+            + (s.status === 'CANCELLED' ? escHtml(labelKeycheckCancelled) + ' \u2013 ' : '')
+            + escHtml(labelKeycheckProcessed) + ': ' + s.processed + ' / ' + s.total + '</span>';
+    }
+
+    function setFilter(filter) {
+        currentFilter = filter;
+        currentPage = 0;
+        updateFilterButtons();
+        loadResults();
+    }
+
+    function updateFilterButtons() {
+        const filterButtons = { all: 'filterAll', exists: 'filterExists', missing: 'filterMissing', error: 'filterError' };
+        Object.keys(filterButtons).forEach(filter => {
+            document.getElementById(filterButtons[filter]).classList.toggle('active', filter === currentFilter);
+        });
+    }
+
+    async function loadResults() {
+        const params = new URLSearchParams({ page: currentPage, pageSize: PAGE_SIZE, filter: currentFilter });
+        let data;
+        try {
+            const res = await fetch('/api/keycheck/results?' + params.toString());
+            data = await res.json();
+        } catch (err) {
+            document.getElementById('errorText').textContent = 'Error: ' + escHtml(err.message);
+            document.getElementById('errorPanel').style.display = 'block';
+            return;
+        }
+        document.getElementById('resultsPanel').style.display = 'block';
+        document.getElementById('exportBtn').style.display = data.allTotal > 0 ? '' : 'none';
+        renderRows(data);
+        renderPager(data);
+    }
+
+    function renderRows(data) {
         const tableEl = document.getElementById('resultsTable');
-        const exportBtn = document.getElementById('exportBtn');
 
-        panel.style.display = 'block';
-        exportBtn.style.display = data.results.length > 0 ? '' : 'none';
-
-        summaryEl.innerHTML = '<span class="badge bg-success me-1">' + escHtml(labelKeycheckExists) + ': ' + data.existCount + '</span>'
-            + '<span class="badge bg-danger me-1">' + escHtml(labelKeycheckMissing) + ': ' + data.missingCount + '</span>'
-            + '<span class="text-muted small ms-2">' + escHtml(labelKeycheckProcessed) + ': ' + data.processed + ' / ' + data.total + '</span>';
-
-        if (data.results.length === 0) {
-            tableEl.innerHTML = '<span class="text-muted small fst-italic">No results.</span>';
+        if (!data.rows || data.rows.length === 0) {
+            tableEl.innerHTML = '<span class="text-muted small fst-italic">' + escHtml(labelKeycheckNoResults) + '</span>';
             return;
         }
 
@@ -219,7 +341,7 @@
             + '<th style="width:44px"></th>'
             + '</tr></thead><tbody>';
 
-        for (const r of data.results) {
+        for (const r of data.rows) {
             const rowClass = r.error ? 'table-warning' : r.exists ? '' : 'table-danger';
             const statusIcon = r.error
                 ? '<i class="bi bi-exclamation-triangle-fill text-warning" title="' + escHtml(r.error) + '"></i>'
@@ -228,7 +350,7 @@
                     : '<i class="bi bi-x-circle-fill text-danger"></i>';
             const sizeKb = r.sizeBytes != null ? (r.sizeBytes / 1024).toFixed(2) : '';
             const menuCell = (r.exists && !r.error)
-                ? '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon row-menu-btn" title="' + escHtml(labelRowMenu) + '" aria-label="' + escHtml(labelRowMenu) + '" data-bucket="' + escHtml(bucket) + '" data-key="' + escHtml(r.key) + '"><i class="bi bi-three-dots" aria-hidden="true"></i></button>'
+                ? '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon row-menu-btn" title="' + escHtml(labelRowMenu) + '" aria-label="' + escHtml(labelRowMenu) + '" data-bucket="' + escHtml(currentBucket) + '" data-key="' + escHtml(r.key) + '"><i class="bi bi-three-dots" aria-hidden="true"></i></button>'
                 : '';
 
             html += '<tr class="' + rowClass + '">'
@@ -243,6 +365,43 @@
 
         html += '</tbody></table>';
         tableEl.innerHTML = html;
+    }
+
+    function renderPager(data) {
+        const total = data.total || 0;
+        const totalPages = Math.max(1, Math.ceil(total / (data.pageSize || PAGE_SIZE)));
+
+        ['paginationTop', 'paginationBottom'].forEach(id => {
+            const pag = document.getElementById(id);
+            pag.innerHTML = '';
+            pag.classList.toggle('d-flex', total > 0);
+            pag.style.display = total > 0 ? '' : 'none';
+            if (total === 0) return;
+
+            const btn = (iconClass, disabled, onclick) => {
+                const b = document.createElement('button');
+                b.className = 'btn btn-sm btn-outline-secondary btn-icon';
+                b.innerHTML = '<i class="bi ' + iconClass + '"></i>';
+                b.disabled = disabled;
+                if (!disabled) b.onclick = onclick;
+                return b;
+            };
+
+            pag.appendChild(btn('bi-skip-start', currentPage === 0,
+                () => { currentPage = 0; loadResults(); }));
+            pag.appendChild(btn('bi-skip-backward', currentPage === 0,
+                () => { currentPage--; loadResults(); }));
+
+            const info = document.createElement('span');
+            info.className = 'text-muted small px-2';
+            info.textContent = (currentPage + 1) + ' / ' + totalPages + ' (' + total + ')';
+            pag.appendChild(info);
+
+            pag.appendChild(btn('bi-skip-forward', currentPage >= totalPages - 1,
+                () => { currentPage++; loadResults(); }));
+            pag.appendChild(btn('bi-skip-end', currentPage >= totalPages - 1,
+                () => { currentPage = totalPages - 1; loadResults(); }));
+        });
     }
 
     function exportCsv() {

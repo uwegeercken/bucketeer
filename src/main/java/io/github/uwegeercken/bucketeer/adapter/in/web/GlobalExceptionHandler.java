@@ -5,16 +5,25 @@ import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import java.util.Map;
+
 /**
  * Catches exceptions from page-rendering controllers and re-populates the model
  * so that the index page renders correctly even on error.
  * Form field values are preserved by reading them from the original request.
+ *
+ * <p>Requests under {@code /api/**} are JSON endpoints: they get a JSON error body with a
+ * matching status instead of the index page. Returning the HTML page (with HTTP 200) would
+ * break the browser's {@code response.json()} and hide the real error.</p>
  */
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -40,22 +49,38 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(S3Exception.class)
-    public ModelAndView handleS3Exception(S3Exception ex, HttpServletRequest request) {
+    public Object handleS3Exception(S3Exception ex, HttpServletRequest request) {
         log.error("S3 error: {}", ex.awsErrorDetails().errorMessage());
-        return errorView("S3 Fehler: " + ex.awsErrorDetails().errorMessage()
-                + " (Code: " + ex.awsErrorDetails().errorCode() + ")", request);
+        return errorResponse("S3 Fehler: " + ex.awsErrorDetails().errorMessage()
+                + " (Code: " + ex.awsErrorDetails().errorCode() + ")",
+                HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ModelAndView handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+    public Object handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         log.error("Invalid argument: {}", ex.getMessage());
-        return errorView(ex.getMessage(), request);
+        return errorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST, request);
     }
 
     @ExceptionHandler(Exception.class)
-    public ModelAndView handleGeneral(Exception ex, HttpServletRequest request) {
+    public Object handleGeneral(Exception ex, HttpServletRequest request) {
         log.error("Unexpected error: {}", ex.getMessage());
-        return errorView("Unerwarteter Fehler: " + ex.getMessage(), request);
+        return errorResponse("Unerwarteter Fehler: " + ex.getMessage(),
+                HttpStatus.INTERNAL_SERVER_ERROR, request);
+    }
+
+    /**
+     * Returns a JSON error for {@code /api/**} requests and the index page otherwise.
+     * The message may be {@code null}; both branches guard against that.
+     */
+    private Object errorResponse(String message, HttpStatus status, HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri != null && uri.startsWith("/api/")) {
+            return ResponseEntity.status(status)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("error", message != null ? message : ""));
+        }
+        return errorView(message, request);
     }
 
     private ModelAndView errorView(String message, HttpServletRequest request) {

@@ -554,15 +554,15 @@ public class DuckDbRepository {
      */
     public void exportDiffToCsv(String snapshotParquetPath, String exportPath) {
         String sql = "COPY ("
-                + "SELECT 'added' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
+                + "SELECT 'added' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, trim(o.etag, '\"') AS etag "
                 + "FROM objects o LEFT JOIN read_parquet('" + snapshotParquetPath + "') s ON o.key = s.key "
                 + "WHERE s.key IS NULL "
                 + "UNION ALL "
-                + "SELECT 'removed' AS status, s.key, s.bucket, s.size_bytes, s.last_modified, s.etag "
+                + "SELECT 'removed' AS status, s.key, s.bucket, s.size_bytes, s.last_modified, trim(s.etag, '\"') AS etag "
                 + "FROM read_parquet('" + snapshotParquetPath + "') s LEFT JOIN objects o ON s.key = o.key "
                 + "WHERE o.key IS NULL "
                 + "UNION ALL "
-                + "SELECT 'changed' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
+                + "SELECT 'changed' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, trim(o.etag, '\"') AS etag "
                 + "FROM objects o INNER JOIN read_parquet('" + snapshotParquetPath + "') s ON o.key = s.key "
                 + "WHERE o.size_bytes != s.size_bytes OR o.last_modified != s.last_modified "
                 + "ORDER BY status, key"
@@ -622,15 +622,15 @@ public class DuckDbRepository {
      */
     public void exportDiffToCsvTwoSnapshots(String snapshot1Path, String snapshot2Path, String exportPath) {
         String sql = "COPY ("
-                + "SELECT 'added' AS status, n.key, n.bucket, n.size_bytes, n.last_modified, n.etag "
+                + "SELECT 'added' AS status, n.key, n.bucket, n.size_bytes, n.last_modified, trim(n.etag, '\"') AS etag "
                 + "FROM read_parquet('" + snapshot2Path + "') n LEFT JOIN read_parquet('" + snapshot1Path + "') o ON n.key = o.key "
                 + "WHERE o.key IS NULL "
                 + "UNION ALL "
-                + "SELECT 'removed' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, o.etag "
+                + "SELECT 'removed' AS status, o.key, o.bucket, o.size_bytes, o.last_modified, trim(o.etag, '\"') AS etag "
                 + "FROM read_parquet('" + snapshot1Path + "') o LEFT JOIN read_parquet('" + snapshot2Path + "') n ON o.key = n.key "
                 + "WHERE n.key IS NULL "
                 + "UNION ALL "
-                + "SELECT 'changed' AS status, n.key, n.bucket, n.size_bytes, n.last_modified, n.etag "
+                + "SELECT 'changed' AS status, n.key, n.bucket, n.size_bytes, n.last_modified, trim(n.etag, '\"') AS etag "
                 + "FROM read_parquet('" + snapshot2Path + "') n INNER JOIN read_parquet('" + snapshot1Path + "') o ON n.key = o.key "
                 + "WHERE n.size_bytes != o.size_bytes OR n.last_modified != o.last_modified "
                 + "ORDER BY status, key"
@@ -642,6 +642,59 @@ public class DuckDbRepository {
             handleObjectsTableIssue(e);
             log.error("Failed to export diff to CSV: {}", e.getMessage());
             throw new RuntimeException("Diff export failed: " + e.getMessage());
+        }
+    }
+
+    /** CSV export variants for a snapshot parquet file. */
+    public enum SnapshotCsvFormat {
+        /** Two columns {@code prefix,key} that can be re-imported into Key Check. */
+        PREFIX_KEY,
+        /** The full parquet schema: {@code key,bucket,size_bytes,last_modified,etag}. */
+        PARQUET
+    }
+
+    /**
+     * Exports a snapshot parquet file to CSV (UTF-8, comma separated, with a header row).
+     * {@link SnapshotCsvFormat#PREFIX_KEY} splits each key at its last '/' so the resulting
+     * file can be re-imported into Key Check; {@link SnapshotCsvFormat#PARQUET} mirrors the
+     * parquet schema. Rows are ordered by the full object key.
+     *
+     * <p>The parquet ETag is trimmed of surrounding quotes on export: snapshots written before
+     * ETag normalisation still hold the quoted S3 header value, which the CSV writer would
+     * otherwise re-escape into {@code """..."""}.</p>
+     *
+     * <p><strong>Known limitation:</strong> a prefix or key that contains a comma is written as a
+     * quoted CSV field (RFC 4180). Key Check's importer splits on the delimiter without honouring
+     * quotes, so such a file cannot be re-imported. Prefix/key templates and ordinary S3 keys do
+     * not contain commas.</p>
+     */
+    public void exportSnapshotToCsv(String snapshotParquetPath, String exportPath, SnapshotCsvFormat format) {
+        String projection;
+        String orderBy;
+        switch (format) {
+            case PREFIX_KEY -> {
+                // NULLIF turns an empty directory into a NULL so DuckDB writes a truly empty
+                // CSV field (a raw empty string would be written as "" and break Key Check's
+                // quote-less parser). A key without '/' therefore keeps prefix empty.
+                projection = "NULLIF(regexp_replace(t.key, '[^/]*$', ''), '') AS prefix, "
+                        + "regexp_extract(t.key, '([^/]*)$', 1) AS key";
+                orderBy = "t.key";
+            }
+            case PARQUET -> {
+                projection = "key, bucket, size_bytes, last_modified, trim(etag, '\"') AS etag";
+                orderBy = "key";
+            }
+            default -> throw new IllegalArgumentException("Unknown snapshot CSV format: " + format);
+        }
+        String sql = "COPY (SELECT " + projection + " FROM read_parquet('" + snapshotParquetPath + "') AS t "
+                + "ORDER BY " + orderBy + ") TO '" + exportPath + "' (FORMAT CSV, HEADER 1)";
+
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(sql);
+        } catch (SQLException e) {
+            handleObjectsTableIssue(e);
+            log.error("Failed to export snapshot to CSV: {}", e.getMessage());
+            throw new RuntimeException("Snapshot CSV export failed: " + e.getMessage());
         }
     }
 

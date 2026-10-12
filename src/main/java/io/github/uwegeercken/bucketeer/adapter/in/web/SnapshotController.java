@@ -344,6 +344,66 @@ public class SnapshotController {
         }
     }
 
+    @GetMapping("/api/snapshots/{id}/export")
+    public ResponseEntity<Resource> exportSnapshotCsv(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "parquet") String format) {
+
+        SnapshotMeta meta = snapshotRepo.findById(id);
+        if (meta == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        Path dataPath = meta.dataPath(snapshotRepo.getSnapshotsDir());
+        if (!dataPath.toFile().exists()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        DuckDbRepository.SnapshotCsvFormat csvFormat;
+        String formatLabel;
+        switch (format.toLowerCase(java.util.Locale.ROOT)) {
+            case "prefix-key" -> {
+                csvFormat = DuckDbRepository.SnapshotCsvFormat.PREFIX_KEY;
+                formatLabel = "prefix-key";
+            }
+            case "parquet" -> {
+                csvFormat = DuckDbRepository.SnapshotCsvFormat.PARQUET;
+                formatLabel = "parquet";
+            }
+            default -> {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+
+        try {
+            java.io.File tmpFile = java.io.File.createTempFile("bucketeer-snapshot-", ".csv");
+            tmpFile.deleteOnExit();
+            duckDb.exportSnapshotToCsv(dataPath.toString(), tmpFile.getAbsolutePath(), csvFormat);
+
+            FileSystemResource resource = new FileSystemResource(tmpFile);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + snapshotFileName(meta, formatLabel) + "\"")
+                    .contentType(MediaType.parseMediaType("text/csv"))
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("Failed to export snapshot {}: {}", id, e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /** Builds the download file name following the diff-download convention. */
+    private static String snapshotFileName(SnapshotMeta meta, String formatLabel) {
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+        String rawPrefix = (meta.prefix() != null ? meta.prefix() : "").replaceAll("/$", "");
+        String safePrefix = rawPrefix.replaceAll(" ", "_").replaceAll("/", "-");
+        return "snapshot_bucketeer_"
+                + (meta.serverName() != null ? meta.serverName().replaceAll("[^a-zA-Z0-9_-]", "_") : "") + "_"
+                + (meta.bucket() != null ? meta.bucket().replaceAll("[^a-zA-Z0-9_-]", "_") : "") + "_"
+                + safePrefix.replaceAll("[^a-zA-Z0-9_-]", "_") + "_"
+                + meta.createdAt().atZone(ZoneId.systemDefault()).format(fmt) + "_"
+                + formatLabel + ".csv";
+    }
+
     @DeleteMapping("/api/snapshots/{id}")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> deleteSnapshot(@PathVariable String id) {

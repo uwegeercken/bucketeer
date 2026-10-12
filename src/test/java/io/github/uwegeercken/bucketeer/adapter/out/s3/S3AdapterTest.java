@@ -2,6 +2,7 @@ package io.github.uwegeercken.bucketeer.adapter.out.s3;
 
 import io.github.uwegeercken.bucketeer.domain.model.HeadObjectResult;
 import io.github.uwegeercken.bucketeer.domain.model.LevelListing;
+import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixCount;
 import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
@@ -126,6 +127,40 @@ class S3AdapterTest {
 
         assertThat(result.exists()).isTrue();
         assertThat(result.sizeBytes()).isEqualTo(42L);
+    }
+
+    @Test
+    @DisplayName("headObject strips the surrounding quotes S3 puts around the ETag")
+    void headObjectStripsEtagQuotes() {
+        handler = (proxy, method, args) -> {
+            if (method.getName().equals("headObject")) {
+                return HeadObjectResponse.builder().contentLength(1L).eTag("\"abc123\"").build();
+            }
+            return method.getDefaultValue();
+        };
+
+        HeadObjectResult result = adapter.headObject("server", "bucket", "key.txt");
+
+        assertThat(result.eTag()).isEqualTo("abc123");
+    }
+
+    @Test
+    @DisplayName("listObjects stores the ETag without the surrounding quotes")
+    void listObjectsStripsEtagQuotes() {
+        handler = (proxy, method, args) -> {
+            if (method.getName().equals("listObjectsV2")) {
+                return ListObjectsV2Response.builder()
+                        .contents(software.amazon.awssdk.services.s3.model.S3Object.builder()
+                                .key("a.txt").size(1L).eTag("\"abc123\"").build())
+                        .build();
+            }
+            return method.getDefaultValue();
+        };
+
+        ObjectListing listing = adapter.listObjects("server", "bucket", "", null, 0);
+
+        assertThat(listing.objects()).singleElement()
+                .extracting(S3Object::etag).isEqualTo("abc123");
     }
 
     @Test

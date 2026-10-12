@@ -1,5 +1,6 @@
 package io.github.uwegeercken.bucketeer.adapter.out.s3;
 
+import io.github.uwegeercken.bucketeer.domain.model.Etags;
 import io.github.uwegeercken.bucketeer.domain.model.HeadObjectResult;
 import io.github.uwegeercken.bucketeer.domain.model.LevelListing;
 import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
@@ -59,7 +60,7 @@ public class S3Adapter implements S3StoragePort {
 
         ListObjectsV2Response response = client.listObjectsV2(builder.build());
         List<S3Object> objects = response.contents().stream()
-                .map(obj -> new S3Object(obj.key(), bucket, obj.size(), obj.lastModified(), obj.eTag()))
+                .map(obj -> new S3Object(obj.key(), bucket, obj.size(), obj.lastModified(), Etags.stripQuotes(obj.eTag())))
                 .toList();
 
         return new ObjectListing(objects, response.nextContinuationToken(), Boolean.TRUE.equals(response.isTruncated()));
@@ -83,7 +84,7 @@ public class S3Adapter implements S3StoragePort {
 
         ListObjectsV2Response response = client.listObjectsV2(builder.build());
         List<S3Object> objects = response.contents().stream()
-                .map(obj -> new S3Object(obj.key(), bucket, obj.size(), obj.lastModified(), obj.eTag()))
+                .map(obj -> new S3Object(obj.key(), bucket, obj.size(), obj.lastModified(), Etags.stripQuotes(obj.eTag())))
                 .toList();
         List<String> prefixes = response.commonPrefixes().stream().map(p -> p.prefix()).toList();
 
@@ -154,7 +155,7 @@ public class S3Adapter implements S3StoragePort {
                     true,
                     response.contentLength(),
                     response.lastModified(),
-                    response.eTag()
+                    Etags.stripQuotes(response.eTag())
             );
         } catch (NoSuchKeyException e) {
             return HeadObjectResult.notFound();
