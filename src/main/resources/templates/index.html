@@ -47,8 +47,14 @@
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold" th:text="#{label.bucket}">Bucket</label>
                     <div class="d-flex gap-2 align-items-center">
-                        <select name="bucket" id="bucketInput"
-                                class="form-select form-select-sm font-monospace">
+                        <div class="fav-combobox-wrapper flex-grow-1">
+                            <input type="text" id="bucketComboInput"
+                                   class="form-control form-control-sm fav-combo-input"
+                                   th:placeholder="#{label.bucketSearch}" autocomplete="off"
+                                   th:aria-label="#{label.bucketSearch}"/>
+                            <div id="bucketComboDropdown" class="fav-dropdown" style="display:none;"></div>
+                        </div>
+                        <select name="bucket" id="bucketInput" class="d-none">
                             <option value="">--</option>
                         </select>
                         <button type="button" id="scanBucketBtn"
@@ -359,6 +365,7 @@
     const labelInfoSizeRange = /*[[#{msg.info.sizeRange}]]*/ 'Size min/max';
     const labelInfoFileTypes = /*[[#{msg.info.fileTypes}]]*/ 'File types';
     const labelInfoOther     = /*[[#{msg.info.other}]]*/ 'Other';
+    const labelBucketNoMatch = /*[[#{label.bucketNoMatch}]]*/ 'No matching bucket';
 
     const STORAGE_KEY  = 'bucketeer_favorites';
     const HISTORY_KEY  = 'bucketeer_history';
@@ -382,19 +389,21 @@
         if (el) el.value = settingsValue('maxObjects', 0, 10000000);
     }
 
-    // --- Bucket dropdown ---
+    // --- Bucket combobox ---
 
     let lastBucketsLoad = 0;
     let refreshInFlight = false;
+    let bucketHighlight = -1;
 
     async function loadBuckets(selectPreselected) {
         const select = document.getElementById('bucketInput');
         try {
             const res = await fetch('/api/buckets');
             const buckets = await res.json();
-            const current = selectPreselected || '';
+            const list = Array.isArray(buckets) ? buckets : [];
+            const current = selectPreselected != null ? selectPreselected : select.value;
             select.innerHTML = '<option value="">--</option>'
-                + buckets.map(b => '<option value="' + escHtml(b) + '"'
+                + list.map(b => '<option value="' + escHtml(b) + '"'
                     + (b === current ? ' selected' : '') + '>'
                     + escHtml(b) + '</option>').join('');
         } catch {
@@ -402,6 +411,90 @@
         } finally {
             lastBucketsLoad = Date.now();
         }
+        syncBucketComboText();
+    }
+
+    // Setzt den Wert des (versteckten) Selects, ergaenzt bei Bedarf eine Option
+    // und gleicht den sichtbaren Combobox-Text an.
+    function setBucketValue(bucket) {
+        const select = document.getElementById('bucketInput');
+        if (!select) return;
+        const value = bucket || '';
+        if (value && !select.querySelector('option[value="' + CSS.escape(value) + '"]')) {
+            const opt = document.createElement('option');
+            opt.value = value; opt.textContent = value;
+            select.appendChild(opt);
+        }
+        select.value = value;
+        setBucketComboText(value);
+    }
+
+    function setBucketComboText(value) {
+        const input = document.getElementById('bucketComboInput');
+        if (input) input.value = value || '';
+    }
+
+    // Beim Neuladen (z. B. Refresh waehrend der Eingabe) den Suchtext nicht
+    // ueberschreiben, solange das Dropdown offen ist.
+    function syncBucketComboText() {
+        const dropdown = document.getElementById('bucketComboDropdown');
+        if (dropdown && dropdown.style.display !== 'none') return;
+        setBucketComboText(document.getElementById('bucketInput').value);
+    }
+
+    // Die Bucket-Liste stammt direkt aus dem (versteckten) Select, damit auch per
+    // Favorit/Verlauf/Snapshot ergaenzte Buckets enthalten sind.
+    function bucketNamesFromSelect() {
+        const select = document.getElementById('bucketInput');
+        if (!select) return [];
+        return Array.from(select.options).map(o => o.value).filter(v => v !== '');
+    }
+
+    function bucketItemHtml(value, label) {
+        return '<div class="fav-dropdown-item" data-bucket="' + escHtml(value) + '">'
+            + '<i class="bi bi-archive fav-icon hist"></i>'
+            + '<span class="fav-label">' + escHtml(label) + '</span></div>';
+    }
+
+    function renderBucketDropdown(filterText) {
+        const dropdown = document.getElementById('bucketComboDropdown');
+        if (!dropdown) return;
+        const text = (filterText || '').trim().toLowerCase();
+        bucketHighlight = -1;
+        if (!text) {
+            // ohne Filter: "--" zum Leeren, dann alle Buckets
+            dropdown.innerHTML =
+                '<div class="fav-dropdown-item" data-bucket="">'
+                + '<i class="bi bi-slash-circle fav-icon hist"></i>'
+                + '<span class="fav-label">--</span></div>'
+                + bucketNamesFromSelect().map(n => bucketItemHtml(n, n)).join('');
+        } else {
+            const current = document.getElementById('bucketInput').value;
+            let names = bucketNamesFromSelect().filter(n => n.toLowerCase().includes(text));
+            if (current && !names.includes(current)) names = [current].concat(names);
+            dropdown.innerHTML = names.length === 0
+                ? '<div class="fav-dropdown-empty">' + escHtml(labelBucketNoMatch) + '</div>'
+                : names.map(n => bucketItemHtml(n, n)).join('');
+        }
+        dropdown.style.display = 'block';
+    }
+
+    function closeBucketDropdown() {
+        const dropdown = document.getElementById('bucketComboDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        bucketHighlight = -1;
+    }
+
+    function selectBucket(bucket) {
+        setBucketValue(bucket);
+        closeBucketDropdown();
+        document.getElementById('bucketInput').dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function handleBucketSelect(target) {
+        const item = target.closest('.fav-dropdown-item');
+        if (!item) return;
+        selectBucket(item.dataset.bucket || '');
     }
 
     async function refreshBucketList() {
@@ -412,6 +505,11 @@
         refreshInFlight = true;
         try {
             await loadBuckets(current);
+            const dropdown = document.getElementById('bucketComboDropdown');
+            if (dropdown && dropdown.style.display !== 'none') {
+                const input = document.getElementById('bucketComboInput');
+                renderBucketDropdown(input ? input.value : '');
+            }
         } finally {
             refreshInFlight = false;
         }
@@ -851,14 +949,7 @@
             return;
         }
         clearFormSessionState();
-        const bucketEl = document.getElementById('bucketInput');
-        if (bucket && !bucketEl.querySelector('option[value="' + CSS.escape(bucket) + '"]')) {
-            const opt = document.createElement('option');
-            opt.value = bucket; opt.textContent = bucket; opt.selected = true;
-            bucketEl.appendChild(opt);
-        } else {
-            bucketEl.value = bucket || '';
-        }
+        setBucketValue(bucket);
         document.getElementById('prefixInput').value = prefix || '';
         document.getElementById('keyInput').value    = key    || '';
         addToHistory();
@@ -1028,16 +1119,7 @@
             const pending = JSON.parse(sessionStorage.getItem('bkt_pending_combo') || 'null');
             if (pending) {
                 sessionStorage.removeItem('bkt_pending_combo');
-                const sel = document.getElementById('bucketInput');
-                if (pending.bucket) {
-                    if (sel.querySelector('option[value="' + CSS.escape(pending.bucket) + '"]')) {
-                        sel.value = pending.bucket;
-                    } else if (sel.options.length > 0) {
-                        const opt = document.createElement('option');
-                        opt.value = pending.bucket; opt.textContent = pending.bucket; opt.selected = true;
-                        sel.appendChild(opt);
-                    }
-                }
+                if (pending.bucket) setBucketValue(pending.bucket);
                 if (pending.prefix) document.getElementById('prefixInput').value = pending.prefix;
                 if (pending.key) document.getElementById('keyInput').value = pending.key;
             }
@@ -1050,14 +1132,7 @@
         if (savedSortBy)  sortBy  = savedSortBy;
         if (savedSortDir) sortDir = savedSortDir;
         if (bucket) {
-            const sel = document.getElementById('bucketInput');
-            if (sel.querySelector('option[value="' + CSS.escape(bucket) + '"]')) {
-                sel.value = bucket;
-            } else if (bucket && sel.options.length > 0) {
-                const opt = document.createElement('option');
-                opt.value = bucket; opt.textContent = bucket; opt.selected = true;
-                sel.appendChild(opt);
-            }
+            setBucketValue(bucket);
         }
         if (prefix && !document.getElementById('prefixInput').value)
             document.getElementById('prefixInput').value = prefix;
@@ -1670,16 +1745,7 @@
 
     function applySnapshotPrefill() {
         if (!snapshotContext) return;
-        const sel = document.getElementById('bucketInput');
-        if (sel && snapshotContext.bucket) {
-            if (sel.querySelector('option[value="' + CSS.escape(snapshotContext.bucket) + '"]')) {
-                sel.value = snapshotContext.bucket;
-            } else {
-                const opt = document.createElement('option');
-                opt.value = snapshotContext.bucket; opt.textContent = snapshotContext.bucket; opt.selected = true;
-                sel.appendChild(opt);
-            }
-        }
+        if (snapshotContext.bucket) setBucketValue(snapshotContext.bucket);
         if (snapshotContext.prefix) document.getElementById('prefixInput').value = snapshotContext.prefix;
         const serverSel = document.getElementById('headerServerSelect');
         if (serverSel && snapshotContext.server) serverSel.value = snapshotContext.server;
@@ -1701,8 +1767,6 @@
         });
 
         const bucketInput = document.getElementById('bucketInput');
-        bucketInput.addEventListener('mousedown', refreshBucketList);
-        bucketInput.addEventListener('focus', refreshBucketList);
         bucketInput.addEventListener('change', () => {
             resetScanState();
             const modalEl = document.getElementById('scanModal');
@@ -1710,6 +1774,53 @@
                 openScanModal();
             }
         });
+
+        const bucketComboInput    = document.getElementById('bucketComboInput');
+        const bucketComboDropdown = document.getElementById('bucketComboDropdown');
+        if (bucketComboInput && bucketComboDropdown) {
+            bucketComboInput.addEventListener('focus', () => {
+                bucketComboInput.value = '';
+                renderBucketDropdown('');
+                refreshBucketList();
+            });
+            bucketComboInput.addEventListener('input', () => {
+                renderBucketDropdown(bucketComboInput.value);
+            });
+            bucketComboInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    closeBucketDropdown();
+                    setBucketComboText(bucketInput.value);
+                }, 200);
+            });
+            bucketComboInput.addEventListener('keydown', (e) => {
+                const items = bucketComboDropdown.querySelectorAll('.fav-dropdown-item');
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    bucketHighlight = Math.min(bucketHighlight + 1, items.length - 1);
+                    items.forEach((el, i) => el.classList.toggle('active', i === bucketHighlight));
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    bucketHighlight = Math.max(bucketHighlight - 1, -1);
+                    items.forEach((el, i) => el.classList.toggle('active', i === bucketHighlight));
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (bucketHighlight >= 0 && items[bucketHighlight]) {
+                        handleBucketSelect(items[bucketHighlight]);
+                    } else {
+                        const text = bucketComboInput.value.trim().toLowerCase();
+                        const names = bucketNamesFromSelect()
+                            .filter(n => n.toLowerCase().includes(text));
+                        if (text && names.length === 1) selectBucket(names[0]);
+                    }
+                } else if (e.key === 'Escape') {
+                    closeBucketDropdown();
+                    setBucketComboText(bucketInput.value);
+                }
+            });
+            bucketComboDropdown.addEventListener('mousedown', (e) => {
+                handleBucketSelect(e.target);
+            });
+        }
 
         // Combobox logic
         const comboInput = document.getElementById('favComboInput');
