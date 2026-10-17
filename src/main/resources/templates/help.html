@@ -35,6 +35,13 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.9.6 <small class="text-muted">2026-10-17</small></h6>
+                    <ul>
+                        <li>Bucket list on the main page is now a searchable combobox (filter by name).</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.9.5 <small class="text-muted">2026-10-12</small></h6>
                     <ul>
                         <li><strong>Key Check: background run with progress and cancel</strong>: the check now runs in the background instead of blocking the page &mdash; a progress line reports <code>Processed X of Y (Z%)</code> while it runs, and a <strong>Cancel</strong> button stops it, keeping the keys checked so far. Large files (hundreds of thousands of keys) no longer freeze the user interface.</li>
