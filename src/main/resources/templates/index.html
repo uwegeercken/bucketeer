@@ -1220,9 +1220,22 @@
 
     function setSearchButtonMode(running) {
         const btn = document.getElementById('searchBtn');
+        queryActive = running;
+        // Ergebnis-Aktionen sind waehrend einer laufenden Suche nicht sinnvoll
+        // verfuegbar: die Ergebnisse existieren (noch) nicht, und "Ergebnisse
+        // leeren" wuerde den Ergebnis-Cache loeschen, waehrend die Query weiter
+        // im Hintergrund laeuft.
+        ['btnAddAll', 'btnClearResults'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = running;
+        });
+        // Der Snapshot-Button wird hier nur gesperrt. Freigegeben wird er nach dem
+        // Ende ausschliesslich von loadResults() (disabled = total === 0), damit er
+        // bei 0 Treffern bzw. Abbruch korrekt deaktiviert bleibt.
+        const snapBtn = document.getElementById('btnSaveSnapshot');
+        if (snapBtn && running) snapBtn.disabled = true;
         if (!btn) return;
         const icon = btn.querySelector('i.bi');
-        queryActive = running;
         btn.title = running ? labelCancelQuery : labelSearch;
         btn.setAttribute('aria-label', running ? labelCancelQuery : labelSearch);
         if (icon) {
@@ -1619,8 +1632,22 @@
         queryStartTime = null;
         clearInterval(pollInterval);
         stopTimer();
+        // Such-/Cancel-Button und Ergebnis-Aktionen zurueck auf Ausgangslage, damit
+        // der UI-Zustand nie haengenbleibt (falls "Ergebnisse leeren" doch einmal
+        // waehrend einer laufenden Suche ausgeloest wird - die Query selbst laeuft
+        // dann weiter und wird nur nie mehr dargestellt).
+        setSearchButtonMode(false);
+        // Keine Ergebnisse mehr -> Snapshot-Button gesperrt (analog loadResults).
+        const snapBtn = document.getElementById('btnSaveSnapshot');
+        if (snapBtn) snapBtn.disabled = true;
         setQueryStrategyBadge(null, false);
         document.getElementById('querySpinner').style.display = 'none';
+        const statusText = document.getElementById('queryStatusText');
+        statusText.textContent = '';
+        statusText.classList.remove('text-warning', 'text-danger');
+        const timerEl = document.getElementById('queryTimer');
+        timerEl.textContent = '';
+        timerEl.style.display = 'none';
         document.getElementById('resultsPanel').style.display = 'none';
         currentPage = 0;
         document.getElementById('selectAll').checked = false;
@@ -1756,6 +1783,10 @@
             new bootstrap.Popover(el);
         });
         setResolvedPopover('');
+
+        // Bei einem Seitenladen mit laufender Query die Ergebnis-Aktionen sofort
+        // sperren, bis der erste Poll-Status vorliegt.
+        if (queryStarted) setSearchButtonMode(true);
 
         loadBuckets(currentBucket).then(() => {
             restoreFormState();
