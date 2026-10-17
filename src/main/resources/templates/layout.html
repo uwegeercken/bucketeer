@@ -63,7 +63,10 @@
 <nav th:fragment="header" class="navbar navbar-dark bg-dark mb-3 border-bottom border-secondary">
     <div class="container-fluid position-relative d-flex justify-content-between align-items-center">
         <!-- Left: app name -->
-        <a class="navbar-brand fw-bold" href="/" th:text="#{app.title}">Bucketeer</a>
+        <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
+            <img th:src="@{/img/bucketeer_logo.png}" alt="Bucketeer Logo" height="28" class="me-2">
+            <span th:text="#{app.title}">Bucketeer</span>
+        </a>
 
         <!-- Center: server selector -->
         <form method="post" action="/session/server"
