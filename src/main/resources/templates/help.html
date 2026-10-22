@@ -35,6 +35,14 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.9.7 <small class="text-muted">2026-10-22</small></h6>
+                    <ul>
+                        <li><strong>Bucket selector: see the full name</strong>: bucket names that are too long for the searchable bucket field are now shown in full as a tooltip when hovering over the field &mdash; the tooltip only appears when the name is actually truncated</li>
+                        <li><strong>DuckDB 2.0 (LTS)</strong>: the embedded in-memory query cache now runs on DuckDB 2.0.0, the long-term support release &mdash; existing snapshot files stay compatible, they are stored as Parquet</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.9.6 <small class="text-muted">2026-10-17</small></h6>
                     <ul>
                         <li>Bucket list on the main page is now a searchable combobox (filter by name).</li>
