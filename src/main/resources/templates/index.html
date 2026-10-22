@@ -431,7 +431,18 @@
 
     function setBucketComboText(value) {
         const input = document.getElementById('bucketComboInput');
-        if (input) input.value = value || '';
+        if (!input) return;
+        input.value = value || '';
+        updateBucketComboTooltip();
+    }
+
+    // Tooltip mit dem vollen Bucket-Namen nur, wenn der Name im Feld tatsaechlich
+    // abgeschnitten ist - ist er vollstaendig lesbar, bleibt es ohne Tooltip.
+    function updateBucketComboTooltip() {
+        const input = document.getElementById('bucketComboInput');
+        if (!input) return;
+        input.title = (input.value && input.scrollWidth > input.clientWidth + 1)
+            ? input.value : '';
     }
 
     // Beim Neuladen (z. B. Refresh waehrend der Eingabe) den Suchtext nicht
@@ -1475,6 +1486,9 @@
             search.style.display = '';
             icon.className = 'bi bi-arrows-fullscreen';
         }
+        // Feldbreite hat sich geaendert - Abschneide-Zustand fuer den Bucket-Tooltip
+        // neu bewerten (wenn das Suchfeld sichtbar ist).
+        updateBucketComboTooltip();
     }
 
     let filterTimer = null;
@@ -1811,6 +1825,8 @@
         if (bucketComboInput && bucketComboDropdown) {
             bucketComboInput.addEventListener('focus', () => {
                 bucketComboInput.value = '';
+                // Beim Suchen steht kein Name im Feld - der Tooltip waere veraltet.
+                bucketComboInput.title = '';
                 renderBucketDropdown('');
                 refreshBucketList();
             });
@@ -1851,6 +1867,13 @@
             bucketComboDropdown.addEventListener('mousedown', (e) => {
                 handleBucketSelect(e.target);
             });
+            // Breitenänderungen (Maximize, Fenstergröße, Scrollleiste) neu bewerten -
+            // sonst kann der "abgeschnitten"-Zustand für den Bucket-Tooltip veralten.
+            if (typeof ResizeObserver === 'function') {
+                new ResizeObserver(updateBucketComboTooltip).observe(bucketComboInput);
+            } else {
+                window.addEventListener('resize', updateBucketComboTooltip);
+            }
         }
 
         // Combobox logic
