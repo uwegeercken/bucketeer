@@ -1,6 +1,8 @@
 # Bucketeer
 
-A web-based **S3 object browser** for any S3-compatible server — list, filter, sort, download, move, delete, upload and compare objects in your browser.
+A web-based **S3 object browser** for any S3-compatible server — list, filter, sort, collect, download, move, delete, upload and compare objects in your browser.
+
+Using duckdb at it's core. Available in English, German and Spanish language.
 
 ![Bucketeer](img.png)
 ## Features
@@ -11,7 +13,7 @@ A web-based **S3 object browser** for any S3-compatible server — list, filter,
 - **Fast search** — every listing (search, download, snapshot, REST list) picks its strategy per query: a quick prefix analysis chooses between a sequential flat stream and a parallel per-prefix harvest (worker threads), so large sub-prefixes are fetched concurrently while many tiny prefixes stay on one stream — see [Parallel Listing](https://github.com/uwegeercken/bucketeer/wiki/Parallel-Listing)
 - **Settings dialog** — all configuration (Query, History, Snapshots, Timezone, Upload, Scan) is grouped into blocks and opened from the gear icon on any page
 - **Favorites &amp; history** — searchable combobox for favorites (server + bucket + prefix + key) and automatic search history
-- **Selection &amp; bulk download** — collect objects across queries as batches and download them all as a ZIP
+- **Selection &amp; bulk download** — collect objects across one or multiple queries as batches and download them all as a ZIP
 - **Move &amp; delete objects** — single and batch operations (copy + delete); existing targets are skipped and reported
 - **File upload** — upload single or multiple files to any configured server and bucket, with an optional target prefix
 - **Object tags** — view S3 tags of any object via the row context menu
