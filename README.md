@@ -2,7 +2,7 @@
 
 A web-based **S3 object browser** for any S3-compatible server — list, filter, sort, collect, download, move, delete, upload and compare objects in your browser.
 
-Using duckdb at it's core. Available in English, German and Spanish language.
+Using duckdb at it's core and providing access to the data though the user interface, rest api and duckdb quack protocol. Available in English, German and Spanish language.
 
 ![Bucketeer](img.png)
 ## Features
