@@ -619,8 +619,8 @@ public class BucketeerController {
         String server = resolveServer(null);
         try (InputStream in = s3StoragePort.downloadObject(server, bucket, key)) {
             byte[] bytes = in.readAllBytes();
-            if (bytes.length > 5 * 1024 * 1024) {
-                return Map.of("ok", false, "error", "File too large to preview (> 5MB)");
+            if (bytes.length > 20 * 1024 * 1024) {
+                return Map.of("ok", false, "error", "File too large to preview (> 20MB)");
             }
             String content = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
             return Map.of("ok", true, "content", content, "key", key);
