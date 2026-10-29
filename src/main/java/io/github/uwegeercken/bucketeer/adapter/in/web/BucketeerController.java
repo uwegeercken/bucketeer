@@ -1,7 +1,6 @@
 package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
-import io.github.uwegeercken.bucketeer.domain.model.ObjectListing;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
