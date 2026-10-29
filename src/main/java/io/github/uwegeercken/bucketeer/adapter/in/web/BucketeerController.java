@@ -606,6 +606,30 @@ public class BucketeerController {
         }
     }
 
+    @GetMapping(value = "/api/object/preview", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> previewObject(@RequestParam String bucket, @RequestParam String key) {
+        if (!StringUtils.hasText(bucket) || !StringUtils.hasText(key)) {
+            return Map.of("ok", false, "error", "Bucket and key are required");
+        }
+        String lowerKey = key.toLowerCase();
+        if (!lowerKey.endsWith(".csv") && !lowerKey.endsWith(".json") && !lowerKey.endsWith(".txt")) {
+            return Map.of("ok", false, "error", "Only CSV, JSON and TXT files can be previewed");
+        }
+        String server = resolveServer(null);
+        try (InputStream in = s3StoragePort.downloadObject(server, bucket, key)) {
+            byte[] bytes = in.readAllBytes();
+            if (bytes.length > 5 * 1024 * 1024) {
+                return Map.of("ok", false, "error", "File too large to preview (> 5MB)");
+            }
+            String content = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            return Map.of("ok", true, "content", content, "key", key);
+        } catch (Exception e) {
+            log.error("Failed to preview object {}/{}: {}", bucket, key, e.getMessage());
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
     public record ObjectDeleteRequest(String serverName, String bucket, String key) {}
 
     public record ObjectMoveRequest(String serverName, String bucket, String sourceKey, String toPrefix) {}

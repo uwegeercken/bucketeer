@@ -1511,9 +1511,66 @@
     </div>
 </th:block>
 
-<!-- Row context menu fragment (object actions: download / copy link / tags / move / delete) -->
+<!-- Preview modal fragment -->
+<th:block th:fragment="previewModal">
+    <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="previewModalTitle" th:text="#{modal.preview.title}">File preview</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="previewModalLoading" class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <span class="ms-2" th:text="#{modal.preview.loading}">Loading...</span>
+                    </div>
+                    <div id="previewModalError" class="alert alert-danger py-1 px-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                    <div id="previewModalContent" style="display:none;">
+                        <div id="previewModalFindBar" class="tools-find-bar mb-2">
+                            <div class="d-flex align-items-center gap-1 flex-wrap">
+                                <div class="input-group input-group-sm flex-grow-1" style="min-width:200px; max-width:320px;">
+                                    <input type="text" id="previewModalFindInput" class="form-control form-control-sm font-monospace"
+                                           th:placeholder="#{tools.find.placeholder}" placeholder="Find"/>
+                                </div>
+                                <button type="button" id="previewModalFindPrev" class="btn btn-sm btn-outline-secondary btn-icon"
+                                        th:title="#{tools.findPrev}" th:aria-label="#{tools.findPrev}">
+                                    <i class="bi bi-chevron-up"></i>
+                                </button>
+                                <button type="button" id="previewModalFindNext" class="btn btn-sm btn-outline-secondary btn-icon"
+                                        th:title="#{tools.findNext}" th:aria-label="#{tools.findNext}">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                                <button type="button" id="previewModalFindCase" class="btn btn-sm btn-outline-secondary btn-icon"
+                                        th:title="#{tools.matchCase}" th:aria-label="#{tools.matchCase}">Aa</button>
+                                <button type="button" id="previewModalFindRegex" class="btn btn-sm btn-outline-secondary btn-icon"
+                                        th:title="#{tools.regex}" th:aria-label="#{tools.regex}">.*</button>
+                            </div>
+                            <div id="previewModalFindStatus" class="small text-muted mt-1"></div>
+                        </div>
+                        <div id="previewModalTableWrap" style="display:none;" class="table-responsive">
+                            <table class="table table-sm table-bordered table-striped mb-0" id="previewModalTable">
+                                <tbody id="previewModalTableBody"></tbody>
+                            </table>
+                        </div>
+                        <div id="previewModalJsonWrap" style="display:none;">
+                            <pre class="mb-0 p-2 bg-light border rounded" style="max-height:60vh; overflow:auto;"><code id="previewModalJson"></code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.close}">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!-- Row context menu fragment (object actions: download / preview / copy link / tags / move / delete) -->
 <th:block th:fragment="rowContextMenu">
     <div id="rowContextMenu" class="dropdown-menu row-context-menu" role="menu">
+        <button type="button" class="dropdown-item" id="ctxPreview" role="menuitem" style="display:none;"><i class="bi bi-eye me-2" aria-hidden="true"></i><span th:text="#{btn.preview}">View</span></button>
         <a class="dropdown-item" id="ctxDownload" role="menuitem" href="#"><i class="bi bi-download me-2" aria-hidden="true"></i><span th:text="#{label.download}">Download</span></a>
         <button type="button" class="dropdown-item" id="ctxCopyLink" role="menuitem"><i class="bi bi-link-45deg me-2" aria-hidden="true"></i><span id="ctxCopyLinkText" th:text="#{btn.copyDownloadLink}">Copy download link</span></button>
         <div class="dropdown-divider"></div>
@@ -1525,11 +1582,15 @@
     <script th:inline="javascript">
         const rowMenuLabels = {
             download: /*[[#{label.download}]]*/ 'Download',
+            preview:  /*[[#{btn.preview}]]*/ 'View',
             copy:     /*[[#{btn.copyDownloadLink}]]*/ 'Copy download link',
             copied:   /*[[#{btn.copied}]]*/ 'Copied',
             opError:  /*[[#{msg.opError}]]*/ 'Operation failed:',
             noTags:   /*[[#{modal.tags.noTags}]]*/ 'No tags set for this object.',
-            delete:   /*[[#{modal.delete.message}]]*/ 'Delete this object permanently?\n\n{0}'
+            delete:   /*[[#{modal.delete.message}]]*/ 'Delete this object permanently?\n\n{0}',
+            previewTitle: /*[[#{modal.preview.title}]]*/ 'File preview',
+            previewLoading: /*[[#{modal.preview.loading}]]*/ 'Loading...',
+            previewError: /*[[#{modal.preview.error}]]*/ 'Failed to load preview'
         };
 
         function menuEscHtml(s) {
@@ -1559,6 +1620,15 @@
                 if (!menu) return;
                 ctxRow = { bucket: bucket, key: key, serverName: serverName || '' };
                 document.getElementById('ctxDownload').href = getDownloadUrl(bucket, key);
+                const previewBtn = document.getElementById('ctxPreview');
+                if (previewBtn) {
+                    const lowerKey = key.toLowerCase();
+                    if (lowerKey.endsWith('.csv') || lowerKey.endsWith('.json') || lowerKey.endsWith('.txt')) {
+                        previewBtn.style.display = 'block';
+                    } else {
+                        previewBtn.style.display = 'none';
+                    }
+                }
                 resetCopyLabel();
                 window.BucketeerContextMenu.open(menu, x, y);
             }
@@ -1643,6 +1713,289 @@
                 }
             }
 
+            async function openPreviewModal(bucket, key) {
+                const modalEl = document.getElementById('previewModal');
+                const titleEl = document.getElementById('previewModalTitle');
+                const loadingEl = document.getElementById('previewModalLoading');
+                const errorEl = document.getElementById('previewModalError');
+                const contentEl = document.getElementById('previewModalContent');
+                const tableWrapEl = document.getElementById('previewModalTableWrap');
+                const tableBodyEl = document.getElementById('previewModalTableBody');
+                const jsonWrapEl = document.getElementById('previewModalJsonWrap');
+                const jsonEl = document.getElementById('previewModalJson');
+                const findInput = document.getElementById('previewModalFindInput');
+                const findStatus = document.getElementById('previewModalFindStatus');
+                const findCase = document.getElementById('previewModalFindCase');
+                const findRegex = document.getElementById('previewModalFindRegex');
+                const findPrevBtn = document.getElementById('previewModalFindPrev');
+                const findNextBtn = document.getElementById('previewModalFindNext');
+
+                titleEl.textContent = rowMenuLabels.previewTitle + ' - ' + key;
+                loadingEl.style.display = 'block';
+                errorEl.style.display = 'none';
+                contentEl.style.display = 'none';
+                tableWrapEl.style.display = 'none';
+                tableBodyEl.innerHTML = '';
+                jsonWrapEl.style.display = 'none';
+                jsonEl.textContent = '';
+                if (findInput) { findInput.value = ''; }
+                if (findStatus) { findStatus.textContent = ''; findStatus.className = 'small text-muted mt-1'; }
+                if (findCase) findCase.classList.remove('active');
+                if (findRegex) findRegex.classList.remove('active');
+                if (findPrevBtn) findPrevBtn.onclick = null;
+                if (findNextBtn) findNextBtn.onclick = null;
+
+                new bootstrap.Modal(modalEl).show();
+
+                try {
+                    const res = await fetch('/api/object/preview?bucket=' + encodeURIComponent(bucket)
+                        + '&key=' + encodeURIComponent(key));
+                    const data = await res.json();
+                    if (!data.ok) {
+                        throw new Error(data.error || '');
+                    }
+                    const content = data.content || '';
+                    loadingEl.style.display = 'none';
+                    contentEl.style.display = 'block';
+
+                    const lowerKey = key.toLowerCase();
+                    if (lowerKey.endsWith('.json')) {
+                        try {
+                            const parsed = JSON.parse(content);
+                            jsonEl.textContent = JSON.stringify(parsed, null, 2);
+                        } catch (e) {
+                            jsonEl.textContent = content;
+                        }
+                        jsonWrapEl.style.display = 'block';
+                    } else if (lowerKey.endsWith('.csv')) {
+                        const lines = content.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim() !== '');
+                        if (lines.length > 0) {
+                            const delimiter = lines[0].includes(';') && !lines[0].includes(',') ? ';' : ',';
+                            const headers = lines[0].split(delimiter).map(h => h.replace(/^"|"$/g, ''));
+                            let html = '<thead><tr>' + headers.map(h => '<th>' + menuEscHtml(h) + '</th>').join('') + '</tr></thead><tbody>';
+                            for (let i = 1; i < Math.min(lines.length, 1000); i++) {
+                                const cols = lines[i].split(delimiter).map(c => c.replace(/^"|"$/g, ''));
+                                html += '<tr>' + cols.map(c => '<td>' + menuEscHtml(c) + '</td>').join('') + '</tr>';
+                            }
+                            html += '</tbody>';
+                            tableBodyEl.innerHTML = html;
+                            if (lines.length > 1000) {
+                                const note = document.createElement('div');
+                                note.className = 'text-muted small mt-2';
+                                note.textContent = 'Showing first 1000 rows of ' + lines.length + ' rows';
+                                tableWrapEl.appendChild(note);
+                            }
+                            tableWrapEl.style.display = 'block';
+                        } else {
+                            jsonEl.textContent = content;
+                            jsonWrapEl.style.display = 'block';
+                        }
+                    } else if (lowerKey.endsWith('.txt')) {
+                        jsonEl.textContent = content;
+                        jsonWrapEl.style.display = 'block';
+                    } else {
+                        jsonEl.textContent = content;
+                        jsonWrapEl.style.display = 'block';
+                    }
+
+                    const findState = { matchCase: false, regex: false };
+                    const msg = {
+                        findNone: /*[[#{tools.find.none}]]*/ 'No matches',
+                        findInvalid: /*[[#{tools.find.invalid}]]*/ 'Invalid regular expression',
+                        found: /*[[#{tools.find.found}]]*/ 'Found'
+                    };
+                    const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const buildRegex = (global) => {
+                        const text = findInput.value;
+                        if (!text) return { empty: true };
+                        const source = findState.regex ? text : escapeRegExp(text);
+                        try {
+                            return { regex: new RegExp(source, (global ? 'g' : '') + (findState.matchCase ? '' : 'i')) };
+                        } catch (e) {
+                            return { error: true };
+                        }
+                    };
+                    const collectMatches = (value, re) => {
+                        const matches = [];
+                        re.lastIndex = 0;
+                        let m;
+                        while ((m = re.exec(value)) !== null) {
+                            matches.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
+                            if (m[0].length === 0) re.lastIndex++;
+                            if (matches.length > 200000) break;
+                        }
+                        return matches;
+                    };
+                    const setStatus = (text, isError) => {
+                        if (!findStatus) return;
+                        findStatus.textContent = text || '';
+                        findStatus.classList.toggle('text-danger', !!isError);
+                        findStatus.classList.toggle('text-muted', !isError);
+                    };
+                    const getTarget = () => (tableWrapEl.style.display !== 'none') ? tableWrapEl : jsonWrapEl;
+
+                    if (findCase) {
+                        findCase.onclick = () => {
+                            findState.matchCase = !findState.matchCase;
+                            findCase.classList.toggle('active', findState.matchCase);
+                            updateStatus();
+                        };
+                    }
+                    if (findRegex) {
+                        findRegex.onclick = () => {
+                            findState.regex = !findState.regex;
+                            findRegex.classList.toggle('active', findState.regex);
+                            updateStatus();
+                        };
+                    }
+
+                    const updateStatus = () => {
+                        if (!findInput || !findInput.value) { setStatus('', false); return; }
+                        const re = buildRegex(true);
+                        if (re.error) { setStatus(msg.findInvalid, true); return; }
+                        if (re.empty) { setStatus('', false); return; }
+                        const container = getTarget();
+                        if (container.style.display === 'none') return;
+                        let value = (tableWrapEl.style.display !== 'none') ? tableBodyEl.innerText : (jsonEl.textContent || '');
+                        const count = collectMatches(value, re.regex).length;
+                        setStatus(count ? msg.found + ': ' + count : msg.findNone, false);
+                    };
+
+                    if (findInput) {
+                        findInput.oninput = () => {
+                            currentMatchIndex = -1;
+                            updateStatus();
+                        };
+                        findInput.onkeydown = (e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (e.shiftKey) doFind(false);
+                                else doFind(true);
+                            }
+                        };
+                    }
+
+                    let currentMatchIndex = -1;
+                    const doFind = (forward) => {
+                        if (!findInput) return;
+                        const container = getTarget();
+                        if (container.style.display === 'none') return;
+                        const re = buildRegex(true);
+                        if (re.empty) { setStatus('', false); return; }
+                        if (re.error) { setStatus(msg.findInvalid, true); return; }
+                        const isTable = tableWrapEl.style.display !== 'none';
+                        if (isTable) {
+                            // Clear previous highlights
+                            container.querySelectorAll('.preview-highlight').forEach(s => {
+                                const parent = s.parentNode;
+                                parent.replaceChild(document.createTextNode(s.textContent), s);
+                                parent.normalize();
+                            });
+                            const localRe = buildRegex(true).regex;
+                            const nodes = [];
+                            const walker = document.createTreeWalker(tableBodyEl, NodeFilter.SHOW_TEXT, null);
+                            while (walker.nextNode()) nodes.push(walker.currentNode);
+                            nodes.forEach(node => {
+                                if (!node.nodeValue) return;
+                                const text = node.nodeValue;
+                                localRe.lastIndex = 0;
+                                const found = [];
+                                let mm;
+                                while ((mm = localRe.exec(text)) !== null) {
+                                    found.push({start: mm.index, end: localRe.lastIndex});
+                                    if (mm[0].length === 0) localRe.lastIndex++;
+                                }
+                                if (found.length === 0) return;
+                                const frag = document.createDocumentFragment();
+                                let last = 0;
+                                found.forEach(f => {
+                                    if (f.start > last) frag.appendChild(document.createTextNode(text.substring(last, f.start)));
+                                    const span = document.createElement('span');
+                                    span.className = 'preview-highlight bg-warning';
+                                    span.textContent = text.substring(f.start, f.end);
+                                    frag.appendChild(span);
+                                    last = f.end;
+                                });
+                                if (last < text.length) frag.appendChild(document.createTextNode(text.substring(last)));
+                                node.parentNode.replaceChild(frag, node);
+                            });
+                            const allSpans = Array.from(container.querySelectorAll('.preview-highlight'));
+                            if (allSpans.length === 0) { setStatus(msg.findNone, false); currentMatchIndex = -1; return; }
+                            if (currentMatchIndex < 0 || currentMatchIndex >= allSpans.length) {
+                                currentMatchIndex = forward ? 0 : allSpans.length - 1;
+                            } else {
+                                currentMatchIndex = forward ? (currentMatchIndex + 1) % allSpans.length : (currentMatchIndex - 1 + allSpans.length) % allSpans.length;
+                            }
+                            allSpans.forEach((s, i) => {
+                                if (i === currentMatchIndex) {
+                                    s.classList.add('border', 'border-dark');
+                                    s.scrollIntoView({behavior: 'smooth', block: 'center'});
+                                } else {
+                                    s.classList.remove('border', 'border-dark');
+                                }
+                            });
+                            setStatus(msg.found + ': ' + (currentMatchIndex + 1) + ' / ' + allSpans.length, false);
+                            return;
+                        } else {
+                            const pre = jsonWrapEl.querySelector('pre');
+                            if (!pre) return;
+                            jsonWrapEl.querySelectorAll('.preview-highlight').forEach(s => {
+                                const parent = s.parentNode;
+                                parent.replaceChild(document.createTextNode(s.textContent), s);
+                                parent.normalize();
+                            });
+                            const localRe = buildRegex(true).regex;
+                            const text = jsonEl.textContent || '';
+                            localRe.lastIndex = 0;
+                            const found = [];
+                            let mm;
+                            while ((mm = localRe.exec(text)) !== null) {
+                                found.push({start: mm.index, end: localRe.lastIndex});
+                                if (mm[0].length === 0) localRe.lastIndex++;
+                            }
+                            if (found.length === 0) { setStatus(msg.findNone, false); currentMatchIndex = -1; return; }
+                            const frag = document.createDocumentFragment();
+                            let last = 0;
+                            found.forEach(f => {
+                                if (f.start > last) frag.appendChild(document.createTextNode(text.substring(last, f.start)));
+                                const span = document.createElement('span');
+                                span.className = 'preview-highlight bg-warning';
+                                span.textContent = text.substring(f.start, f.end);
+                                frag.appendChild(span);
+                                last = f.end;
+                            });
+                            if (last < text.length) frag.appendChild(document.createTextNode(text.substring(last)));
+                            jsonEl.innerHTML = '';
+                            jsonEl.appendChild(frag);
+                            const allSpans = Array.from(jsonWrapEl.querySelectorAll('.preview-highlight'));
+                            if (allSpans.length === 0) { setStatus(msg.findNone, false); currentMatchIndex = -1; return; }
+                            if (currentMatchIndex < 0 || currentMatchIndex >= allSpans.length) {
+                                currentMatchIndex = forward ? 0 : allSpans.length - 1;
+                            } else {
+                                currentMatchIndex = forward ? (currentMatchIndex + 1) % allSpans.length : (currentMatchIndex - 1 + allSpans.length) % allSpans.length;
+                            }
+                            allSpans.forEach((s, i) => {
+                                if (i === currentMatchIndex) {
+                                    s.classList.add('border', 'border-dark');
+                                    s.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+                                } else {
+                                    s.classList.remove('border', 'border-dark');
+                                }
+                            });
+                            setStatus(msg.found + ': ' + (currentMatchIndex + 1) + ' / ' + allSpans.length, false);
+                        }
+                    };
+
+                    if (findPrevBtn) findPrevBtn.onclick = () => doFind(false);
+                    if (findNextBtn) findNextBtn.onclick = () => doFind(true);
+                    updateStatus();
+                } catch (e) {
+                    loadingEl.style.display = 'none';
+                    errorEl.textContent = rowMenuLabels.previewError + ': ' + e.message;
+                    errorEl.style.display = 'block';
+                }
+            }
+
             function openMoveModal(bucket, key, serverName) {
                 const sourceKey = key;
                 window.MoveModal.open({
@@ -1720,6 +2073,13 @@
                 const menu = document.getElementById('rowContextMenu');
                 if (!menu) return;
                 document.getElementById('ctxDownload').addEventListener('click', () => { takeRow(); });
+                const ctxPreview = document.getElementById('ctxPreview');
+                if (ctxPreview) {
+                    ctxPreview.addEventListener('click', () => {
+                        const r = takeRow();
+                        if (r) openPreviewModal(r.bucket, r.key);
+                    });
+                }
                 document.getElementById('ctxCopyLink').addEventListener('click', copyDownloadLink);
                 document.getElementById('ctxTags').addEventListener('click', () => {
                     const r = takeRow();
