@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Controller;
@@ -51,7 +52,7 @@ public class BucketeerController {
                                S3StoragePort s3StoragePort,
                                SessionContext sessionContext,
                                DuckDbRepository duckDb,
-                               ThreadPoolTaskExecutor executor,
+                               @Qualifier("taskExecutor") ThreadPoolTaskExecutor executor,
                                ActionHistory actionHistory,
                                AppSettings appSettings) {
         this.bucketeerUseCase = bucketeerUseCase;

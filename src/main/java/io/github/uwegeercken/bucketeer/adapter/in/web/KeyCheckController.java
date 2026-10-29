@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Controller;
@@ -43,7 +44,7 @@ public class KeyCheckController {
 
     public KeyCheckController(S3StoragePort s3StoragePort,
                               SessionContext sessionContext,
-                              ThreadPoolTaskExecutor executor,
+                              @Qualifier("taskExecutor") ThreadPoolTaskExecutor executor,
                               BucketeerUseCase bucketeerUseCase,
                               AppSettings appSettings) {
         this.s3StoragePort = s3StoragePort;

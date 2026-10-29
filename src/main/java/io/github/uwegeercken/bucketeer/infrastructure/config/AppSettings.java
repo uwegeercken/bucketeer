@@ -122,7 +122,7 @@ public class AppSettings {
 
     /** Sets the time zone id; invalid or blank values fall back to the system default. */
     public void setTimeZoneId(String timeZoneId) {
-        this.timeZoneId = timeZoneId != null && isValidZoneId(timeZoneId)
+        this.timeZoneId = isValidZoneId(timeZoneId)
                 ? timeZoneId.trim() : ZoneId.systemDefault().getId();
         save();
     }
