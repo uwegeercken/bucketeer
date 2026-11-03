@@ -39,6 +39,9 @@ public class BucketeerController {
     /** A literal '{' is only a template marker when it is not escaped with a backslash. */
     private static final Pattern UNESCAPED_OPEN_BRACE = Pattern.compile("(?<!\\\\)\\{");
 
+    /** Largest object (in bytes) the preview dialog loads; larger objects are rejected. */
+    static final int PREVIEW_MAX_BYTES = 20 * 1024 * 1024;
+
     private final BucketeerUseCase bucketeerUseCase;
     private final S3StoragePort s3StoragePort;
     private final SessionContext sessionContext;
@@ -618,8 +621,9 @@ public class BucketeerController {
         }
         String server = resolveServer(null);
         try (InputStream in = s3StoragePort.downloadObject(server, bucket, key)) {
-            byte[] bytes = in.readAllBytes();
-            if (bytes.length > 20 * 1024 * 1024) {
+            // Read at most one byte past the limit: an oversized object must not be pulled into the heap completely
+            byte[] bytes = in.readNBytes(PREVIEW_MAX_BYTES + 1);
+            if (bytes.length > PREVIEW_MAX_BYTES) {
                 return Map.of("ok", false, "error", "File too large to preview (> 20MB)");
             }
             String content = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);

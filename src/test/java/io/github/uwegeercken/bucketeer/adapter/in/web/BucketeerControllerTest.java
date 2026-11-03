@@ -16,6 +16,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.ui.Model;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -152,6 +155,43 @@ class BucketeerControllerTest {
         org.mockito.Mockito.verify(storage, org.mockito.Mockito.never())
                 .putObject(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("previewObject returns the content of a small text object")
+    void previewReturnsSmallObject() {
+        when(storage.downloadObject("server", "bucket", "dir/a.txt"))
+                .thenReturn(new ByteArrayInputStream("hello\nworld".getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, Object> resp = controller.previewObject("bucket", "dir/a.txt");
+
+        assertThat(resp.get("ok")).isEqualTo(true);
+        assertThat(resp.get("content")).isEqualTo("hello\nworld");
+        assertThat(resp.get("key")).isEqualTo("dir/a.txt");
+    }
+
+    @Test
+    @DisplayName("previewObject rejects an oversized object without reading it completely")
+    void previewRejectsOversizedObjectWithoutReadingAll() {
+        CountingInputStream big = new CountingInputStream(BucketeerController.PREVIEW_MAX_BYTES * 3L);
+        when(storage.downloadObject("server", "bucket", "big.csv")).thenReturn(big);
+
+        Map<String, Object> resp = controller.previewObject("bucket", "big.csv");
+
+        assertThat(resp.get("ok")).isEqualTo(false);
+        assertThat(resp.get("error").toString()).contains("File too large to preview");
+        assertThat(big.bytesRead).isLessThanOrEqualTo(BucketeerController.PREVIEW_MAX_BYTES + 1L);
+        assertThat(big.closed).isTrue();
+    }
+
+    @Test
+    @DisplayName("previewObject rejects unsupported file types without calling S3")
+    void previewRejectsUnsupportedType() {
+        Map<String, Object> resp = controller.previewObject("bucket", "data.parquet");
+
+        assertThat(resp.get("ok")).isEqualTo(false);
+        assertThat(resp.get("error").toString()).contains("Only CSV, JSON and TXT");
+        verify(storage, never()).downloadObject(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -441,6 +481,39 @@ class BucketeerControllerTest {
         Map<String, Object> resp = controller.queryStatus(session);
         assertThat(resp.get("status")).isEqualTo("CANCELLED");
         assertThat(resp.get("error")).isEqualTo("");
+    }
+
+    /** Endless-looking stream of {@code size} bytes that records how much was read and whether it was closed. */
+    private static class CountingInputStream extends InputStream {
+        private final long size;
+        long bytesRead;
+        boolean closed;
+
+        CountingInputStream(long size) {
+            this.size = size;
+        }
+
+        @Override
+        public int read() {
+            if (bytesRead >= size) return -1;
+            bytesRead++;
+            return 'x';
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) {
+            if (len == 0) return 0;
+            if (bytesRead >= size) return -1;
+            int n = (int) Math.min(len, size - bytesRead);
+            java.util.Arrays.fill(b, off, off + n, (byte) 'x');
+            bytesRead += n;
+            return n;
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
     }
 
     private static class RecordingDuckDb extends DuckDbRepository {
