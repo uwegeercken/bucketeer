@@ -401,6 +401,45 @@ footer {
     display: none !important;
 }
 
+/* Preview modal: fullscreen maximize - find bar stays on top, content fills the rest */
+#previewModal.preview-max .modal-dialog {
+    width: calc(100vw - 2rem);
+    max-width: none;
+    height: calc(100vh - 2rem);
+    margin: 1rem auto;
+}
+#previewModal.preview-max .modal-content {
+    height: 100%;
+    max-height: none;
+    display: flex;
+    flex-direction: column;
+}
+#previewModal.preview-max .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#previewModal.preview-max #previewModalContent {
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
+}
+#previewModal.preview-max #previewModalContent[style*="block"] {
+    display: flex !important;
+}
+#previewModal.preview-max #previewModalTableWrap,
+#previewModal.preview-max #previewModalJsonWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+#previewModal.preview-max #previewModalJsonWrap pre {
+    max-height: none !important;
+    min-height: 100%;
+}
+
 /* Tools find/replace bar: let the inputs shrink so the buttons always fit */
 .tools-find-bar .form-control {
     flex: 1 1 auto;

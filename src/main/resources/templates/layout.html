@@ -1517,9 +1517,15 @@
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header py-2">
-                    <h6 class="modal-title fw-semibold" id="previewModalTitle" th:text="#{modal.preview.title}">File preview</h6>
-                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
-                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                    <h6 class="modal-title fw-semibold me-2" id="previewModalTitle" th:text="#{modal.preview.title}">File preview</h6>
+                    <div class="d-flex align-items-center gap-2 ms-auto">
+                        <button type="button" id="previewModalMaxBtn" class="btn btn-sm btn-outline-secondary btn-icon"
+                                onclick="previewToggleMax()" th:title="#{modal.preview.maximize}" th:aria-label="#{modal.preview.maximize}">
+                            <i class="bi bi-arrows-fullscreen"></i>
+                        </button>
+                        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                                aria-label="Close" th:aria-label="#{btn.close}"></button>
+                    </div>
                 </div>
                 <div class="modal-body">
                     <div id="previewModalLoading" class="text-center py-3">
@@ -1590,8 +1596,34 @@
             delete:   /*[[#{modal.delete.message}]]*/ 'Delete this object permanently?\n\n{0}',
             previewTitle: /*[[#{modal.preview.title}]]*/ 'File preview',
             previewLoading: /*[[#{modal.preview.loading}]]*/ 'Loading...',
-            previewError: /*[[#{modal.preview.error}]]*/ 'Failed to load preview'
+            previewError: /*[[#{modal.preview.error}]]*/ 'Failed to load preview',
+            previewMaximize: /*[[#{modal.preview.maximize}]]*/ 'Maximize preview',
+            previewRestore:  /*[[#{modal.preview.restore}]]*/ 'Restore'
         };
+
+        // ---- Preview modal maximize / restore ----------------------------------
+        function previewSetMax(on) {
+            const modal = document.getElementById('previewModal');
+            if (!modal) return;
+            modal.classList.toggle('preview-max', on);
+            const btn = document.getElementById('previewModalMaxBtn');
+            if (btn) {
+                const label = on ? rowMenuLabels.previewRestore : rowMenuLabels.previewMaximize;
+                btn.querySelector('i').className = on ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen';
+                btn.title = label;
+                btn.setAttribute('aria-label', label);
+            }
+        }
+
+        window.previewToggleMax = function() {
+            const modal = document.getElementById('previewModal');
+            if (modal) previewSetMax(!modal.classList.contains('preview-max'));
+        };
+
+        // Delegated: works regardless of whether the previewModal fragment is included before or after this script
+        document.addEventListener('hidden.bs.modal', function(e) {
+            if (e.target && e.target.id === 'previewModal') previewSetMax(false);
+        });
 
         function menuEscHtml(s) {
             return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
