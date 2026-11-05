@@ -35,6 +35,17 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>0.9.8 <small class="text-muted">2026-11-05</small></h6>
+                    <ul>
+                        <li><strong>Object preview</strong>: preview dialog with text search and maximize / restore</li>
+                        <li><strong>Server order</strong>: S3 servers can be moved up / down on the server configuration page; the dropdown follows this order</li>
+                        <li><strong>Server selection kept</strong>: the selected server is remembered across session timeouts and restarts</li>
+                        <li><strong>Header</strong>: the server dropdown no longer overlaps the icons in narrow windows</li>
+                        <li><strong>Updates</strong>: Spring Boot 4.1.2, Tomcat 11.0.27, AWS SDK 2.57.9, DuckDB 2.0.0.1, Jackson 3.1.8</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.9.7 <small class="text-muted">2026-10-22</small></h6>
                     <ul>
                         <li><strong>Bucket selector: see the full name</strong>: bucket names that are too long for the searchable bucket field are now shown in full as a tooltip when hovering over the field &mdash; the tooltip only appears when the name is actually truncated</li>
