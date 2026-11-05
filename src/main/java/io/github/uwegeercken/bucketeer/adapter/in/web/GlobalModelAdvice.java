@@ -3,6 +3,7 @@ package io.github.uwegeercken.bucketeer.adapter.in.web;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.infrastructure.config.S3Properties;
 import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -41,7 +42,13 @@ public class GlobalModelAdvice {
     }
 
     @ModelAttribute("selectedServer")
-    public String selectedServer() {
+    public String selectedServer(HttpServletRequest request) {
+        // /api/v1/** is the stateless terminal API: touching the session-scoped
+        // SessionContext would create an HTTP session (JSESSIONID) on every call.
+        String uri = request.getRequestURI();
+        if (uri != null && uri.startsWith("/api/v1/")) {
+            return null;
+        }
         try {
             List<String> names = bucketeerUseCase.serverNames();
             if (sessionContext.getSelectedServer() == null && !names.isEmpty()) {
