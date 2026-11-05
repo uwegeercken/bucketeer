@@ -213,8 +213,10 @@ public class BucketeerController {
     }
 
     @PostMapping("/session/server")
-    public String selectServer(@RequestParam String serverName, HttpSession session) {
+    public String selectServer(@RequestParam String serverName, HttpSession session,
+                               HttpServletResponse response) {
         sessionContext.setSelectedServer(serverName);
+        SelectedServerInterceptor.writeCookie(response, serverName);
         duckDb.clear();
         session.removeAttribute(QueryContext.SESSION_KEY);
         session.removeAttribute("bucketeer_query_params");
