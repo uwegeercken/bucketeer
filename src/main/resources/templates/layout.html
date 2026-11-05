@@ -68,26 +68,29 @@
             <span th:text="#{app.title}">Bucketeer</span>
         </a>
 
-        <!-- Center: server selector -->
-        <form method="post" action="/session/server"
-              class="d-flex align-items-center gap-2 position-absolute start-50 translate-middle-x">
-            <label class="text-secondary small" th:text="#{label.server}">Server</label>
-            <select name="serverName" id="headerServerSelect" class="form-select form-select-sm w-auto"
-                    onchange="sessionStorage.removeItem('bkt_server');sessionStorage.removeItem('bkt_bucket');sessionStorage.removeItem('bkt_prefix');sessionStorage.removeItem('bkt_key');this.form.submit()"
-                    th:if="${serverNames != null and !serverNames.isEmpty()}">
-                <option th:each="s : ${serverNames}"
-                        th:value="${s}"
-                        th:text="${s}"
-                        th:selected="${s == selectedServer}">
-                </option>
-            </select>
-            <span th:if="${serverNames == null or serverNames.isEmpty()}"
-                  class="text-secondary small fst-italic"
-                  th:text="#{header.noServers}">No servers configured</span>
-        </form>
-
-        <!-- Right: nav links -->
+        <!-- Right: server selector, then nav links -->
         <div class="d-flex gap-2 align-items-center">
+            <!-- Server selector (right, before icons) -->
+            <form method="post" action="/session/server"
+                  class="d-flex align-items-center gap-2 flex-nowrap">
+                <label class="text-secondary small text-nowrap" th:text="#{label.server}">Server</label>
+                <select name="serverName" id="headerServerSelect" class="form-select form-select-sm w-auto"
+                        onchange="sessionStorage.removeItem('bkt_server');sessionStorage.removeItem('bkt_bucket');sessionStorage.removeItem('bkt_prefix');sessionStorage.removeItem('bkt_key');this.form.submit()"
+                        th:if="${serverNames != null and !serverNames.isEmpty()}">
+                    <option th:each="s : ${serverNames}"
+                            th:value="${s}"
+                            th:text="${s}"
+                            th:selected="${s == selectedServer}">
+                    </option>
+                </select>
+                <span th:if="${serverNames == null or serverNames.isEmpty()}"
+                      class="text-secondary small fst-italic text-nowrap"
+                      th:text="#{header.noServers}">No servers configured</span>
+            </form>
+
+            <!-- Same width as the separators between icon groups, but without the line -->
+            <div class="vr mx-2 invisible"></div>
+
             <a th:if="${backUrl != null}" th:href="${backUrl}"
                class="btn btn-sm btn-outline-light" th:title="#{nav.back}"><i class="bi bi-arrow-left"></i></a>
 
