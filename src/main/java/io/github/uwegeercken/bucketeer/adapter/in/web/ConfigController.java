@@ -76,6 +76,18 @@ public class ConfigController {
         return "redirect:/config";
     }
 
+    @PostMapping("/server/{name}/move-up")
+    public String moveUp(@PathVariable String name) {
+        configService.moveUp(name);
+        return "redirect:/config";
+    }
+
+    @PostMapping("/server/{name}/move-down")
+    public String moveDown(@PathVariable String name) {
+        configService.moveDown(name);
+        return "redirect:/config";
+    }
+
     @PostMapping("/server/{name}/delete")
     public String delete(@PathVariable String name, RedirectAttributes redirect) {
         configService.delete(name);

@@ -45,6 +45,21 @@ public class ServerConfigService {
         log.info("Deleted server '{}' and reloaded client registry", name);
     }
 
+    public void moveUp(String name) {
+        move(name, -1);
+    }
+
+    public void moveDown(String name) {
+        move(name, 1);
+    }
+
+    private void move(String name, int delta) {
+        if (repository.move(name, delta)) {
+            // Only the order changed - reorder existing clients instead of rebuilding them.
+            clientRegistry.reorder(repository.serverNames());
+        }
+    }
+
     /**
      * Saves the server and tests the connection by listing buckets.
      *

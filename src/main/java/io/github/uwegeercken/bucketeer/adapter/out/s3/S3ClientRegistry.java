@@ -54,6 +54,26 @@ public class S3ClientRegistry {
         }
     }
 
+    /**
+     * Re-orders the existing clients to match {@code orderedNames} without rebuilding them.
+     * Names not currently registered are ignored; registered clients missing from the list
+     * keep their relative order at the end.
+     */
+    public void reorder(List<String> orderedNames) {
+        lock.writeLock().lock();
+        try {
+            Map<String, S3Client> reordered = new LinkedHashMap<>();
+            for (String name : orderedNames) {
+                S3Client client = clients.get(name);
+                if (client != null) reordered.put(name, client);
+            }
+            clients.forEach(reordered::putIfAbsent);
+            clients = reordered;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
     public List<String> serverNames() {
         lock.readLock().lock();
         try { return List.copyOf(clients.keySet()); }

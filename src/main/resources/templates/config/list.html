@@ -52,11 +52,11 @@
                 <th th:text="#{config.col.endpoint}">Endpoint</th>
                 <th th:text="#{config.col.region}">Region</th>
                 <th th:text="#{config.col.verifyCert}">Verify Cert</th>
-                <th style="width:120px"></th>
+                <th style="width:190px"></th>
             </tr>
             </thead>
             <tbody>
-            <tr th:each="server : ${servers}">
+            <tr th:each="server, stat : ${servers}">
                 <td th:text="${server.name()}" class="fw-semibold"></td>
                 <td th:text="${server.endpoint()}" class="font-monospace small"></td>
                 <td th:text="${server.region()}"></td>
@@ -66,6 +66,24 @@
                 </td>
                 <td>
                     <div class="d-flex gap-1">
+                        <form th:action="@{/config/server/{name}/move-up(name=${server.name()})}"
+                              method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary btn-icon"
+                                    th:disabled="${stat.first}"
+                                    th:title="#{config.action.moveUp}" title="Move up"
+                                    th:aria-label="#{config.action.moveUp}" aria-label="Move up">
+                                <i class="bi bi-arrow-up"></i>
+                            </button>
+                        </form>
+                        <form th:action="@{/config/server/{name}/move-down(name=${server.name()})}"
+                              method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary btn-icon"
+                                    th:disabled="${stat.last}"
+                                    th:title="#{config.action.moveDown}" title="Move down"
+                                    th:aria-label="#{config.action.moveDown}" aria-label="Move down">
+                                <i class="bi bi-arrow-down"></i>
+                            </button>
+                        </form>
                         <a th:href="@{/config/server/{name}/edit(name=${server.name()})}"
                            class="btn btn-sm btn-outline-secondary btn-icon"
                            th:title="#{config.action.edit}" title="Edit"
