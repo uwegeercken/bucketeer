@@ -52,12 +52,16 @@
                 <th th:text="#{config.col.endpoint}">Endpoint</th>
                 <th th:text="#{config.col.region}">Region</th>
                 <th th:text="#{config.col.verifyCert}">Verify Cert</th>
-                <th style="width:190px"></th>
+                <th style="width:120px"></th>
             </tr>
             </thead>
-            <tbody>
-            <tr th:each="server, stat : ${servers}">
-                <td th:text="${server.name()}" class="fw-semibold"></td>
+            <tbody id="serverRows">
+            <tr th:each="server : ${servers}" th:attr="data-name=${server.name()}">
+                <td class="fw-semibold">
+                    <i class="bi bi-grip-vertical text-muted drag-handle me-1"
+                       th:title="#{config.action.dragToReorder}" title="Drag to reorder"></i>
+                    <span th:text="${server.name()}"></span>
+                </td>
                 <td th:text="${server.endpoint()}" class="font-monospace small"></td>
                 <td th:text="${server.region()}"></td>
                 <td>
@@ -66,24 +70,6 @@
                 </td>
                 <td>
                     <div class="d-flex gap-1">
-                        <form th:action="@{/config/server/{name}/move-up(name=${server.name()})}"
-                              method="post" class="d-inline">
-                            <button type="submit" class="btn btn-sm btn-outline-secondary btn-icon"
-                                    th:disabled="${stat.first}"
-                                    th:title="#{config.action.moveUp}" title="Move up"
-                                    th:aria-label="#{config.action.moveUp}" aria-label="Move up">
-                                <i class="bi bi-arrow-up"></i>
-                            </button>
-                        </form>
-                        <form th:action="@{/config/server/{name}/move-down(name=${server.name()})}"
-                              method="post" class="d-inline">
-                            <button type="submit" class="btn btn-sm btn-outline-secondary btn-icon"
-                                    th:disabled="${stat.last}"
-                                    th:title="#{config.action.moveDown}" title="Move down"
-                                    th:aria-label="#{config.action.moveDown}" aria-label="Move down">
-                                <i class="bi bi-arrow-down"></i>
-                            </button>
-                        </form>
                         <a th:href="@{/config/server/{name}/edit(name=${server.name()})}"
                            class="btn btn-sm btn-outline-secondary btn-icon"
                            th:title="#{config.action.edit}" title="Edit"
@@ -113,7 +99,66 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script th:inline="javascript">
     const labelConfirmDelete = /*[[#{config.confirm.delete}]]*/ 'Delete this server?';
+
+    // Drag-and-drop reordering. Dragging starts only from the grip icon so the
+    // buttons and links in the row stay normally clickable.
+    (function () {
+        const tbody = document.getElementById('serverRows');
+        if (!tbody) return;
+        let dragged = null;
+        let initialOrder = null;
+
+        const currentOrder = () =>
+            Array.from(tbody.querySelectorAll('tr[data-name]')).map(tr => tr.dataset.name);
+
+        tbody.addEventListener('mousedown', e => {
+            const handle = e.target.closest('.drag-handle');
+            if (handle) handle.closest('tr').draggable = true;
+        });
+        tbody.addEventListener('mouseup', () => {
+            tbody.querySelectorAll('tr[draggable="true"]').forEach(tr => tr.draggable = false);
+        });
+
+        tbody.addEventListener('dragstart', e => {
+            dragged = e.target.closest('tr[data-name]');
+            if (!dragged) return;
+            initialOrder = currentOrder().join('\u0000');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', dragged.dataset.name);
+            dragged.classList.add('opacity-50');
+        });
+
+        tbody.addEventListener('dragover', e => {
+            if (!dragged) return;
+            e.preventDefault();
+            const target = e.target.closest('tr[data-name]');
+            if (!target || target === dragged) return;
+            const rect = target.getBoundingClientRect();
+            const after = e.clientY > rect.top + rect.height / 2;
+            tbody.insertBefore(dragged, after ? target.nextSibling : target);
+        });
+
+        tbody.addEventListener('drop', e => e.preventDefault());
+
+        tbody.addEventListener('dragend', () => {
+            if (!dragged) return;
+            dragged.classList.remove('opacity-50');
+            dragged.draggable = false;
+            dragged = null;
+            const order = currentOrder();
+            if (order.join('\u0000') === initialOrder) return;
+            fetch('/config/servers/reorder', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(order)
+            }).finally(() => location.reload());   // show the persisted order (also restores it on error)
+        });
+    })();
 </script>
+<style>
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+</style>
 <th:block th:replace="~{layout :: uploadModal}"></th:block>
 </body>
 </html>

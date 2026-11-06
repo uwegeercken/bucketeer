@@ -2,10 +2,13 @@ package io.github.uwegeercken.bucketeer.adapter.in.web;
 
 import io.github.uwegeercken.bucketeer.infrastructure.config.server.ServerConfig;
 import io.github.uwegeercken.bucketeer.infrastructure.config.server.ServerConfigService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.List;
 
 @Controller
 @RequestMapping("/config")
@@ -76,16 +79,11 @@ public class ConfigController {
         return "redirect:/config";
     }
 
-    @PostMapping("/server/{name}/move-up")
-    public String moveUp(@PathVariable String name) {
-        configService.moveUp(name);
-        return "redirect:/config";
-    }
-
-    @PostMapping("/server/{name}/move-down")
-    public String moveDown(@PathVariable String name) {
-        configService.moveDown(name);
-        return "redirect:/config";
+    @PostMapping("/servers/reorder")
+    @ResponseBody
+    public ResponseEntity<Void> reorder(@RequestBody List<String> names) {
+        configService.reorder(names);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/server/{name}/delete")

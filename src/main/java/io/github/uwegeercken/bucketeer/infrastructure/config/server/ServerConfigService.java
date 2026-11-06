@@ -45,17 +45,9 @@ public class ServerConfigService {
         log.info("Deleted server '{}' and reloaded client registry", name);
     }
 
-    public void moveUp(String name) {
-        move(name, -1);
-    }
-
-    public void moveDown(String name) {
-        move(name, 1);
-    }
-
-    private void move(String name, int delta) {
-        if (repository.move(name, delta)) {
-            // Only the order changed - reorder existing clients instead of rebuilding them.
+    /** Applies a complete new order (drag-and-drop); unknown names are ignored. */
+    public void reorder(List<String> orderedNames) {
+        if (repository.reorder(orderedNames)) {
             clientRegistry.reorder(repository.serverNames());
         }
     }

@@ -64,54 +64,6 @@ class ServerConfigRepositoryTest {
     }
 
     @Test
-    @DisplayName("moving a server up swaps it with its predecessor and persists")
-    void moveUp() {
-        assertThat(repository.move("c", -1)).isTrue();
-
-        assertThat(names()).containsExactly("a", "c", "b");
-    }
-
-    @Test
-    @DisplayName("moving a server down swaps it with its successor and persists")
-    void moveDown() {
-        assertThat(repository.move("a", 1)).isTrue();
-
-        assertThat(names()).containsExactly("b", "a", "c");
-    }
-
-    @Test
-    @DisplayName("moving beyond the list edges is a no-op")
-    void moveAtEdgesIsNoOp() throws Exception {
-        String before = Files.readString(configFile);
-
-        assertThat(repository.move("a", -1)).isFalse();
-        assertThat(repository.move("c", 1)).isFalse();
-
-        assertThat(Files.readString(configFile)).isEqualTo(before);
-    }
-
-    @Test
-    @DisplayName("moving an unknown server returns false")
-    void moveUnknown() {
-        assertThat(repository.move("nope", 1)).isFalse();
-        assertThat(names()).containsExactly("a", "b", "c");
-    }
-
-    @Test
-    @DisplayName("moving a server neither encrypts nor decrypts credentials")
-    void moveDoesNoCrypto() {
-        clearInvocations(encryptor);
-
-        repository.move("b", -1);
-        repository.serverNames();
-        List<String> names = names();   // served from the cache kept warm by move
-
-        assertThat(names).containsExactly("b", "a", "c");
-        verify(encryptor, never()).encrypt(anyString());
-        verify(encryptor, never()).decrypt(anyString());
-    }
-
-    @Test
     @DisplayName("loadAll decrypts once and serves repeat calls from the cache")
     void loadAllIsCached() {
         repository.saveAll(List.of(server("x")));
@@ -132,6 +84,51 @@ class ServerConfigRepositoryTest {
         Files.setLastModifiedTime(configFile, FileTime.fromMillis(System.currentTimeMillis() + 5_000));
 
         assertThat(names()).containsExactly("z", "y");
+    }
+
+    @Test
+    @DisplayName("reorder applies a complete new order and persists it")
+    void reorderPersists() {
+        assertThat(repository.reorder(List.of("c", "a", "b"))).isTrue();
+
+        assertThat(names()).containsExactly("c", "a", "b");
+        assertThat(new ServerConfigRepository(encryptor, configFile).serverNames())
+                .containsExactly("c", "a", "b");
+    }
+
+    @Test
+    @DisplayName("reorder ignores unknown names and keeps missing servers at the end")
+    void reorderPartialAndUnknown() {
+        assertThat(repository.reorder(List.of("nope", "c"))).isTrue();
+
+        assertThat(names()).containsExactly("c", "a", "b");
+    }
+
+    @Test
+    @DisplayName("reorder with the current order is a no-op")
+    void reorderUnchangedIsNoOp() throws Exception {
+        String before = Files.readString(configFile);
+
+        assertThat(repository.reorder(List.of("a", "b", "c"))).isFalse();
+
+        assertThat(Files.readString(configFile)).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("reorder neither encrypts nor decrypts credentials and keeps them intact")
+    void reorderDoesNoCrypto() {
+        clearInvocations(encryptor);
+
+        repository.reorder(List.of("b", "c", "a"));
+        List<ServerConfig> servers = repository.loadAll();   // served from the warm cache
+
+        assertThat(servers).extracting(ServerConfig::name).containsExactly("b", "c", "a");
+        assertThat(servers).allSatisfy(s -> {
+            assertThat(s.accessKey()).isEqualTo("ak");
+            assertThat(s.secretKey()).isEqualTo("sk");
+        });
+        verify(encryptor, never()).encrypt(anyString());
+        verify(encryptor, never()).decrypt(anyString());
     }
 
     @Test

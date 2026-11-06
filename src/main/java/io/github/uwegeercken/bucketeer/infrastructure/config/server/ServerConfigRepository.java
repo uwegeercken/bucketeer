@@ -14,8 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 @Repository
@@ -118,32 +119,41 @@ public class ServerConfigRepository {
     }
 
     /**
-     * Moves the named server by {@code delta} positions (-1 = up, +1 = down).
-     * Swaps the stored (still encrypted) entries directly - no decrypt/re-encrypt round trip.
+     * Re-orders the servers to match {@code orderedNames} (e.g. after a drag-and-drop in the UI).
+     * Unknown names are ignored; servers missing from the list keep their relative order at the
+     * end. Works on the stored (still encrypted) entries - no decrypt/re-encrypt round trip.
      *
-     * @return true if the order changed, false if the server is unknown or already at the edge
+     * @return true if the order changed
      */
-    public synchronized boolean move(String name, int delta) {
+    public synchronized boolean reorder(List<String> orderedNames) {
         if (!Files.exists(configPath)) return false;
         FileStamp before = currentStamp();
-        List<JsonServerEntry> entries = new ArrayList<>(readEntries());
-        int idx = indexOf(entries, JsonServerEntry::name, name);
-        int target = idx + delta;
-        if (idx < 0 || target < 0 || target >= entries.size()) return false;
-        Collections.swap(entries, idx, target);
-        writeEntries(entries);
+        List<JsonServerEntry> entries = readEntries();
+        List<JsonServerEntry> reordered = applyOrder(entries, JsonServerEntry::name, orderedNames);
+        if (reordered.equals(entries)) return false;
+        writeEntries(reordered);
 
-        // Keep the decrypted cache warm if it reflected the file we just rewrote.
         if (cache != null && before != null && before.equals(cacheStamp)
                 && cache.size() == entries.size()) {
-            List<ServerConfig> reordered = new ArrayList<>(cache);
-            Collections.swap(reordered, idx, target);
-            cache      = List.copyOf(reordered);
+            cache      = applyOrder(cache, ServerConfig::name, orderedNames);
             cacheStamp = currentStamp();
         } else {
             invalidateCache();
         }
         return true;
+    }
+
+    private static <T> List<T> applyOrder(List<T> items, Function<T, String> nameOf,
+                                          List<String> orderedNames) {
+        Map<String, T> byName = new LinkedHashMap<>();
+        items.forEach(item -> byName.put(nameOf.apply(item), item));
+        List<T> result = new ArrayList<>(items.size());
+        for (String name : orderedNames) {
+            T item = byName.remove(name);
+            if (item != null) result.add(item);
+        }
+        result.addAll(byName.values());
+        return List.copyOf(result);
     }
 
     /** Server names in file order, read without decrypting any credentials. */
