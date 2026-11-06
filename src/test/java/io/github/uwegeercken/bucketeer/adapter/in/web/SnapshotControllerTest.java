@@ -5,6 +5,7 @@ import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.infrastructure.config.SnapshotRepository;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import jakarta.servlet.http.HttpSession;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +18,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -26,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +38,11 @@ class SnapshotControllerTest {
     private final DuckDbRepository duckDb = mock(DuckDbRepository.class);
     private final BucketeerUseCase bucketeerUseCase = mock(BucketeerUseCase.class);
     private final BucketeerController bucketeerController = mock(BucketeerController.class);
+
+    @BeforeEach
+    void stubServers() {
+        when(bucketeerUseCase.serverNames()).thenReturn(List.of("Minio Local", "Minio Local 2"));
+    }
 
     private SnapshotController newController(SessionContext ctx) {
         return new SnapshotController(duckDb, snapshotRepo, ctx, bucketeerUseCase, bucketeerController);
@@ -90,6 +98,37 @@ class SnapshotControllerTest {
         controller.loadSnapshot("s1", mock(HttpSession.class));
 
         assertThat(ctx.getSelectedServer()).isEqualTo("Minio Local");
+    }
+
+    @Test
+    @DisplayName("loadSnapshot of a deleted server shows the data but keeps the selected server")
+    void loadSnapshotOfDeletedServerKeepsSelection(@TempDir Path tempDir) throws Exception {
+        stubSnapshotWithData("Deleted Server", tempDir);
+        SessionContext ctx = new SessionContext();
+        ctx.setSelectedServer("Minio Local");
+        SnapshotController controller = newController(ctx);
+
+        ResponseEntity<Map<String, Object>> resp = controller.loadSnapshot("s1", mock(HttpSession.class));
+
+        assertThat(resp.getBody()).containsEntry("ok", true);
+        assertThat(ctx.getSelectedServer()).isEqualTo("Minio Local");
+    }
+
+    @Test
+    @DisplayName("repeatSnapshot of a deleted server is rejected without touching session or S3")
+    void repeatSnapshotOfDeletedServerIsRejected() {
+        when(snapshotRepo.findById("s1")).thenReturn(snapshot("Deleted Server"));
+        SessionContext ctx = new SessionContext();
+        ctx.setSelectedServer("Minio Local");
+        SnapshotController controller = newController(ctx);
+
+        ResponseEntity<Map<String, Object>> resp = controller.repeatSnapshot("s1", mock(HttpSession.class));
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+        assertThat(String.valueOf(resp.getBody().get("error"))).contains("Deleted Server");
+        assertThat(ctx.getSelectedServer()).isEqualTo("Minio Local");
+        verify(duckDb, never()).clear();
+        verify(bucketeerUseCase, never()).fetchAllObjects(any(), any(), any(), anyLong(), any(), any());
     }
 
     @Test

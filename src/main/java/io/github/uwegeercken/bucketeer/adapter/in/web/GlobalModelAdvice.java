@@ -51,8 +51,10 @@ public class GlobalModelAdvice {
         }
         try {
             List<String> names = bucketeerUseCase.serverNames();
-            if (sessionContext.getSelectedServer() == null && !names.isEmpty()) {
-                sessionContext.setSelectedServer(names.getFirst());
+            String selected = names.isEmpty() ? null : sessionContext.getSelectedServer();
+            // Also falls back when the selected server was deleted in the meantime.
+            if (selected == null || !names.contains(selected)) {
+                sessionContext.setSelectedServer(names.isEmpty() ? null : names.getFirst());
             }
         } catch (Exception e) {
             log.error("Failed to determine selected server: {}", e.getMessage());

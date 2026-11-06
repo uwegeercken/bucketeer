@@ -516,6 +516,44 @@ class BucketeerControllerTest {
         }
     }
 
+    @Test
+    @DisplayName("selecting an unknown (e.g. deleted) server changes nothing")
+    void selectUnknownServerIsIgnored() {
+        when(useCase.serverNames()).thenReturn(List.of("a", "b"));
+        SessionContext ctx = new SessionContext();
+        ctx.setSelectedServer("a");
+        DuckDbRepository db = mock(DuckDbRepository.class);
+        BucketeerController c = new BucketeerController(useCase, storage, ctx, db,
+                new ThreadPoolTaskExecutor(), new RecordingActionHistory(), appSettings);
+        org.springframework.mock.web.MockHttpServletResponse response =
+                new org.springframework.mock.web.MockHttpServletResponse();
+
+        String view = c.selectServer("deleted", mock(HttpSession.class), response);
+
+        assertThat(view).isEqualTo("redirect:/");
+        assertThat(ctx.getSelectedServer()).isEqualTo("a");
+        assertThat(response.getHeader("Set-Cookie")).isNull();
+        verify(db, never()).clear();
+    }
+
+    @Test
+    @DisplayName("selecting a known server switches the session and writes the cookie")
+    void selectKnownServerSwitches() {
+        when(useCase.serverNames()).thenReturn(List.of("a", "b"));
+        SessionContext ctx = new SessionContext();
+        ctx.setSelectedServer("a");
+        BucketeerController c = new BucketeerController(useCase, storage, ctx,
+                mock(DuckDbRepository.class), new ThreadPoolTaskExecutor(),
+                new RecordingActionHistory(), appSettings);
+        org.springframework.mock.web.MockHttpServletResponse response =
+                new org.springframework.mock.web.MockHttpServletResponse();
+
+        c.selectServer("b", mock(HttpSession.class), response);
+
+        assertThat(ctx.getSelectedServer()).isEqualTo("b");
+        assertThat(response.getHeader("Set-Cookie")).contains("bucketeer_server=b");
+    }
+
     private static class RecordingDuckDb extends DuckDbRepository {
         final List<String> deletedKeys = new ArrayList<>();
         boolean failDelete;

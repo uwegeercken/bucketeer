@@ -40,4 +40,40 @@ class GlobalModelAdviceTest {
         assertThat(result).isEqualTo("first");
         assertThat(sessionContext.getSelectedServer()).isEqualTo("first");
     }
+
+    @Test
+    @DisplayName("selectedServer falls back to the first server when the selected one was deleted")
+    void fallsBackWhenSelectedServerWasDeleted() {
+        when(useCase.serverNames()).thenReturn(List.of("first", "second"));
+        SessionContext sessionContext = new SessionContext();
+        sessionContext.setSelectedServer("deleted");
+        GlobalModelAdvice advice = new GlobalModelAdvice(useCase, sessionContext, null, null);
+
+        String result = advice.selectedServer(new MockHttpServletRequest("GET", "/"));
+
+        assertThat(result).isEqualTo("first");
+        assertThat(sessionContext.getSelectedServer()).isEqualTo("first");
+    }
+
+    @Test
+    @DisplayName("selectedServer is cleared when the last server was deleted")
+    void clearedWhenNoServersLeft() {
+        when(useCase.serverNames()).thenReturn(List.of());
+        SessionContext sessionContext = new SessionContext();
+        sessionContext.setSelectedServer("deleted");
+        GlobalModelAdvice advice = new GlobalModelAdvice(useCase, sessionContext, null, null);
+
+        assertThat(advice.selectedServer(new MockHttpServletRequest("GET", "/"))).isNull();
+    }
+
+    @Test
+    @DisplayName("selectedServer keeps a selected server that still exists")
+    void keepsExistingSelection() {
+        when(useCase.serverNames()).thenReturn(List.of("first", "second"));
+        SessionContext sessionContext = new SessionContext();
+        sessionContext.setSelectedServer("second");
+        GlobalModelAdvice advice = new GlobalModelAdvice(useCase, sessionContext, null, null);
+
+        assertThat(advice.selectedServer(new MockHttpServletRequest("GET", "/"))).isEqualTo("second");
+    }
 }

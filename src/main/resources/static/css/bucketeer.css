@@ -90,6 +90,12 @@ footer {
     color: #adb5bd;
 }
 
+/* favorite / history entry whose server no longer exists */
+.fav-dropdown-item.fav-stale .fav-label,
+.fav-dropdown-item.fav-stale .fav-icon {
+    opacity: 0.5;
+}
+
 .fav-dropdown-item .fav-label {
     flex: 1;
     min-width: 0;

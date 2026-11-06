@@ -130,8 +130,11 @@ public class SnapshotController {
             // effective server to the snapshot's server, so the shown scope (header,
             // bucket, prefix) always belongs to the server the data actually comes from.
             // Done after a successful load, so a failed snapshot never changes the server.
+            // A snapshot of a server that was deleted meanwhile is still shown (the data is
+            // local), but must not make the deleted server the selected one.
             String server = meta.serverName();
-            if (server != null && !server.isBlank() && !server.equals(sessionContext.getSelectedServer())) {
+            if (server != null && !server.isBlank() && !server.equals(sessionContext.getSelectedServer())
+                    && bucketeerUseCase.serverNames().contains(server)) {
                 sessionContext.setSelectedServer(server);
             }
 
@@ -165,6 +168,10 @@ public class SnapshotController {
         String bucket = meta.bucket();
         if (server == null || server.isBlank() || bucket == null || bucket.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Snapshot is missing server or bucket"));
+        }
+        if (!bucketeerUseCase.serverNames().contains(server)) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "Server '" + server + "' no longer exists - the snapshot cannot be repeated"));
         }
 
         sessionContext.setSelectedServer(server);

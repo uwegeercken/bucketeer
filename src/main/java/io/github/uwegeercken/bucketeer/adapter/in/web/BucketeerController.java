@@ -215,6 +215,10 @@ public class BucketeerController {
     @PostMapping("/session/server")
     public String selectServer(@RequestParam String serverName, HttpSession session,
                                HttpServletResponse response) {
+        if (!bucketeerUseCase.serverNames().contains(serverName)) {
+            log.warn("Ignoring selection of unknown server '{}'", serverName);
+            return "redirect:/";
+        }
         sessionContext.setSelectedServer(serverName);
         SelectedServerInterceptor.writeCookie(response, serverName);
         duckDb.clear();
