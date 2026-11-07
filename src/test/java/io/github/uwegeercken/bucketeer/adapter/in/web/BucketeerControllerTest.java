@@ -190,8 +190,23 @@ class BucketeerControllerTest {
         Map<String, Object> resp = controller.previewObject("bucket", "data.parquet");
 
         assertThat(resp.get("ok")).isEqualTo(false);
-        assertThat(resp.get("error").toString()).contains("Only CSV, JSON and TXT");
+        assertThat(resp.get("error").toString()).contains("cannot be previewed");
         verify(storage, never()).downloadObject(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("isPreviewable accepts text, table and config formats case-insensitively and rejects binary ones")
+    void isPreviewableMatchesSupportedExtensions() {
+        assertThat(BucketeerController.isPreviewable("dir/a.TSV")).isTrue();
+        assertThat(BucketeerController.isPreviewable("x.ndjson")).isTrue();
+        assertThat(BucketeerController.isPreviewable("x.jsonl")).isTrue();
+        assertThat(BucketeerController.isPreviewable("conf/c.yml")).isTrue();
+        assertThat(BucketeerController.isPreviewable("logs/d.log")).isTrue();
+        assertThat(BucketeerController.isPreviewable("e.parquet")).isFalse();
+        assertThat(BucketeerController.isPreviewable("f.json.gz")).isFalse();
+        assertThat(BucketeerController.isPreviewable("noext")).isFalse();
+        assertThat(BucketeerController.isPreviewable("dir.csv/noext")).isFalse();
+        assertThat(BucketeerController.isPreviewable("trailingdot.")).isFalse();
     }
 
     @Test

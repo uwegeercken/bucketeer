@@ -1604,6 +1604,16 @@
             previewRestore:  /*[[#{modal.preview.restore}]]*/ 'Restore'
         };
 
+        // Extensions the preview dialog supports. Keep in sync with BucketeerController.PREVIEW_EXTENSIONS.
+        const PREVIEW_EXTS = ['csv', 'tsv', 'json', 'jsonl', 'ndjson', 'txt', 'log', 'md', 'xml', 'yaml', 'yml',
+            'properties', 'ini', 'conf', 'toml', 'sql', 'html', 'htm'];
+        function previewExt(key) {
+            const dot = key.lastIndexOf('.');
+            if (dot < 0 || dot === key.length - 1 || key.indexOf('/', dot) >= 0) return null;
+            const ext = key.substring(dot + 1).toLowerCase();
+            return PREVIEW_EXTS.includes(ext) ? ext : null;
+        }
+
         // ---- Preview modal maximize / restore ----------------------------------
         function previewSetMax(on) {
             const modal = document.getElementById('previewModal');
@@ -1657,12 +1667,7 @@
                 document.getElementById('ctxDownload').href = getDownloadUrl(bucket, key);
                 const previewBtn = document.getElementById('ctxPreview');
                 if (previewBtn) {
-                    const lowerKey = key.toLowerCase();
-                    if (lowerKey.endsWith('.csv') || lowerKey.endsWith('.json') || lowerKey.endsWith('.txt')) {
-                        previewBtn.style.display = 'block';
-                    } else {
-                        previewBtn.style.display = 'none';
-                    }
+                    previewBtn.style.display = previewExt(key) ? 'block' : 'none';
                 }
                 resetCopyLabel();
                 window.BucketeerContextMenu.open(menu, x, y);
@@ -1793,8 +1798,8 @@
                     loadingEl.style.display = 'none';
                     contentEl.style.display = 'block';
 
-                    const lowerKey = key.toLowerCase();
-                    if (lowerKey.endsWith('.json')) {
+                    const ext = previewExt(key);
+                    if (ext === 'json') {
                         try {
                             const parsed = JSON.parse(content);
                             jsonEl.textContent = JSON.stringify(parsed, null, 2);
@@ -1802,10 +1807,26 @@
                             jsonEl.textContent = content;
                         }
                         jsonWrapEl.style.display = 'block';
-                    } else if (lowerKey.endsWith('.csv')) {
+                    } else if (ext === 'jsonl' || ext === 'ndjson') {
+                        const lines = content.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim() !== '');
+                        const shown = lines.slice(0, 1000).map(l => {
+                            try {
+                                return JSON.stringify(JSON.parse(l), null, 2);
+                            } catch (e) {
+                                return l;
+                            }
+                        });
+                        let text = shown.join('\n\n');
+                        if (lines.length > 1000) {
+                            text += '\n\n… Showing first 1000 rows of ' + lines.length + ' rows';
+                        }
+                        jsonEl.textContent = text;
+                        jsonWrapEl.style.display = 'block';
+                    } else if (ext === 'csv' || ext === 'tsv') {
                         const lines = content.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim() !== '');
                         if (lines.length > 0) {
-                            const delimiter = lines[0].includes(';') && !lines[0].includes(',') ? ';' : ',';
+                            const delimiter = ext === 'tsv' ? '\t'
+                                : (lines[0].includes(';') && !lines[0].includes(',') ? ';' : ',');
                             const headers = lines[0].split(delimiter).map(h => h.replace(/^"|"$/g, ''));
                             let html = '<thead><tr>' + headers.map(h => '<th>' + menuEscHtml(h) + '</th>').join('') + '</tr></thead><tbody>';
                             for (let i = 1; i < Math.min(lines.length, 1000); i++) {
@@ -1825,9 +1846,6 @@
                             jsonEl.textContent = content;
                             jsonWrapEl.style.display = 'block';
                         }
-                    } else if (lowerKey.endsWith('.txt')) {
-                        jsonEl.textContent = content;
-                        jsonWrapEl.style.display = 'block';
                     } else {
                         jsonEl.textContent = content;
                         jsonWrapEl.style.display = 'block';

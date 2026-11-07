@@ -42,6 +42,19 @@ public class BucketeerController {
     /** Largest object (in bytes) the preview dialog loads; larger objects are rejected. */
     static final int PREVIEW_MAX_BYTES = 20 * 1024 * 1024;
 
+    /** File extensions (lower case, without dot) the preview dialog can show. Keep in sync with PREVIEW_EXTS in layout.html. */
+    static final java.util.Set<String> PREVIEW_EXTENSIONS = java.util.Set.of(
+            "csv", "tsv", "json", "jsonl", "ndjson", "txt", "log", "md", "xml", "yaml", "yml",
+            "properties", "ini", "conf", "toml", "sql", "html", "htm");
+
+    /** True if the key's extension (case-insensitive) is one the preview dialog supports. */
+    static boolean isPreviewable(String key) {
+        if (key == null) return false;
+        int dot = key.lastIndexOf('.');
+        if (dot < 0 || dot == key.length() - 1 || key.indexOf('/', dot) >= 0) return false;
+        return PREVIEW_EXTENSIONS.contains(key.substring(dot + 1).toLowerCase(java.util.Locale.ROOT));
+    }
+
     private final BucketeerUseCase bucketeerUseCase;
     private final S3StoragePort s3StoragePort;
     private final SessionContext sessionContext;
@@ -621,9 +634,8 @@ public class BucketeerController {
         if (!StringUtils.hasText(bucket) || !StringUtils.hasText(key)) {
             return Map.of("ok", false, "error", "Bucket and key are required");
         }
-        String lowerKey = key.toLowerCase();
-        if (!lowerKey.endsWith(".csv") && !lowerKey.endsWith(".json") && !lowerKey.endsWith(".txt")) {
-            return Map.of("ok", false, "error", "Only CSV, JSON and TXT files can be previewed");
+        if (!isPreviewable(key)) {
+            return Map.of("ok", false, "error", "This file type cannot be previewed");
         }
         String server = resolveServer(null);
         try (InputStream in = s3StoragePort.downloadObject(server, bucket, key)) {
