@@ -189,7 +189,7 @@
         <!-- Result count -->
         <div id="resultCount" style="display:none;" class="mb-2">
             <span class="text-muted small" id="resultCountText"></span>
-            <i class="bi bi-info-circle text-muted small ms-1" role="img"
+            <i class="bi bi-info-circle text-muted small ms-1" role="img" tabindex="0"
                id="resultsInfoIcon" style="display:none; cursor:pointer;"
                data-bs-toggle="popover" data-bs-trigger="hover"
                data-bs-placement="right" data-bs-html="true"></i>
@@ -1101,20 +1101,34 @@
     }
 
     function buildResultsInfoHtml(data) {
+        const section = (title, body) =>
+            '<div class="ri-section"><div class="ri-title">' + escHtml(title) + '</div>' + body + '</div>';
+        const range = (min, max) =>
+            '<div class="ri-range">'
+            + '<span class="ri-mark">↓</span><span>' + escHtml(min) + '</span>'
+            + '<span class="ri-mark">↑</span><span>' + escHtml(max) + '</span>'
+            + '</div>';
         const parts = [];
         if (data.minDate && data.maxDate)
-            parts.push(labelInfoDateRange + ': ' + formatBucketDateTime(data.minDate) + ' / ' + formatBucketDateTime(data.maxDate));
+            parts.push(section(labelInfoDateRange,
+                range(formatBucketDateTime(data.minDate), formatBucketDateTime(data.maxDate))));
         if (data.minSizeBytes || data.maxSizeBytes)
-            parts.push(labelInfoSizeRange + ': ' + formatSizeReadable(data.minSizeBytes) + ' / ' + formatSizeReadable(data.maxSizeBytes));
+            parts.push(section(labelInfoSizeRange,
+                range(formatSizeReadable(data.minSizeBytes), formatSizeReadable(data.maxSizeBytes))));
         if (data.fileTypes && data.fileTypes.length > 0) {
-            const top5 = data.fileTypes.slice(0, 5);
-            const rest = data.fileTypes.slice(5);
-            const sum = rest.reduce((a, b) => a + b.count, 0);
-            const items = top5.map(ft => ft.ext.charAt(0).toUpperCase() + ft.ext.slice(1) + ':' + formatCountAbbreviated(ft.count));
-            if (sum > 0) items.push(labelInfoOther + ':' + formatCountAbbreviated(sum));
-            parts.push(labelInfoFileTypes + ': ' + items.join(', '));
+            const top5 = data.fileTypes.slice(0, 5).map(ft => ({ label: '.' + ft.ext, count: ft.count }));
+            const sum = data.fileTypes.slice(5).reduce((a, b) => a + b.count, 0);
+            if (sum > 0) top5.push({ label: labelInfoOther, count: sum });
+            const total = data.fileTypes.reduce((a, b) => a + b.count, 0) || 1;
+            const rows = top5.map(t => {
+                const pct = (t.count / total) * 100;
+                return '<span class="ri-ext">' + escHtml(t.label) + '</span>'
+                    + '<span class="ri-bar" title="' + pct.toFixed(1) + ' %"><span style="width:' + pct.toFixed(1) + '%"></span></span>'
+                    + '<span class="ri-count">' + escHtml(formatCountAbbreviated(t.count)) + '</span>';
+            }).join('');
+            parts.push(section(labelInfoFileTypes, '<div class="ri-types">' + rows + '</div>'));
         }
-        return parts.join('<br/>') || 'Keine Daten';
+        return parts.join('') || '–';
     }
 
     function clearFormSessionState() {
@@ -1442,7 +1456,11 @@
             infoIcon.style.display = '';
             const existing = bootstrap.Popover.getInstance(infoIcon);
             if (existing) existing.dispose();
-            new bootstrap.Popover(infoIcon, { trigger: 'hover', placement: 'right', html: true, content: buildResultsInfoHtml(data) });
+            new bootstrap.Popover(infoIcon, {
+                trigger: 'hover focus', placement: 'right', html: true,
+                customClass: 'results-info-popover', content: buildResultsInfoHtml(data),
+                sanitize: false   // content is built from escHtml()-escaped values; bar widths need style=""
+            });
         } else {
             infoIcon.style.display = 'none';
         }
