@@ -17,3 +17,4 @@ hs_err_pid*
 replay_pid*
 /CLAUDE.md
 /.claude/skills/bump/SKILL.md
+/.claude/launch.json
