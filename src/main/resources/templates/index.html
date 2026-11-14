@@ -439,13 +439,11 @@
         updateBucketComboTooltip();
     }
 
-    // Tooltip mit dem vollen Bucket-Namen nur, wenn der Name im Feld tatsaechlich
-    // abgeschnitten ist - ist er vollstaendig lesbar, bleibt es ohne Tooltip.
+    // Tooltip (Hover) mit dem vollen Bucket-Namen, sobald ein Bucket gesetzt ist.
     function updateBucketComboTooltip() {
         const input = document.getElementById('bucketComboInput');
         if (!input) return;
-        input.title = (input.value && input.scrollWidth > input.clientWidth + 1)
-            ? input.value : '';
+        input.title = input.value || '';
     }
 
     // Beim Neuladen (z. B. Refresh waehrend der Eingabe) den Suchtext nicht
@@ -465,7 +463,7 @@
     }
 
     function bucketItemHtml(value, label) {
-        return '<div class="fav-dropdown-item" data-bucket="' + escHtml(value) + '">'
+        return '<div class="fav-dropdown-item" data-bucket="' + escHtml(value) + '" title="' + escHtml(label) + '">'
             + '<i class="bi bi-archive fav-icon hist"></i>'
             + '<span class="fav-label">' + escHtml(label) + '</span></div>';
     }
