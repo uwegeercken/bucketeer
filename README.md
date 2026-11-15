@@ -30,7 +30,7 @@ Using duckdb at it's core and providing access to the data though the user inter
 
 ```bash
 mvn package
-java -jar target/bucketeer-0.9.8.jar
+java -jar target/bucketeer-1.0.0.jar
 ```
 
 Open [http://localhost:8444](http://localhost:8444).

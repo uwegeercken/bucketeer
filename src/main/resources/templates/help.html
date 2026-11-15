@@ -35,6 +35,20 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>1.0.0 <small class="text-muted">2026-11-15</small></h6>
+                    <ul>
+                        <li><strong>Prefix scan in more places</strong>: the &ldquo;Scan bucket&rdquo; dialog is now also available in the <strong>Upload</strong> and <strong>Move</strong> dialogs (including batch moves from the selection) &mdash; browse the prefixes of the target bucket and take one over as target prefix; it works for a server other than the currently selected one, and opens at the folder already entered</li>
+                        <li><strong>Action history: undo and show</strong>: <em>Moved</em> entries can be undone &mdash; the object is moved back to its exact original key (also in the bucket root) on the server of the entry, an object already present at the original location is never overwritten, and the undo itself is recorded; <em>Moved</em> and <em>Uploaded</em> entries can be shown, which runs a query for exactly that key on the main page (switching the server if needed)</li>
+                        <li><strong>Size unit</strong>: new display setting to show sizes in KB, MB or GB &mdash; applies to the size filters, the size column of the results and the key check, and the size filters stored in the selection; filter values entered before a unit change keep their meaning. Stored in the browser</li>
+                        <li><strong>S3 servers: drag and drop</strong>: the order of the S3 servers on the configuration page is now changed by drag and drop</li>
+                        <li><strong>Removed S3 servers</strong>: a removed server is no longer kept as the selected server; the selection falls back to the first server, and snapshots of a removed server can still be opened without selecting it</li>
+                        <li><strong>Results info</strong>: date and size ranges are shown as min / max rows, file types as a list with counts and share bars</li>
+                        <li><strong>Display</strong>: the bucket field always shows the full bucket name as a tooltip, also in the bucket dropdown; the settings dialog groups size unit and timezone under <em>Display</em>; clearer labels &ldquo;Target prefix&rdquo; / &ldquo;or prefix from history&rdquo; in the Upload and Move dialogs; the snapshot menu entry is now &ldquo;Export snapshot (CSV)&rdquo;</li>
+                        <li><strong>Updates</strong>: AWS SDK 2.59.1</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>0.9.8 <small class="text-muted">2026-11-05</small></h6>
                     <ul>
                         <li><strong>Object preview</strong>: preview dialog with text search and maximize / restore. CSV and TSV are shown as a table, JSON pretty-printed, JSONL / NDJSON pretty-printed line by line; TXT, LOG, MD, XML, YAML, PROPERTIES, INI, CONF, TOML, SQL and HTML are shown as plain text</li>
