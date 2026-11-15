@@ -271,6 +271,17 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script th:inline="javascript">
     const currentServer  = /*[[${selectedServer}]]*/ '';
+
+    // "Anzeigen" aus dem Aktionsverlauf fuer einen anderen Server: nach dem Serverwechsel
+    // (Redirect auf '/') die vorgemerkte Suche nach genau diesem Schluessel ausfuehren.
+    (function() {
+        let pending = null;
+        try {
+            pending = sessionStorage.getItem('bkt_pending_search');
+            sessionStorage.removeItem('bkt_pending_search');
+        } catch (e) {}
+        if (pending && pending.startsWith('/?search=true')) location.replace(pending);
+    })();
     const currentBucket  = /*[[${bucket}]]*/ '';
     const queryStarted   = /*[[${queryStarted}]]*/ false;
     const labelNoFav     = /*[[#{msg.noFavorites}]]*/ 'No favorites yet.';

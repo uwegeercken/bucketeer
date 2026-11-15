@@ -43,6 +43,7 @@
                     <th th:text="#{history.bucket}">Bucket</th>
                     <th th:text="#{history.source}">Source</th>
                     <th th:text="#{history.target}">Target</th>
+                    <th style="width:80px;" th:text="#{history.actions}">Actions</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -56,9 +57,47 @@
                     <td class="small" th:text="${row.bucket}"></td>
                     <td class="small font-monospace text-break" th:text="${row.sourceKey}"></td>
                     <td class="small font-monospace text-break" th:text="${row.targetKey}"></td>
+                    <td class="text-nowrap"
+                        th:attr="data-status=${row.status},data-server=${row.server},data-bucket=${row.bucket},data-source=${row.sourceKey},data-target=${row.targetKey}">
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-icon history-show-btn"
+                                th:if="${row.status == 'moved' or row.status == 'uploaded'}"
+                                th:title="#{history.show}" th:aria-label="#{history.show}">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-icon history-undo-btn"
+                                th:if="${row.status == 'moved'}"
+                                th:title="#{history.undo}" th:aria-label="#{history.undo}">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </td>
                 </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Undo Move Modal -->
+    <div class="modal fade" id="undoMoveModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" th:text="#{history.undo}">Undo move</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="small mb-2" th:text="#{history.undo.confirm}">Move the object back to its original location?</div>
+                    <div class="small text-muted" id="undoMoveInfo"></div>
+                    <div class="small font-monospace text-break"><span class="text-muted" th:text="#{history.undo.from}">From</span>: <span id="undoMoveFrom"></span></div>
+                    <div class="small font-monospace text-break"><span class="text-muted" th:text="#{history.undo.to}">To</span>: <span id="undoMoveTo"></span></div>
+                    <div id="undoMoveError" class="alert alert-danger py-1 px-2 mt-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                    <div id="undoMoveResult" class="alert py-1 px-2 mt-2 mb-0" style="display:none; font-size:0.82rem;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.cancel}">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-primary" id="undoMoveConfirmBtn" th:text="#{history.undo}">Undo move</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -85,7 +124,116 @@
 <footer th:replace="~{layout :: footer}"></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
+<script th:inline="javascript">
+    const historyLabels = {
+        undoDone:    /*[[#{history.undo.done}]]*/ 'Object moved back.',
+        undoSkipped: /*[[#{history.undo.skipped}]]*/ 'An object already exists at the original location - nothing was moved.',
+        opError:     /*[[#{msg.opError}]]*/ 'Operation failed:'
+    };
+
+    // --- Anzeigen: Query fuer genau diesen Schluessel auf der Hauptseite ---
+    function splitKey(key) {
+        const idx = key.lastIndexOf('/');
+        return {
+            // '{' im Ordner wuerde als Template interpretiert - als Literal escapen
+            prefix: (idx >= 0 ? key.substring(0, idx + 1) : '').replace(/\{/g, '\\{'),
+            name: idx >= 0 ? key.substring(idx + 1) : key
+        };
+    }
+
+    function historySearchUrl(bucket, key) {
+        const parts = splitKey(key);
+        const params = new URLSearchParams({ search: 'true', bucket: bucket, prefix: parts.prefix, key: parts.name });
+        return '/?' + params.toString();
+    }
+
+    // Die Hauptseite stellt Bucket/Praefix/Schluessel aus der sessionStorage wieder her -
+    // vorab auf die gesuchten Werte setzen, sonst zeigt das Formular die letzte Suche.
+    function storeSearchFormState(server, bucket, key) {
+        const parts = splitKey(key);
+        try {
+            sessionStorage.setItem('bkt_server', server || '');
+            sessionStorage.setItem('bkt_bucket', bucket);
+            sessionStorage.setItem('bkt_prefix', parts.prefix);
+            sessionStorage.setItem('bkt_key', parts.name);
+        } catch (e) {}
+    }
+
+    function showHistoryObject(cell) {
+        const d = cell.dataset;
+        const key = d.status === 'moved' ? d.target : d.source;
+        const url = historySearchUrl(d.bucket, key);
+        storeSearchFormState(d.server, d.bucket, key);
+        const current = document.getElementById('headerServerSelect')?.value || '';
+        if (!d.server || d.server === current) {
+            location.href = url;
+            return;
+        }
+        // Anderer Server: erst umschalten, die Hauptseite fuehrt die Suche danach aus.
+        sessionStorage.setItem('bkt_pending_search', url);
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/session/server';
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'serverName'; inp.value = d.server;
+        form.appendChild(inp);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    // --- Rueckgaengig: Objekt vom Ziel an den Ursprung zurueckverschieben ---
+    let undoRequest = null;
+
+    function openUndoModal(cell) {
+        const d = cell.dataset;
+        undoRequest = { server: d.server, bucket: d.bucket, sourceKey: d.source, targetKey: d.target };
+        document.getElementById('undoMoveInfo').textContent = d.server + ' / ' + d.bucket;
+        document.getElementById('undoMoveFrom').textContent = d.target;
+        document.getElementById('undoMoveTo').textContent = d.source;
+        document.getElementById('undoMoveError').style.display = 'none';
+        document.getElementById('undoMoveResult').style.display = 'none';
+        document.getElementById('undoMoveConfirmBtn').disabled = false;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('undoMoveModal')).show();
+    }
+
+    async function confirmUndo() {
+        if (!undoRequest) return;
+        const btn = document.getElementById('undoMoveConfirmBtn');
+        const errEl = document.getElementById('undoMoveError');
+        const resultEl = document.getElementById('undoMoveResult');
+        btn.disabled = true;
+        errEl.style.display = 'none';
+        try {
+            const res = await fetch('/api/history/undo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(undoRequest)
+            });
+            const data = await res.json();
+            if (!data.ok) {
+                errEl.textContent = historyLabels.opError + ' ' + (data.error || ('HTTP ' + res.status));
+                errEl.style.display = 'block';
+                return;
+            }
+            resultEl.className = 'alert py-1 px-2 mt-2 mb-0 ' + (data.skipped ? 'alert-warning' : 'alert-success');
+            resultEl.textContent = data.skipped ? historyLabels.undoSkipped : historyLabels.undoDone;
+            resultEl.style.display = 'block';
+            // Neue Verlaufszeile (das Zurueckverschieben selbst) anzeigen
+            setTimeout(() => location.reload(), 1200);
+        } catch (e) {
+            errEl.textContent = historyLabels.opError + ' ' + e.message;
+            errEl.style.display = 'block';
+        }
+    }
+
+    document.addEventListener('click', e => {
+        const showBtn = e.target.closest('.history-show-btn');
+        if (showBtn) { showHistoryObject(showBtn.closest('td')); return; }
+        const undoBtn = e.target.closest('.history-undo-btn');
+        if (undoBtn) openUndoModal(undoBtn.closest('td'));
+    });
+    document.getElementById('undoMoveConfirmBtn').addEventListener('click', confirmUndo);
+
     function openClearHistoryModal() {
         new bootstrap.Modal(document.getElementById('clearHistoryModal')).show();
     }
