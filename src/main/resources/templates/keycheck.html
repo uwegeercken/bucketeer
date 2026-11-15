@@ -337,7 +337,7 @@
         let html = '<table class="table table-sm table-bordered mb-1"><thead class="table-secondary"><tr>'
             + '<th>' + escHtml(labelKeycheckStatus) + '</th>'
             + '<th>' + escHtml(labelKeycheckName) + '</th>'
-            + '<th class="text-end">' + escHtml(labelKeycheckSize) + '</th>'
+            + '<th class="text-end">' + escHtml(BucketeerSize.label(labelKeycheckSize)) + '</th>'
             + '<th>' + escHtml(labelKeycheckLastModified) + '</th>'
             + '<th>' + escHtml(labelKeycheckEtag) + '</th>'
             + '<th style="width:44px"></th>'
@@ -350,7 +350,7 @@
                 : r.exists
                     ? '<i class="bi bi-check-circle-fill text-success"></i>'
                     : '<i class="bi bi-x-circle-fill text-danger"></i>';
-            const sizeKb = r.sizeBytes != null ? (r.sizeBytes / 1024).toFixed(2) : '';
+            const sizeKb = r.sizeBytes != null ? BucketeerSize.format(r.sizeBytes) : '';
             const menuCell = (r.exists && !r.error)
                 ? '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon row-menu-btn" title="' + escHtml(labelRowMenu) + '" aria-label="' + escHtml(labelRowMenu) + '" data-bucket="' + escHtml(currentBucket) + '" data-key="' + escHtml(r.key) + '"><i class="bi bi-three-dots" aria-hidden="true"></i></button>'
                 : '';

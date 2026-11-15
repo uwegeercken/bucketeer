@@ -34,6 +34,48 @@
                 return '';
             }
         }
+        // Groesseneinheit fuer Groessenfilter und -anzeige (Browser-Einstellung 'sizeUnit').
+        // Das Backend arbeitet weiter in KB (minSizeKb/maxSizeKb) bzw. Bytes - umgerechnet
+        // wird nur hier. Liest live aus localStorage, damit ein Wechsel sofort greift.
+        window.BucketeerSize = (function() {
+            var FACTOR_KB = { KB: 1, MB: 1024, GB: 1024 * 1024 };
+            function unit() {
+                try {
+                    var u = JSON.parse(localStorage.getItem('bucketeer_settings') || '{}').sizeUnit;
+                    return FACTOR_KB[u] ? u : 'KB';
+                } catch (e) { return 'KB'; }
+            }
+            // Eingabe in der gewaehlten Einheit -> KB-Wert fuer die API ('' = kein Filter).
+            function toKb(value) {
+                if (value === '' || value === null || value === undefined) return '';
+                var n = Number(value);
+                if (!isFinite(n)) return '';
+                return String(Math.round(n * FACTOR_KB[unit()] * 100) / 100);
+            }
+            // KB-Wert (z. B. gespeicherter Warenkorb-Filter) -> Wert in der gewaehlten Einheit.
+            function fromKb(kb) {
+                if (kb === '' || kb === null || kb === undefined) return '';
+                return String(Number(kb) / FACTOR_KB[unit()]);
+            }
+            // Bytes -> Zahl in der gewaehlten Einheit (ohne Einheit, 2 Nachkommastellen).
+            // Nicht-leere Objekte unter 0.01 (z. B. kleine Dateien in GB) als '< 0.01'.
+            function format(bytes) {
+                if (bytes === null || bytes === undefined || bytes === '') return '';
+                var n = Number(bytes) / 1024 / FACTOR_KB[unit()];
+                return (n > 0 && n < 0.01) ? '< 0.01' : n.toFixed(2);
+            }
+            function label(template) {
+                return String(template || '').replace('{0}', unit());
+            }
+            // Alle Elemente mit data-size-label (Text mit Platzhalter {0}) beschriften.
+            function applyLabels() {
+                document.querySelectorAll('[data-size-label]').forEach(function(el) {
+                    el.textContent = label(el.getAttribute('data-size-label'));
+                });
+            }
+            document.addEventListener('DOMContentLoaded', applyLabels);
+            return { unit: unit, toKb: toKb, fromKb: fromKb, format: format, label: label, applyLabels: applyLabels };
+        })();
         (function() {
             var saved = localStorage.getItem('bs-theme');
             if (saved === 'dark' || saved === 'light') {
@@ -384,6 +426,21 @@
                     </div>
 
                     <div class="settings-group">
+                        <div class="panel-title" th:text="#{settings.section.display}">Display</div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold small" for="sizeUnitSelect" th:text="#{settings.sizeUnit.label}">Size unit</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <select id="sizeUnitSelect" class="form-select form-select-sm" style="width: 100px;">
+                                    <option value="KB">KB</option>
+                                    <option value="MB">MB</option>
+                                    <option value="GB">GB</option>
+                                </select>
+                                <span class="text-muted small" th:text="#{settings.sizeUnit.hint}">Unit for the size filters and the size column (this browser).</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
                         <div class="panel-title" th:text="#{settings.section.timezone}">Timezone</div>
                         <div class="mb-0">
                             <label class="form-label fw-semibold small" th:text="#{settings.timeZone.label}">Timezone</label>
@@ -501,6 +558,7 @@
                 document.getElementById('filterHistoryMaxInput').value = settings.filterHistoryMax !== undefined ? settings.filterHistoryMax : DEFAULTS.filterHistoryMax;
                 document.getElementById('scanMaxPrefixesInput').value = settings.scanMaxPrefixes !== undefined ? settings.scanMaxPrefixes : DEFAULTS.scanMaxPrefixes;
                 document.getElementById('scanMaxDepthInput').value = settings.scanMaxDepth !== undefined ? settings.scanMaxDepth : DEFAULTS.scanMaxDepth;
+                document.getElementById('sizeUnitSelect').value = BucketeerSize.unit();
             }
 
             function duckdbQuackChecked() {
@@ -781,7 +839,14 @@
                 settings.filterHistoryMax = values.filterHistoryMaxInput;
                 settings.scanMaxPrefixes = values.scanMaxPrefixesInput;
                 settings.scanMaxDepth = values.scanMaxDepthInput;
+                var previousSizeUnit = BucketeerSize.unit();
+                settings.sizeUnit = document.getElementById('sizeUnitSelect').value || 'KB';
                 localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+                if (settings.sizeUnit !== previousSizeUnit) {
+                    BucketeerSize.applyLabels();
+                    document.dispatchEvent(new CustomEvent('bucketeer:sizeunit',
+                        { detail: { from: previousSizeUnit, to: settings.sizeUnit } }));
+                }
 
                 var collected = collectVariables();
                 var errSpan = document.getElementById('variablesSaveError');
@@ -842,6 +907,7 @@
                     el.value = DEFAULTS[key];
                     el.classList.remove('is-invalid');
                 });
+                document.getElementById('sizeUnitSelect').value = 'KB';
                 var tzSelect = document.getElementById('timeZoneSelect');
                 if (tzSelect.options.length > 0) tzSelect.value = tzSelect.options[0].value;
                 var duckdbQuackResetEl = document.getElementById('duckdbQuackEnabled');

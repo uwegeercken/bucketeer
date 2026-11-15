@@ -164,14 +164,16 @@
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-semibold" th:text="#{label.filterSizeMin}">Size min (KB)</label>
+                    <label class="form-label small fw-semibold" th:text="#{label.filterSizeMin('KB')}"
+                           th:attr="data-size-label=#{label.filterSizeMin}">Size min (KB)</label>
                     <input type="number" id="filterSizeMin" class="form-control form-control-sm"
-                           min="0" oninput="applyFilter()"/>
+                           min="0" step="any" oninput="applyFilter()"/>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-semibold" th:text="#{label.filterSizeMax}">Size max (KB)</label>
+                    <label class="form-label small fw-semibold" th:text="#{label.filterSizeMax('KB')}"
+                           th:attr="data-size-label=#{label.filterSizeMax}">Size max (KB)</label>
                     <input type="number" id="filterSizeMax" class="form-control form-control-sm"
-                           min="0" oninput="applyFilter()"/>
+                           min="0" step="any" oninput="applyFilter()"/>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold" th:text="#{label.filterDateFrom}">Date from</label>
@@ -210,7 +212,7 @@
                     <span th:text="#{label.objectName}">Name</span> <i class="bi bi-arrow-down-up small text-muted"></i>
                 </th>
                 <th class="text-end" style="width:110px;cursor:pointer;" onclick="toggleSort('size_bytes')" id="th-size_bytes">
-                    <span th:text="#{label.size}">Size (KB)</span> <i class="bi bi-arrow-down-up small text-muted"></i>
+                    <span th:text="#{label.size('KB')}" th:attr="data-size-label=#{label.size}">Size (KB)</span> <i class="bi bi-arrow-down-up small text-muted"></i>
                 </th>
                 <th style="width:210px;cursor:pointer;" onclick="toggleSort('last_modified')" id="th-last_modified">
                     <span th:text="#{label.lastModified}">Last Modified</span> <i class="bi bi-arrow-down-up small text-muted"></i>
@@ -536,6 +538,22 @@
             }
         });
     }
+
+    // Einheitenwechsel im Settings-Dialog: eingetragene Groessenfilter umrechnen (gleiche
+    // Bedeutung, neue Einheit) und die Ergebnisliste in der neuen Einheit neu laden.
+    document.addEventListener('bucketeer:sizeunit', e => {
+        const factor = { KB: 1, MB: 1024, GB: 1024 * 1024 };
+        const ratio = factor[e.detail.from] / factor[e.detail.to];
+        ['filterSizeMin', 'filterSizeMax'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input && input.value !== '') {
+                // Faktoren sind Zweierpotenzen - die Umrechnung ist exakt, daher nicht runden
+                // (sonst verschiebt ein Hin- und Herwechseln den Filterwert).
+                input.value = String(Number(input.value) * ratio);
+            }
+        });
+        if (document.getElementById('resultsBody')) loadResults();
+    });
 
     // --- Favorites & History ---
 
@@ -1135,8 +1153,8 @@
         const gen = ++loadGen;
         const params = new URLSearchParams({ page: currentPage, pageSize: PAGE_SIZE, sortBy: sortBy, sortDir: sortDir });
         const keyFilter = document.getElementById('filterKey')?.value    || '';
-        const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
-        const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
+        const minSizeKb = BucketeerSize.toKb(document.getElementById('filterSizeMin')?.value || '');
+        const maxSizeKb = BucketeerSize.toKb(document.getElementById('filterSizeMax')?.value || '');
         const dateFrom  = document.getElementById('filterDateFrom')?.value || '';
         const dateTo    = document.getElementById('filterDateTo')?.value   || '';
         if (keyFilter)  params.append('keyFilter',  keyFilter);
@@ -1178,7 +1196,7 @@
             + ' data-lastmodified="' + escHtml(row.lastModified) + '"'
             + ' onchange="updateAddSelectedBtn()"/></td>'
             + '<td class="text-break font-monospace small">' + escHtml(row.key) + '</td>'
-            + '<td class="text-end small">' + escHtml(row.sizeKb) + '</td>'
+            + '<td class="text-end small">' + escHtml(BucketeerSize.format(row.sizeBytes)) + '</td>'
             + '<td class="small">' + escHtml(formatBucketDateTime(row.lastModified)) + '</td>'
             + '<td class="text-center">'
             + '<button type="button" class="btn btn-sm btn-outline-secondary btn-icon row-menu-btn" title="' + escHtml(labelRowMenu) + '" aria-label="' + escHtml(labelRowMenu) + '" data-bucket="' + escHtml(row.bucket || currentBucket) + '" data-key="' + escHtml(row.key) + '"><i class="bi bi-three-dots" aria-hidden="true"></i></button>'
@@ -1374,8 +1392,8 @@
                 key:        document.getElementById('keyInput')?.value || ''
             });
             const keyFilter = document.getElementById('filterKey')?.value || '';
-            const minSizeKb = document.getElementById('filterSizeMin')?.value || '';
-            const maxSizeKb = document.getElementById('filterSizeMax')?.value || '';
+            const minSizeKb = BucketeerSize.toKb(document.getElementById('filterSizeMin')?.value || '');
+            const maxSizeKb = BucketeerSize.toKb(document.getElementById('filterSizeMax')?.value || '');
             const dateFrom  = document.getElementById('filterDateFrom')?.value || '';
             const dateTo    = document.getElementById('filterDateTo')?.value || '';
             if (keyFilter) params.append('keyFilter', keyFilter);

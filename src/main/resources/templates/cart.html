@@ -184,8 +184,8 @@
     function renderUsedFilters(item) {
         const parts = [];
         if (item.keyFilter)         parts.push(escHtml(labelFilterKey) + ': ' + escHtml(item.keyFilter));
-        if (item.minSizeKb != null) parts.push(escHtml(labelFilterSizeMin) + ': ' + escHtml(String(item.minSizeKb)));
-        if (item.maxSizeKb != null) parts.push(escHtml(labelFilterSizeMax) + ': ' + escHtml(String(item.maxSizeKb)));
+        if (item.minSizeKb != null) parts.push(escHtml(BucketeerSize.label(labelFilterSizeMin)) + ': ' + escHtml(BucketeerSize.fromKb(item.minSizeKb)));
+        if (item.maxSizeKb != null) parts.push(escHtml(BucketeerSize.label(labelFilterSizeMax)) + ': ' + escHtml(BucketeerSize.fromKb(item.maxSizeKb)));
         if (item.dateFrom)          parts.push(escHtml(labelFilterDateFrom) + ': ' + escHtml(item.dateFrom));
         if (item.dateTo)            parts.push(escHtml(labelFilterDateTo) + ': ' + escHtml(item.dateTo));
         return parts.length ? parts.join(' \u00b7 ') : '\u2013';
