@@ -1244,11 +1244,18 @@
                     <div id="moveModalInfo" class="font-monospace small fw-semibold mb-1"></div>
                     <div id="moveModalCount" class="text-muted small mb-2"></div>
                     <div class="mb-2">
-                        <label class="form-label small fw-semibold" for="moveModalToPrefix" th:text="#{cart.batch.toPrefix}">To prefix</label>
-                        <input type="text" id="moveModalToPrefix" class="form-control form-control-sm font-monospace"/>
+                        <label class="form-label small fw-semibold" for="moveModalToPrefix" th:text="#{cart.batch.toPrefix}">Target prefix</label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="text" id="moveModalToPrefix" class="form-control form-control-sm font-monospace flex-grow-1"/>
+                            <button type="button" id="moveModalScanBtn"
+                                    class="btn btn-sm btn-outline-secondary btn-icon flex-shrink-0"
+                                    th:title="#{scan.choosePrefix}" th:aria-label="#{scan.choosePrefix}">
+                                <i class="bi bi-folder2-open"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label small" for="moveModalPrefixSelect" th:text="#{cart.batch.choosePrefix}">Or choose a common prefix</label>
+                        <label class="form-label small" for="moveModalPrefixSelect" th:text="#{cart.batch.choosePrefix}">or prefix from history</label>
                         <select id="moveModalPrefixSelect" class="form-select form-select-sm font-monospace"
                                 onchange="if(this.value) document.getElementById('moveModalToPrefix').value = this.value;">
                             <option value=""></option>
@@ -1330,6 +1337,8 @@
                 if (cfg.title) {
                     document.getElementById('moveModalLabel').textContent = cfg.title;
                 }
+                const scanBtn = document.getElementById('moveModalScanBtn');
+                if (scanBtn) scanBtn.style.display = window.PrefixScan ? '' : 'none';
                 const btn = document.getElementById('moveModalConfirmBtn');
                 btn.disabled = !sameGroup;
                 const errEl = document.getElementById('moveModalError');
@@ -1421,7 +1430,21 @@
                 }, 400);
             }
 
+            // Zielpraefix per Scan waehlen - im Server/Bucket der (ersten) Quellobjekte.
+            function openScan() {
+                if (!config || !window.PrefixScan) return;
+                const input = document.getElementById('moveModalToPrefix');
+                PrefixScan.open({
+                    server: config.items[0].serverName,
+                    bucket: config.items[0].bucket,
+                    startPrefix: input.value,
+                    onSelect: prefix => { input.value = prefix; input.focus(); }
+                });
+            }
+
             document.addEventListener('DOMContentLoaded', () => {
+                const scanBtn = document.getElementById('moveModalScanBtn');
+                if (scanBtn) scanBtn.addEventListener('click', openScan);
                 const btn = document.getElementById('moveModalConfirmBtn');
                 if (btn) btn.addEventListener('click', confirm);
                 const input = document.getElementById('moveModalToPrefix');
@@ -2178,6 +2201,339 @@
 </th:block>
 
 <!-- Upload modal fragment -->
+<!-- Praefix-Scan-Dialog (wiederverwendbar): PrefixScan.open({ server, bucket, startPrefix, onSelect }) -->
+<th:block th:fragment="scanModal">
+    <div class="modal fade" id="scanModal" tabindex="-1" aria-labelledby="scanModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg scan-modal">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="scanModalLabel">
+                        <i class="bi bi-folder2-open me-1"></i><span th:text="#{scan.scanBucket}">Scan bucket</span>
+                    </h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"
+                            aria-label="Close" th:aria-label="#{btn.close}"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex align-items-center gap-2 mb-2 scan-toolbar">
+                        <span class="badge bg-secondary font-monospace" id="scanBucketBadge">--</span>
+                        <span class="text-muted small font-monospace flex-grow-1" id="scanPath"
+                              style="display:none;"></span>
+                        <button type="button" id="scanUpBtn" class="btn btn-sm btn-outline-secondary btn-icon"
+                                th:title="#{scan.up}">
+                            <i class="bi bi-arrow-up-short"></i>
+                        </button>
+                    </div>
+                    <div class="scan-current-prefix d-flex align-items-center gap-2 mb-2"
+                         id="scanCurrentPrefixRow" style="display:none;">
+                        <span class="text-muted small flex-shrink-0" th:text="#{scan.currentPrefix}">Current prefix</span>
+                        <code class="font-monospace small text-body flex-grow-1 text-truncate" id="scanCurrentPrefix"></code>
+                        <button type="button" id="scanCopyPrefixBtn"
+                                class="btn btn-sm btn-outline-secondary btn-icon flex-shrink-0"
+                                th:title="#{scan.usePrefix}" th:aria-label="#{scan.usePrefix}">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                    </div>
+                    <div class="scan-filter d-flex align-items-center gap-2 mb-2" id="scanFilterRow">
+                        <div class="position-relative flex-grow-1">
+                            <i class="bi bi-filter text-muted position-absolute start-0 top-50 translate-middle-y ms-2"></i>
+                            <input type="text" id="scanFilterInput"
+                                   class="form-control form-control-sm ps-5"
+                                   th:placeholder="#{scan.filter}"/>
+                        </div>
+                        <button type="button" id="scanFilterClearBtn"
+                                class="btn btn-sm btn-outline-secondary btn-icon flex-shrink-0"
+                                th:title="#{scan.clearFilter}" th:aria-label="#{scan.clearFilter}"
+                                style="display:none;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <span class="text-muted small" id="scanStatus"></span>
+                    <div id="scanList" class="mt-1"></div>
+                    <button type="button" id="scanMoreBtn"
+                            class="btn btn-sm btn-outline-secondary"
+                            th:text="#{scan.loadMore}" style="display:none;">Load more</button>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" th:text="#{btn.close}">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        window.PrefixScan = (function() {
+            const labels = {
+                selectBucket: /*[[#{scan.selectBucket}]]*/ 'Select a bucket first',
+                scanning:     /*[[#{scan.scanning}]]*/ 'Scanning...',
+                noFilter:     /*[[#{scan.noFilterMatch}]]*/ 'No matches',
+                noPrefixes:   /*[[#{scan.noPrefixes}]]*/ 'No prefixes found',
+                usePrefix:    /*[[#{scan.usePrefix}]]*/ 'Use prefix'
+            };
+
+            // Ein Scan-Aufruf: Server/Bucket des Aufrufers plus Callback fuer den gewaehlten Praefix.
+            let ctx = { server: '', bucket: '', onSelect: null };
+            const state = { path: '', token: '', listing: [], pathCounts: [], filter: '', hasMore: false };
+
+            const el = id => document.getElementById(id);
+            const esc = s => String(s).replace(/[&<>"']/g,
+                c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+            // Live aus localStorage lesen, damit eine Aenderung im Settings-Dialog sofort greift.
+            function maxPrefixes() {
+                try {
+                    const s = JSON.parse(localStorage.getItem('bucketeer_settings') || '{}');
+                    const v = s.scanMaxPrefixes;
+                    return v !== undefined && v >= 0 && v <= 5000 ? v : 200;
+                } catch (e) { return 200; }
+            }
+
+            function setStatus(text) {
+                const s = el('scanStatus');
+                if (s) s.textContent = text || '';
+            }
+
+            function reset() {
+                state.path = ''; state.token = ''; state.listing = [];
+                state.pathCounts = []; state.filter = ''; state.hasMore = false;
+                if (el('scanList')) el('scanList').innerHTML = '';
+                if (el('scanPath')) el('scanPath').style.display = 'none';
+                if (el('scanMoreBtn')) el('scanMoreBtn').style.display = 'none';
+                if (el('scanCurrentPrefixRow')) el('scanCurrentPrefixRow').style.display = 'none';
+                if (el('scanFilterInput')) el('scanFilterInput').value = '';
+                if (el('scanFilterClearBtn')) el('scanFilterClearBtn').style.display = 'none';
+                setStatus('');
+            }
+
+            function parent(path) {
+                const segs = (path || '').split('/').filter(Boolean);
+                segs.pop();
+                return segs.length ? segs.join('/') + '/' : '';
+            }
+
+            // Startpraefix auf einen Ordner-Praefix kuerzen (Teil nach dem letzten '/' entfaellt),
+            // Template-Ausdruecke ({...}, @{...}) koennen nicht gescannt werden.
+            function folderOf(prefix) {
+                const p = (prefix || '').trim().replace(/^\/+/, '');
+                if (!p || p.indexOf('{') >= 0) return '';
+                const i = p.lastIndexOf('/');
+                return i >= 0 ? p.substring(0, i + 1) : '';
+            }
+
+            function params(path) {
+                const q = new URLSearchParams();
+                if (ctx.server) q.set('serverName', ctx.server);
+                q.set('bucket', ctx.bucket);
+                if (path) q.set('prefix', path);
+                q.set('maxPrefixes', maxPrefixes());
+                return q;
+            }
+
+            function breadcrumb(path, pathCounts) {
+                const pathEl = el('scanPath');
+                if (!pathEl) return;
+                pathEl.style.display = 'inline';
+                pathEl.innerHTML = '';
+                const addSegment = (text, target, title, count) => {
+                    const seg = document.createElement('span');
+                    seg.style.cursor = 'pointer';
+                    seg.style.whiteSpace = 'nowrap';
+                    seg.className = 'border-end border-secondary pe-2 me-2';
+                    seg.title = title || text;
+                    seg.innerHTML = esc(text) + (count ? ' <span class="scan-path-count">(' + esc(count) + ')</span>' : '');
+                    seg.addEventListener('click', () => level(target));
+                    pathEl.appendChild(seg);
+                };
+                addSegment('/', '', '/', '');
+                let agg = '';
+                (path || '').split('/').filter(Boolean).forEach((s, i) => {
+                    agg += s + '/';
+                    addSegment(s, agg, '/' + agg, pathCounts ? pathCounts[i] : '');
+                });
+            }
+
+            function level(path) {
+                if (!ctx.bucket) {
+                    setStatus(labels.selectBucket);
+                    return;
+                }
+                state.path = path;
+                state.token = '';
+                setStatus(labels.scanning);
+                fetch('/api/scan-prefixes?' + params(path).toString())
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.ok === false) {
+                            renderLevel(path, [], false, data.error || '');
+                            return;
+                        }
+                        state.token = data.nextToken || '';
+                        state.pathCounts = data.pathCounts || [];
+                        renderLevel(path, data.prefixes || [], !!data.hasMore, '');
+                    })
+                    .catch(() => renderLevel(path, [], false, 'Scan failed'));
+            }
+
+            function more() {
+                if (!state.token) return;
+                const q = params(state.path);
+                q.set('continuationToken', state.token);
+                fetch('/api/scan-prefixes?' + q.toString())
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.ok === false) { setStatus(data.error || 'Scan failed'); return; }
+                        state.token = data.nextToken || '';
+                        renderLevel(state.path, state.listing.concat(data.prefixes || []), !!data.hasMore, '');
+                    })
+                    .catch(() => setStatus('Scan failed'));
+            }
+
+            function adopt(prefix) {
+                const cb = ctx.onSelect;
+                const modalEl = el('scanModal');
+                if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                if (typeof cb === 'function') cb(prefix);
+            }
+
+            function filtered() {
+                const needle = state.filter.toLowerCase();
+                if (!needle) return state.listing;
+                return state.listing.filter(p => p.toLowerCase().includes(needle));
+            }
+
+            function applyFilter() {
+                state.filter = el('scanFilterInput') ? el('scanFilterInput').value.trim() : '';
+                if (el('scanFilterClearBtn')) el('scanFilterClearBtn').style.display = state.filter ? 'inline-block' : 'none';
+                renderList('');
+            }
+
+            function clearFilter() {
+                if (el('scanFilterInput')) el('scanFilterInput').value = '';
+                state.filter = '';
+                if (el('scanFilterClearBtn')) el('scanFilterClearBtn').style.display = 'none';
+                renderList('');
+            }
+
+            function renderList(errorText) {
+                const listEl = el('scanList');
+                const moreBtn = el('scanMoreBtn');
+                if (!listEl) return;
+                listEl.innerHTML = '';
+                const shown = filtered();
+                if (errorText || shown.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'text-muted small py-1';
+                    empty.textContent = errorText || (state.filter ? labels.noFilter : labels.noPrefixes);
+                    listEl.appendChild(empty);
+                } else {
+                    const list = document.createElement('ul');
+                    list.className = 'list-group list-group-flush font-monospace small mb-2';
+                    shown.forEach(p => {
+                        const item = document.createElement('li');
+                        item.className = 'list-group-item d-flex align-items-center justify-content-between gap-2 px-2 py-1';
+                        item.style.cursor = 'pointer';
+                        const label = document.createElement('span');
+                        label.innerHTML = '<i class="bi bi-folder me-1"></i>'
+                            + esc(state.path ? p.substring(state.path.length) : p);
+                        label.addEventListener('click', () => level(p));
+                        const use = document.createElement('button');
+                        use.type = 'button';
+                        use.className = 'btn btn-sm btn-outline-secondary btn-icon';
+                        use.title = labels.usePrefix;
+                        use.innerHTML = '<i class="bi bi-copy"></i>';
+                        use.addEventListener('click', () => adopt(p));
+                        item.appendChild(label);
+                        item.appendChild(use);
+                        list.appendChild(item);
+                    });
+                    listEl.appendChild(list);
+                }
+                if (moreBtn) moreBtn.style.display = (state.hasMore && !state.filter) ? 'inline-block' : 'none';
+            }
+
+            function renderLevel(path, prefixes, hasMore, errorText) {
+                state.listing = prefixes;
+                state.hasMore = hasMore;
+                breadcrumb(path, state.pathCounts);
+                setStatus(errorText);
+                const row = el('scanCurrentPrefixRow');
+                const label = el('scanCurrentPrefix');
+                if (row && label) {
+                    label.textContent = path || '';
+                    row.style.display = path ? 'flex' : 'none';
+                }
+                renderList(errorText);
+            }
+
+            function isOpen() {
+                const modalEl = el('scanModal');
+                return !!(modalEl && modalEl.classList.contains('show'));
+            }
+
+            // opts: { server, bucket, startPrefix, onSelect(prefix) }. server leer = Session-Server.
+            function open(opts) {
+                const modalEl = el('scanModal');
+                if (!modalEl) return;
+                ctx = {
+                    server: (opts && opts.server) || '',
+                    bucket: (opts && opts.bucket) || '',
+                    onSelect: opts && opts.onSelect
+                };
+                if (el('scanBucketBadge')) el('scanBucketBadge').textContent = ctx.bucket || '--';
+                reset();
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                level(folderOf(opts && opts.startPrefix));
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const modalEl = el('scanModal');
+                if (!modalEl) return;
+                el('scanUpBtn').addEventListener('click', () => level(parent(state.path)));
+                el('scanCopyPrefixBtn').addEventListener('click', () => adopt(state.path));
+                el('scanFilterInput').addEventListener('input', applyFilter);
+                el('scanFilterClearBtn').addEventListener('click', clearFilter);
+                el('scanMoreBtn').addEventListener('click', more);
+
+                // Gestapelt ueber einem offenen Dialog (Upload/Verschieben): Scan-Dialog und sein
+                // Backdrop ueber den darunterliegenden Dialog legen.
+                modalEl.addEventListener('show.bs.modal', () => {
+                    const stacked = document.querySelectorAll('.modal.show').length > 0;
+                    modalEl.style.zIndex = stacked ? '1065' : '';
+                    modalEl.dataset.stacked = stacked ? '1' : '';
+                });
+                // Bootstrap verwendet das Backdrop-Element des Dialogs wieder - der gesetzte
+                // z-index muss beim Schliessen zurueckgesetzt werden, sonst liegt das Backdrop
+                // beim naechsten (nicht gestapelten) Oeffnen ueber dem Dialog.
+                let stackedBackdrop = null;
+                modalEl.addEventListener('shown.bs.modal', () => {
+                    if (!modalEl.dataset.stacked) return;
+                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                    if (backdrops.length) {
+                        stackedBackdrop = backdrops[backdrops.length - 1];
+                        stackedBackdrop.style.zIndex = '1060';
+                    }
+                });
+                // Bootstrap entfernt beim Schliessen 'modal-open' vom body - bei einem noch
+                // offenen Dialog darunter wieder setzen, sonst scrollt die Seite statt des Dialogs.
+                modalEl.addEventListener('hidden.bs.modal', () => {
+                    if (modalEl.dataset.stacked && document.querySelector('.modal.show')) {
+                        document.body.classList.add('modal-open');
+                        document.body.style.overflow = 'hidden';
+                    }
+                    if (stackedBackdrop) {
+                        stackedBackdrop.style.zIndex = '';
+                        stackedBackdrop = null;
+                    }
+                    modalEl.style.zIndex = '';
+                    modalEl.dataset.stacked = '';
+                    ctx.onSelect = null;
+                });
+            });
+
+            return { open, isOpen, reset };
+        })();
+    </script>
+</th:block>
+
 <th:block th:fragment="uploadModal">
     <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -2203,10 +2559,19 @@
                         </div>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label small fw-semibold" for="uploadPrefixInput" th:text="#{upload.prefix}">Prefix</label>
-                        <input type="text" id="uploadPrefixInput" class="form-control form-control-sm font-monospace"
-                               placeholder="events/shard-00/"/>
-                        <select id="uploadPrefixSelect" class="form-select form-select-sm font-monospace mt-1"
+                        <label class="form-label small fw-semibold" for="uploadPrefixInput" th:text="#{upload.prefix}">Target prefix</label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="text" id="uploadPrefixInput" class="form-control form-control-sm font-monospace flex-grow-1"
+                                   placeholder="events/shard-00/"/>
+                            <button type="button" id="uploadScanBtn" disabled
+                                    class="btn btn-sm btn-outline-secondary btn-icon flex-shrink-0"
+                                    th:title="#{scan.choosePrefix}" th:aria-label="#{scan.choosePrefix}"
+                                    onclick="openUploadPrefixScan()">
+                                <i class="bi bi-folder2-open"></i>
+                            </button>
+                        </div>
+                        <label class="form-label small mt-2" for="uploadPrefixSelect" th:text="#{cart.batch.choosePrefix}">or prefix from history</label>
+                        <select id="uploadPrefixSelect" class="form-select form-select-sm font-monospace"
                                 onchange="if(this.value) document.getElementById('uploadPrefixInput').value = this.value;">
                             <option value="">--</option>
                         </select>
@@ -2276,7 +2641,7 @@
         async function loadUploadBuckets() {
             const server = document.getElementById('uploadServerSelect').value;
             const select = document.getElementById('uploadBucketSelect');
-            if (!server) { select.innerHTML = '<option value="">--</option>'; return; }
+            if (!server) { select.innerHTML = '<option value="">--</option>'; updateUploadScanBtn(); return; }
             try {
                 const res = await fetch('/api/buckets?serverName=' + encodeURIComponent(server));
                 const buckets = await res.json();
@@ -2284,9 +2649,31 @@
                     + buckets.map(b => '<option value="' + escHtml(b) + '">' + escHtml(b) + '</option>').join('');
                 if (select.value) loadUploadPrefixHistory();
             } catch { select.innerHTML = '<option value="">--</option>'; }
+            updateUploadScanBtn();
+        }
+
+        // Scan-Button nur aktiv, wenn Server und Bucket gewaehlt sind (und der Scan-Dialog
+        // auf der Seite eingebunden ist).
+        function updateUploadScanBtn() {
+            const btn = document.getElementById('uploadScanBtn');
+            if (!btn) return;
+            btn.disabled = !(window.PrefixScan
+                && document.getElementById('uploadServerSelect').value
+                && document.getElementById('uploadBucketSelect').value);
+        }
+
+        function openUploadPrefixScan() {
+            const input = document.getElementById('uploadPrefixInput');
+            PrefixScan.open({
+                server: document.getElementById('uploadServerSelect').value,
+                bucket: document.getElementById('uploadBucketSelect').value,
+                startPrefix: input.value,
+                onSelect: prefix => { input.value = prefix; }
+            });
         }
 
         function loadUploadPrefixHistory() {
+            updateUploadScanBtn();
             const server = document.getElementById('uploadServerSelect').value;
             const bucket = document.getElementById('uploadBucketSelect').value;
             const select = document.getElementById('uploadPrefixSelect');

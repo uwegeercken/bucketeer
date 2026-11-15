@@ -321,7 +321,7 @@ class BucketeerControllerTest {
         when(useCase.countPrefixes("server", "bucket", List.of("data/")))
                 .thenReturn(List.of("2"));
 
-        Map<String, Object> resp = controller.scanPrefixes("bucket", "data/", "25", "tok");
+        Map<String, Object> resp = controller.scanPrefixes(null, "bucket", "data/", "25", "tok");
 
         assertThat(resp.get("prefixes")).isEqualTo(List.of("data/2024/", "data/2025/"));
         assertThat(resp.get("pathCounts")).isEqualTo(List.of("2"));
@@ -335,7 +335,7 @@ class BucketeerControllerTest {
         when(useCase.scanPrefixes("server", "bucket", "", 0, null))
                 .thenReturn(new PrefixScan(List.of(), null, false));
 
-        Map<String, Object> resp = controller.scanPrefixes("bucket", "", null, "");
+        Map<String, Object> resp = controller.scanPrefixes(null, "bucket", "", null, "");
 
         assertThat(resp.get("prefixes")).isEqualTo(List.of());
         assertThat(resp.get("pathCounts")).isEqualTo(List.of());
@@ -344,9 +344,21 @@ class BucketeerControllerTest {
     }
 
     @Test
+    @DisplayName("scanPrefixes uses an explicitly passed server instead of the session server")
+    void scanPrefixesUsesExplicitServer() {
+        when(useCase.scanPrefixes("other", "bucket", "", 0, null))
+                .thenReturn(new PrefixScan(List.of("x/"), null, false));
+
+        Map<String, Object> resp = controller.scanPrefixes("other", "bucket", "", null, null);
+
+        assertThat(resp.get("prefixes")).isEqualTo(List.of("x/"));
+        verify(useCase).scanPrefixes("other", "bucket", "", 0, null);
+    }
+
+    @Test
     @DisplayName("scanPrefixes requires a bucket")
     void scanPrefixesRequiresBucket() {
-        Map<String, Object> resp = controller.scanPrefixes(null, "", null, null);
+        Map<String, Object> resp = controller.scanPrefixes(null, null, "", null, null);
 
         assertThat(resp.get("ok")).isEqualTo(false);
         assertThat(resp.get("error")).isEqualTo("Bucket is required");
@@ -361,7 +373,7 @@ class BucketeerControllerTest {
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong(),
                         org.mockito.ArgumentMatchers.any());
 
-        Map<String, Object> resp = controller.scanPrefixes("bucket", "a/b/c/d/e/f/g/h/i/j/k/", null, null);
+        Map<String, Object> resp = controller.scanPrefixes(null, "bucket", "a/b/c/d/e/f/g/h/i/j/k/", null, null);
 
         assertThat(resp.get("ok")).isEqualTo(false);
         assertThat(resp.get("error").toString()).contains("maximum of 10");

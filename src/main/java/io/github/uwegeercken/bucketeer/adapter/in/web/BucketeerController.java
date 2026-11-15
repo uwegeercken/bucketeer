@@ -478,6 +478,7 @@ public class BucketeerController {
     @GetMapping(value = "/api/scan-prefixes", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public Map<String, Object> scanPrefixes(
+            @RequestParam(required = false) String serverName,
             @RequestParam(required = false) String bucket,
             @RequestParam(required = false) String prefix,
             @RequestParam(required = false) String maxPrefixes,
@@ -485,7 +486,8 @@ public class BucketeerController {
         if (!StringUtils.hasText(bucket)) {
             return Map.of("ok", false, "error", "Bucket is required");
         }
-        String server = sessionContext.getSelectedServer();
+        // Upload- und Move-Dialog koennen einen anderen Server als den der Session scannen.
+        String server = StringUtils.hasText(serverName) ? serverName : sessionContext.getSelectedServer();
         if (server == null) {
             return Map.of("ok", false, "error", "No server selected");
         }
