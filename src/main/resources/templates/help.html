@@ -35,6 +35,16 @@
                 <div class="panel">
                     <div class="panel-title" th:text="#{help.releases.title}">Release History</div>
 
+                    <h6>1.1.0 <small class="text-muted">2026-11-20</small></h6>
+                    <ul>
+                        <li><strong>Faster ZIP downloads</strong>: the selection download and <code>/api/v1/download/prefix</code> fetch the objects in parallel while the ZIP is still written in the original order &mdash; the worker count is derived from <code>bucketeer.query.parallelism</code> (8 to 32), memory stays bounded (at most 1 MB buffered per object, larger objects are streamed through), a download aborted in the browser stops immediately, and a log line reports objects, duration and throughput. In a test with 8000 small objects and 50 ms latency the download took 56 s instead of 471 s</li>
+                        <li><strong>S3 connections</strong>: all S3 servers use a pooled HTTP client (Apache 5, 64 connections), also when certificate verification is switched off &mdash; parallel requests reuse their connections</li>
+                        <li><strong>Security</strong>: the container image starts Java with <code>-XX:-UseBASE64Intrinsics</code> as a mitigation for Java4Shell (CVE-2026-114938); rebuild the image with <code>--pull</code> to get a fixed JDK</li>
+                        <li><strong>Updates</strong>: AWS SDK 2.59.5, DuckDB 2.0.1.0 (DuckDB Quack: the <code>quack</code> extension must be installed for DuckDB 2.0.1 &mdash; <code>INSTALL quack;</code>)</li>
+                    </ul>
+
+                    <hr/>
+
                     <h6>1.0.0 <small class="text-muted">2026-11-15</small></h6>
                     <ul>
                         <li><strong>Prefix scan in more places</strong>: the &ldquo;Scan bucket&rdquo; dialog is now also available in the <strong>Upload</strong> and <strong>Move</strong> dialogs (including batch moves from the selection) &mdash; browse the prefixes of the target bucket and take one over as target prefix; it works for a server other than the currently selected one, and opens at the folder already entered</li>
