@@ -3,6 +3,7 @@ package io.github.uwegeercken.bucketeer.adapter.in.web;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
@@ -39,12 +39,14 @@ public class ApiV1Controller {
     private final BucketeerUseCase bucketeerUseCase;
     private final S3StoragePort s3StoragePort;
     private final BucketeerController bucketeerController;
+    private final AppSettings appSettings;
 
     public ApiV1Controller(BucketeerUseCase bucketeerUseCase, S3StoragePort s3StoragePort,
-                           BucketeerController bucketeerController) {
+                           BucketeerController bucketeerController, AppSettings appSettings) {
         this.bucketeerUseCase = bucketeerUseCase;
         this.s3StoragePort = s3StoragePort;
         this.bucketeerController = bucketeerController;
+        this.appSettings = appSettings;
     }
 
     @GetMapping(value = "/servers", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -212,12 +214,15 @@ public class ApiV1Controller {
         String filename = "bucketeer-download-" + LocalDateTime.now().format(TIMESTAMP) + ".zip";
         response.setContentType("application/zip");
         response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream());
+             ParallelZipWriter zipWriter = new ParallelZipWriter(s3StoragePort, zos,
+                     ParallelZipWriter.workerCount(appSettings.getQueryParallelism()))) {
             bucketeerUseCase.fetchAllObjects(server, bucket, target.s3Prefix(), Math.max(0, maxObjects),
                     page -> page.objects().stream()
                             .filter(obj -> !obj.key().endsWith("/"))
                             .filter(obj -> target.keyFilter() == null || obj.key().equals(target.keyFilter()))
-                            .forEach(obj -> writeZipEntry(zos, server, bucket, obj)));
+                            .forEach(obj -> zipWriter.submit(server, bucket, obj.key(), obj.key())));
+            zipWriter.finish();
         } catch (Exception e) {
             log.error("Failed to create prefix download for {}/{}: {}", server, bucket, e.getMessage());
             if (!response.isCommitted()) {
@@ -226,17 +231,6 @@ public class ApiV1Controller {
         }
     }
 
-    private void writeZipEntry(ZipOutputStream zos, String server, String bucket, S3Object obj) {
-        try {
-            zos.putNextEntry(new ZipEntry(obj.key()));
-            try (InputStream in = s3StoragePort.downloadObject(server, bucket, obj.key())) {
-                in.transferTo(zos);
-            }
-            zos.closeEntry();
-        } catch (Exception e) {
-            log.error("Failed to zip object {}/{}: {}", bucket, obj.key(), e.getMessage());
-        }
-    }
 
     private boolean serverExists(String server) {
         return bucketeerUseCase.serverNames().contains(server);

@@ -71,7 +71,14 @@
             <artifactId>netty-nio-client</artifactId>
             <version>${aws.sdk.version}</version>
         </dependency>
-        <!-- URL connection client - used for SSL certificate bypass -->
+        <!-- Apache 5 HTTP client - sync client of the app (pooled connections, also used for
+             the SSL certificate bypass); otherwise only a runtime dependency of s3 -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache5-client</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- URL connection client - used by the seed CLI mode (SeedRunner) -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>url-connection-client</artifactId>

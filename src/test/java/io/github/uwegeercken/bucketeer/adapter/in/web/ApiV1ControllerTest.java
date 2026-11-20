@@ -5,6 +5,7 @@ import io.github.uwegeercken.bucketeer.domain.model.PrefixScan;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ class ApiV1ControllerTest {
         useCase = mock(BucketeerUseCase.class);
         storage = mock(S3StoragePort.class);
         bucketeerController = mock(BucketeerController.class);
-        controller = new ApiV1Controller(useCase, storage, bucketeerController);
+        controller = new ApiV1Controller(useCase, storage, bucketeerController, mock(AppSettings.class));
         when(useCase.serverNames()).thenReturn(List.of("serverA", "serverB"));
     }
 

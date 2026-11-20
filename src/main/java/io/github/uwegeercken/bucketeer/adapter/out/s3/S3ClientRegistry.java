@@ -8,7 +8,7 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.retry.RetryPolicy;
-import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
+import software.amazon.awssdk.http.apache5.Apache5HttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
@@ -30,6 +30,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class S3ClientRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(S3ClientRegistry.class);
+
+    /**
+     * Connection pool size per server. Must stay above the parallel worker counts (listing and
+     * ZIP downloads use up to 32 threads) so parallel requests reuse pooled connections instead
+     * of opening a new TCP/TLS connection per request.
+     */
+    static final int MAX_CONNECTIONS = 64;
 
     private volatile Map<String, S3Client> clients = new LinkedHashMap<>();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
@@ -112,11 +119,13 @@ public class S3ClientRegistry {
         }
         builder.overrideConfiguration(overrideBuilder.build());
 
+        Apache5HttpClient.Builder httpClient = Apache5HttpClient.builder()
+                .maxConnections(MAX_CONNECTIONS);
         if (!server.verifyCertificate()) {
-            builder.httpClientBuilder(UrlConnectionHttpClient.builder()
-                    .tlsTrustManagersProvider(
-                            () -> new TrustManager[]{ new TrustAllTrustManager() }));
+            httpClient.tlsTrustManagersProvider(
+                    () -> new TrustManager[]{ new TrustAllTrustManager() });
         }
+        builder.httpClientBuilder(httpClient);
 
         return builder.build();
     }

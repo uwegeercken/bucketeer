@@ -4,6 +4,7 @@ import io.github.uwegeercken.bucketeer.domain.model.ActionEntry;
 import io.github.uwegeercken.bucketeer.domain.model.S3Object;
 import io.github.uwegeercken.bucketeer.domain.port.in.BucketeerUseCase;
 import io.github.uwegeercken.bucketeer.domain.port.out.S3StoragePort;
+import io.github.uwegeercken.bucketeer.infrastructure.config.AppSettings;
 import io.github.uwegeercken.bucketeer.infrastructure.config.TimeZoneProvider;
 import io.github.uwegeercken.bucketeer.infrastructure.db.DuckDbRepository;
 import io.github.uwegeercken.bucketeer.infrastructure.history.ActionHistory;
@@ -18,7 +19,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,7 +31,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @Controller
@@ -51,17 +50,19 @@ public class CartController {
     private final ActionHistory actionHistory;
     private final DuckDbRepository duckDb;
     private final TimeZoneProvider timeZoneProvider;
+    private final AppSettings appSettings;
     private final Map<String, BatchJob> batchJobs = new ConcurrentHashMap<>();
     private final ReentrantLock batchLock = new ReentrantLock();
 
     public CartController(S3StoragePort s3StoragePort, BucketeerUseCase bucketeerUseCase,
                           ActionHistory actionHistory, DuckDbRepository duckDb,
-                          TimeZoneProvider timeZoneProvider) {
+                          TimeZoneProvider timeZoneProvider, AppSettings appSettings) {
         this.s3StoragePort    = s3StoragePort;
         this.bucketeerUseCase = bucketeerUseCase;
         this.actionHistory    = actionHistory;
         this.duckDb           = duckDb;
         this.timeZoneProvider = timeZoneProvider;
+        this.appSettings      = appSettings;
     }
 
     /** In-memory progress state of a background batch job (delete-selected / move-selected). */
@@ -725,24 +726,31 @@ public class CartController {
         response.setContentType("application/zip");
         response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
 
-        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream());
+             ParallelZipWriter zipWriter = new ParallelZipWriter(s3StoragePort, zos,
+                     ParallelZipWriter.workerCount(appSettings.getQueryParallelism()))) {
             Map<String, Integer> nameCount = new HashMap<>();
             for (CartBatch batch : batches) {
                 if (!batch.isLiveQuery()) {
                     for (String key : batch.keys()) {
-                        writeZipEntry(zos, nameCount, batch.serverName(), batch.bucket(), key);
+                        zipWriter.submit(batch.serverName(), batch.bucket(), key, zipEntryName(nameCount, key));
                     }
                 } else {
-                    resolveQuery(batch, obj -> writeZipEntry(zos, nameCount, batch.serverName(), batch.bucket(), obj.key()));
+                    resolveQuery(batch, obj -> zipWriter.submit(batch.serverName(), batch.bucket(), obj.key(),
+                            zipEntryName(nameCount, obj.key())));
                 }
             }
+            zipWriter.finish();
         } catch (Exception e) {
             log.error("Failed to create zip download: {}", e.getMessage());
         }
     }
 
-    private void writeZipEntry(ZipOutputStream zos, Map<String, Integer> nameCount,
-                               String serverName, String bucket, String key) {
+    /**
+     * ZIP entry name for a key: the file name without its folder; repeated names get a
+     * {@code -N} suffix before the extension.
+     */
+    static String zipEntryName(Map<String, Integer> nameCount, String key) {
         String entryName = key;
         int slash = key.lastIndexOf('/');
         if (slash >= 0) {
@@ -757,15 +765,7 @@ public class CartController {
                 entryName = entryName + "-" + nameCount.get(entryName);
             }
         }
-        try {
-            zos.putNextEntry(new ZipEntry(entryName));
-            try (InputStream in = s3StoragePort.downloadObject(serverName, bucket, key)) {
-                in.transferTo(zos);
-            }
-            zos.closeEntry();
-        } catch (Exception e) {
-            log.error("Failed to zip object {}/{}: {}", bucket, key, e.getMessage());
-        }
+        return entryName;
     }
 
     public record CartItemRequest(
