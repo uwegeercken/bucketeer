@@ -41,6 +41,7 @@ Default port is 8444 — change it without recompiling with `--server.port=9000`
 
 The full documentation lives in the [GitHub Wiki](https://github.com/uwegeercken/bucketeer/wiki).
 
+- [Screenshots](https://github.com/uwegeercken/bucketeer/wiki/Screenshots) — a visual tour of the main views
 - [Getting Started](https://github.com/uwegeercken/bucketeer/wiki/Getting-Started) — run the app (jar, Docker/Podman), custom port, test data, encryption key
 - [Environment Variables](https://github.com/uwegeercken/bucketeer/wiki/Environment-Variables) — variables for the jar and the container image, with defaults and precedence
 - [Configuration](https://github.com/uwegeercken/bucketeer/wiki/Configuration) — application settings
